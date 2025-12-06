@@ -1,0 +1,54 @@
+Project Scope & Context Questions:
+1. What specific enterprise software/system will your attendance system integrate with?
+(Is it an existing HR system, custom company software, ERP system, or will you create your own backend? What APIs or integration methods does it currently support?)
+
+The system I am planning to integrate with is Navigo3, developed by Navigo Solutions s.r.o. a small company from Brno Czech Republic for which I work for. It's a smaller scale HR and project management software that has a fully documented API that I plan to integrate with. However I'd like for the finished product to be self-contained with a rest API for any external software to communicate with using custom built integrations .
+
+2. What is the physical environment and scale of your intended deployment?
+(Single office entrance, multiple rooms, expected number of users, indoor/outdoor placement, power availability?)
+
+In the proof of concept phase, let's work with a single entrance with two sensors to better detect the direction of traversal. In later stages, multiple entrances could be supported. The lighthouse sensors themselves should be ready for both indoor and outdoor use preferably with power over Ethernet with power backup and Wi-fi mode. 
+
+3. Which identification method(s) are you prioritizing and why?
+(RFID only, NFC only, PIN as backup, or multiple methods? What are the trade-offs you're considering?)
+
+I've only performed some research into RFid as I want the system to be with no user interaction at all. The id keychain needs to be detected within a 2-3 meter range through any bags or purses where it might be located on a person. The system is not yet meant to interact with any door systems or security gates and is meant to be only used for attendance logging for now.
+I am open to looking into more technologies but as far as I know, all the rest are very short range.
+
+Technical Implementation Questions:
+4. How do you envision the data flow from card scan to enterprise system?
+(Real-time push, periodic batch updates, local caching with sync, direct API calls, or through an intermediate database?)
+
+The moment I determine any log and the direction of traversal I would like to immediately register it with the remote software if available. If the system does not support log based attendance and instead needs a closed interval, I would notify the system only after the closing log for an interval has been detected. In case of unavailability I should log the event, and attempt to send the information at a later time, for example in the event of the next log.
+
+5. What should happen when the network connection is unavailable?
+(Store locally and sync later, deny access, fallback mode? How critical is offline functionality?)
+
+Store locally. Access is not the concern of the system. In the case of a loss of power, the lighthouses should have the ability to store individual raw scan attempts and upon the connection being re-established, they should relay the information to the server which should attempt to reconstruct the event log and determine the state of attendance for all effected users.
+
+6. What specific information needs to be captured and transmitted for each attendance event?
+(Just timestamp and ID, or additional data like temperature, photo, location, entry/exit direction?)
+
+The lighthouses should only concern themselves with a timestamp and id. They should be able to store the logs on device in case of communication failure and then attempt to relay them to the server on reconnect.
+
+Development Approach Questions:
+7. What is your current experience level with embedded systems, networking protocols, and web development?
+(This will help determine which implementation approaches are most feasible for you)
+
+I have some experience with embedded development, programming in C and C++ is not foreign to me. I do know my way around basic network protocols. Finally web development and API design are both areas that I am very experienced in.
+
+8. How are you planning to validate and test your system?
+(Unit testing, simulated environment, pilot deployment, performance metrics, security testing?)
+
+Simulated environment followed by a pilot testing at my companie's offices.
+
+Innovation & Differentiation Questions:
+9. What specific problem or limitation in existing attendance systems are you trying to solve?
+(Speed, security, cost, ease of integration, user experience, maintenance, or something else?)
+
+Cost, ease of integration and user experience. The system should be reliable, low maintenance and require zero to none user interaction.
+
+10. How do you plan to handle security and privacy, particularly regarding biometric/personal data?
+(Encryption methods, data retention policies, GDPR compliance, access controls, audit logs?)
+
+I don't plan to retain any biometric or personal data. The system itself should be able to only keep a unique id of each user with the option that only the remote software knows any user details.
