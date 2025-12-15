@@ -32,11 +32,9 @@
 #define LED2_PIN           GPIO_NUM_18     // GPIO18 - Output LED
 #define BUTTON1_PIN        GPIO_NUM_34     // GPIO34 - Input-only button
 #define BUTTON2_PIN        GPIO_NUM_35     // GPIO35 - Input-only button
-#define PIR_SENSOR_PIN     GPIO_NUM_2      // GPIO3 - PIR motion sensor
 
 #define DEBOUNCE_TIME_MS   20              // 20ms debounce window
 #define LONG_PRESS_TIME_MS 1000            // 1 second = long press
-#define PIR_DEBOUNCE_MS    100             // 100ms debounce for PIR
 
 // Bitmask for LED pins (GPIO5 and GPIO18)
 #define LED_PIN_MASK       ((1ULL << LED1_PIN) | (1ULL << LED2_PIN))
@@ -58,13 +56,6 @@ typedef struct {
 } button_state_t;
 
 static button_state_t button_states[2] = {0};  // Track state for each button
-
-typedef struct {
-    uint32_t last_change_time;     // Timestamp of last state change
-    uint8_t last_stable_state;     // Last debounced state (0 = no motion, 1 = motion)
-} pir_state_t;
-
-static pir_state_t pir_state = {0};
 
 // ============================================================================
 // ISR CONTEXT - Fast interrupt handler
@@ -165,40 +156,6 @@ static void process_buttons(void)
     }
 }
 
-/**
- * Process PIR sensor state with debouncing
- */
-static void process_pir(void)
-{
-    static uint32_t last_sample_time = 0;
-    uint32_t current_time = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
-    
-    // Sample PIR at regular intervals
-    if ((current_time - last_sample_time) < 10) {
-        return;
-    }
-    last_sample_time = current_time;
-    
-    uint32_t pir_level = gpio_get_level(PIR_SENSOR_PIN);
-    
-    // Debounce: check if state has been stable for debounce window
-    if ((current_time - pir_state.last_change_time) >= PIR_DEBOUNCE_MS) {
-        
-        // Detect motion detected (transition from 0 to 1)
-        if (pir_level == 1 && pir_state.last_stable_state == 0) {
-            ESP_LOGI(TAG, "PIR: Motion detected");
-            pir_state.last_change_time = current_time;
-        }
-        // Detect motion ended (transition from 1 to 0)
-        else if (pir_level == 0 && pir_state.last_stable_state == 1) {
-            ESP_LOGI(TAG, "PIR: Motion ended");
-            pir_state.last_change_time = current_time;
-        }
-        
-        pir_state.last_stable_state = pir_level;
-    }
-}
-
 // ============================================================================
 // GPIO CONFIGURATION
 // ============================================================================
@@ -264,21 +221,6 @@ static void gpio_init(void)
     ESP_LOGI(TAG, "Button pins configured: GPIO%d (BUTTON1), GPIO%d (BUTTON2)",
              BUTTON1_PIN, BUTTON2_PIN);
     ESP_LOGI(TAG, "NOTE: Requires external 10kΩ pull-up resistors to 3.3V on input pins");
-    
-    // ========== PIR SENSOR INPUT CONFIGURATION ==========
-    // PIR sensor on GPIO3 as input (typically already has internal pull-down/pullup)
-    
-    gpio_config_t pir_config = {
-        .pin_bit_mask = (1ULL << PIR_SENSOR_PIN),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,  // No interrupt, polled in main loop
-    };
-    
-    gpio_config(&pir_config);
-    
-    ESP_LOGI(TAG, "PIR sensor configured: GPIO%d", PIR_SENSOR_PIN);
 }
 
 // ============================================================================
@@ -293,9 +235,6 @@ static void app_main_task(void* pvParameters)
     while (1) {
         // Process button states (debounce and logic)
         process_buttons();
-        
-        // Process PIR sensor
-        process_pir();
         
         // Small delay to prevent CPU saturation
         vTaskDelay(pdMS_TO_TICKS(50));

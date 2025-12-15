@@ -1,0 +1,16 @@
+CompileFlags:
+  CompilationDatabase: /media/kuba/Games/Documents/VUT/bachelor/my_project/build/
+  Remove:
+    - "-mlongcalls"
+    - "-fno-malloc-dce"
+    - "-fzero-init-padding-bits=all"
+    - "-fno-tree-switch-conversion"
+    - "-fstrict-volatile-bitfields"
+    - "-fno-shrink-wrap"
+
+Diagnostics:
+  ClangTidy:
+    Remove:
+      - "clang-diagnostic-*"
+  UnusedIncludes: None
+  MissingIncludes: None
