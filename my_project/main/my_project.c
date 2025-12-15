@@ -1,19 +1,13 @@
 /**
- * ESP32 GPIO Button and LED Control with Debounced Interrupts
+ * ESP32 Attendance System with RFID Reader Integration
+ * 
+ * Combines GPIO button/LED control with UART-based Y300 UHF RFID reader
+ * for hands-free tag detection.
  * 
  * DATASHEET REFERENCES:
- * - ESP32 Series Datasheet v5.2, Section 4.8.1: General Purpose Input/Output Interface (GPIO)
- *   - 34 GPIO pins available (GPIO0-GPIO39, excluding certain restricted pins)
- *   - Pins have configurable pull-up/pull-down (~45 kΩ resistance per Table 5-3)
- *   - Level and edge trigger interrupt generation supported
- * - Section 2.3 IO Pins: Restrictions on GPIO usage (input-only pins: GPIO34-39)
- * - Section 4.4: General Purpose Timers for debounce timing
- * 
- * PIN MAPPING (Hornaxys Devboard):
- * - LED1: GPIO5  (VDD3P3_CPU domain per Table IO_MUX)
- * - LED2: GPIO18 (VDD3P3_CPU domain)
- * - BUTTON1: GPIO34 (input-only, RTC_GPIO4 - VDET_1 per Table 2-1)
- * - BUTTON2: GPIO35 (input-only, RTC_GPIO5 - VDET_2 per Table 2-1)
+ * - ESP32 Series Datasheet v5.2, Section 4.8.1: GPIO Interface
+ * - ESP32 Technical Reference Manual, Section 7.8: UART Controller
+ * - Y300/R300 Communication Interface Specification
  */
 
 #include <stdio.h>
@@ -21,8 +15,12 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "driver/gpio.h"
+#include "driver/uart.h"
 #include "esp_log.h"
+
+#include "uart_reader.h"
 
 // ============================================================================
 // CONFIGURATION
@@ -32,52 +30,38 @@
 #define LED2_PIN           GPIO_NUM_18     // GPIO18 - Output LED
 #define BUTTON1_PIN        GPIO_NUM_34     // GPIO34 - Input-only button
 #define BUTTON2_PIN        GPIO_NUM_35     // GPIO35 - Input-only button
-#define PIR_SENSOR_PIN     GPIO_NUM_2      // GPIO3 - PIR motion sensor
+#define PIR_SENSOR_PIN     GPIO_NUM_2      // GPIO2 - PIR motion sensor
 
 #define DEBOUNCE_TIME_MS   20              // 20ms debounce window
-#define LONG_PRESS_TIME_MS 1000            // 1 second = long press
 #define PIR_DEBOUNCE_MS    100             // 100ms debounce for PIR
 
-// Bitmask for LED pins (GPIO5 and GPIO18)
 #define LED_PIN_MASK       ((1ULL << LED1_PIN) | (1ULL << LED2_PIN))
-
-// Bitmask for button input pins (GPIO34, GPIO35)
-// Note: GPIO34-39 are input-only, have no internal pull-up/pull-down
 #define BUTTON_PIN_MASK    ((1ULL << BUTTON1_PIN) | (1ULL << BUTTON2_PIN))
 
-static const char* TAG = "GPIO_APP";
+static const char* TAG = "MAIN_APP";
 
 // ============================================================================
 // STATE TRACKING
 // ============================================================================
 
 typedef struct {
-    uint32_t last_interrupt_time;  // Timestamp of last interrupt (milliseconds)
-    uint8_t last_stable_state;     // Last debounced state (0 = released, 1 = pressed)
-    uint8_t press_count;           // Number of presses
+    uint32_t last_interrupt_time;
+    uint8_t last_stable_state;
+    uint8_t press_count;
 } button_state_t;
 
-static button_state_t button_states[2] = {0};  // Track state for each button
-
 typedef struct {
-    uint32_t last_change_time;     // Timestamp of last state change
-    uint8_t last_stable_state;     // Last debounced state (0 = no motion, 1 = motion)
+    uint32_t last_change_time;
+    uint8_t last_stable_state;
 } pir_state_t;
 
+static button_state_t button_states[2] = {0};
 static pir_state_t pir_state = {0};
 
 // ============================================================================
-// ISR CONTEXT - Fast interrupt handler
+// GPIO INTERRUPT HANDLERS
 // ============================================================================
 
-/**
- * GPIO Interrupt Handler
- * Called when GPIO34 or GPIO35 transitions (falling edge = button press)
- * 
- * DATASHEET REFERENCE:
- * - Section 4.8.1: "Edge-trigger or level-trigger to generate CPU interrupts"
- * - ISR should complete quickly; debouncing logic deferred to timer
- */
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     uint32_t gpio_num = (uint32_t) arg;
@@ -86,34 +70,22 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
     button_state_t* state = (gpio_num == BUTTON1_PIN) ? 
         &button_states[0] : &button_states[1];
     
-    // Ignore if still within debounce window
     if ((current_time - state->last_interrupt_time) < DEBOUNCE_TIME_MS) {
         return;
     }
     
-    // Store interrupt time for next debounce check
     state->last_interrupt_time = current_time;
 }
 
 // ============================================================================
-// DEBOUNCE AND LOGIC PROCESSING
+// BUTTON AND SENSOR PROCESSING
 // ============================================================================
 
-/**
- * Process button states with debouncing
- * Called periodically from main task to sample and filter button inputs
- * 
- * This uses a simple state machine approach:
- * 1. Read current GPIO level
- * 2. If stable for debounce window, register as new state
- * 3. Detect state transitions for press/release events
- */
 static void process_buttons(void)
 {
     static uint32_t last_sample_time = 0;
     uint32_t current_time = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
     
-    // Sample buttons at regular intervals (every 5ms between edge detection)
     if ((current_time - last_sample_time) < 5) {
         return;
     }
@@ -124,19 +96,16 @@ static void process_buttons(void)
         uint32_t button_level = gpio_get_level(BUTTON1_PIN);
         button_state_t* state = &button_states[0];
         
-        // Debounce: if state has been stable for debounce window
         if ((current_time - state->last_interrupt_time) >= DEBOUNCE_TIME_MS) {
             
-            // Detect press (transition from 1 to 0, since input-only pins read directly)
             if (button_level == 0 && state->last_stable_state == 1) {
                 state->press_count++;
                 ESP_LOGI(TAG, "BUTTON1 PRESSED (count: %d)", state->press_count);
-                gpio_set_level(LED1_PIN, 1);  // Turn on LED1
+                gpio_set_level(LED1_PIN, 1);
             }
-            // Detect release (transition from 0 to 1)
             else if (button_level == 1 && state->last_stable_state == 0) {
                 ESP_LOGI(TAG, "BUTTON1 RELEASED");
-                gpio_set_level(LED1_PIN, 0);  // Turn off LED1
+                gpio_set_level(LED1_PIN, 0);
             }
             
             state->last_stable_state = button_level;
@@ -153,11 +122,11 @@ static void process_buttons(void)
             if (button_level == 0 && state->last_stable_state == 1) {
                 state->press_count++;
                 ESP_LOGI(TAG, "BUTTON2 PRESSED (count: %d)", state->press_count);
-                gpio_set_level(LED2_PIN, 1);  // Turn on LED2
+                gpio_set_level(LED2_PIN, 1);
             }
             else if (button_level == 1 && state->last_stable_state == 0) {
                 ESP_LOGI(TAG, "BUTTON2 RELEASED");
-                gpio_set_level(LED2_PIN, 0);  // Turn off LED2
+                gpio_set_level(LED2_PIN, 0);
             }
             
             state->last_stable_state = button_level;
@@ -165,15 +134,11 @@ static void process_buttons(void)
     }
 }
 
-/**
- * Process PIR sensor state with debouncing
- */
 static void process_pir(void)
 {
     static uint32_t last_sample_time = 0;
     uint32_t current_time = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
     
-    // Sample PIR at regular intervals
     if ((current_time - last_sample_time) < 10) {
         return;
     }
@@ -181,15 +146,12 @@ static void process_pir(void)
     
     uint32_t pir_level = gpio_get_level(PIR_SENSOR_PIN);
     
-    // Debounce: check if state has been stable for debounce window
     if ((current_time - pir_state.last_change_time) >= PIR_DEBOUNCE_MS) {
         
-        // Detect motion detected (transition from 0 to 1)
         if (pir_level == 1 && pir_state.last_stable_state == 0) {
             ESP_LOGI(TAG, "PIR: Motion detected");
             pir_state.last_change_time = current_time;
         }
-        // Detect motion ended (transition from 1 to 0)
         else if (pir_level == 0 && pir_state.last_stable_state == 1) {
             ESP_LOGI(TAG, "PIR: Motion ended");
             pir_state.last_change_time = current_time;
@@ -200,85 +162,124 @@ static void process_pir(void)
 }
 
 // ============================================================================
-// GPIO CONFIGURATION
+// GPIO INITIALIZATION
 // ============================================================================
 
-/**
- * Initialize GPIO pins for LEDs and buttons
- * 
- * DATASHEET REFERENCES:
- * - Table 4-6 Peripheral Pin Configurations: GPIO5 and GPIO18 support I/O/T
- * - Table 2-1 Pin Overview: GPIO34/35 are input-only (no output driver)
- * - Section 2.3.1 Restrictions: "GPIO 34-39 are input-only pins"
- */
 static void gpio_init(void)
 {
     ESP_LOGI(TAG, "Initializing GPIO pins...");
     
-    // ========== LED OUTPUT CONFIGURATION ==========
-    // LED1 (GPIO5) and LED2 (GPIO18) as outputs
-    
+    // LED output configuration
     gpio_config_t led_config = {
         .pin_bit_mask = LED_PIN_MASK,
         .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,    // No pull-up needed for outputs
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,       // No interrupts for outputs
+        .intr_type = GPIO_INTR_DISABLE,
     };
     
     gpio_config(&led_config);
-    
-    // Initialize LED pins to OFF (low level)
     gpio_set_level(LED1_PIN, 0);
     gpio_set_level(LED2_PIN, 0);
     
     ESP_LOGI(TAG, "LED pins configured: GPIO%d (LED1), GPIO%d (LED2)",
              LED1_PIN, LED2_PIN);
     
-    // ========== BUTTON INPUT CONFIGURATION ==========
-    // BUTTON1 (GPIO34) and BUTTON2 (GPIO35) as inputs with interrupts
-    
-    // NOTE: GPIO34 and GPIO35 are input-only and do NOT have internal pull-up/pull-down
-    // See Datasheet Section 2.3.1 and Table 2-1
-    // External pull-up resistors (10k) should be connected to 3.3V
-    // When button pressed, pin goes LOW (GND)
-    
+    // Button input configuration
     gpio_config_t button_config = {
         .pin_bit_mask = BUTTON_PIN_MASK,
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,     // GPIO34/35 have no pull-up capability
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_ANYEDGE,        // Trigger on both rising and falling edges
+        .intr_type = GPIO_INTR_ANYEDGE,
     };
     
     gpio_config(&button_config);
-    
-    // Install ISR service for GPIO interrupts
-    gpio_install_isr_service(0);  // Flags: 0 = no special flags
-    
-    // Register ISR handlers
-    // When GPIO34 or GPIO35 transition, call gpio_isr_handler
+    gpio_install_isr_service(0);
     gpio_isr_handler_add(BUTTON1_PIN, gpio_isr_handler, (void*) BUTTON1_PIN);
     gpio_isr_handler_add(BUTTON2_PIN, gpio_isr_handler, (void*) BUTTON2_PIN);
     
     ESP_LOGI(TAG, "Button pins configured: GPIO%d (BUTTON1), GPIO%d (BUTTON2)",
              BUTTON1_PIN, BUTTON2_PIN);
-    ESP_LOGI(TAG, "NOTE: Requires external 10kΩ pull-up resistors to 3.3V on input pins");
     
-    // ========== PIR SENSOR INPUT CONFIGURATION ==========
-    // PIR sensor on GPIO3 as input (typically already has internal pull-down/pullup)
-    
+    // PIR sensor configuration
     gpio_config_t pir_config = {
         .pin_bit_mask = (1ULL << PIR_SENSOR_PIN),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,  // No interrupt, polled in main loop
+        .intr_type = GPIO_INTR_DISABLE,
     };
     
     gpio_config(&pir_config);
-    
     ESP_LOGI(TAG, "PIR sensor configured: GPIO%d", PIR_SENSOR_PIN);
+}
+
+// ============================================================================
+// RFID EVENT PROCESSING
+// ============================================================================
+
+/**
+ * Task to monitor RFID reader event queue
+ * 
+ * Processes tag detection events and handles integration with attendance
+ * system. Could trigger REST API calls to backend or local data logging.
+ */
+static void rfid_event_task(void* pvParameters)
+{
+    QueueHandle_t event_queue = uart_reader_get_event_queue();
+    
+    if (!event_queue) {
+        ESP_LOGE(TAG, "Failed to get RFID event queue");
+        vTaskDelete(NULL);
+        return;
+    }
+    
+    rfid_event_t event;
+    
+    ESP_LOGI(TAG, "RFID event task started");
+    
+    while (1) {
+        if (xQueueReceive(event_queue, &event, pdMS_TO_TICKS(1000))) {
+            switch (event.type) {
+                case RFID_EVENT_TAG_READ:
+                    ESP_LOGI(TAG, "Tag detected: EPC=%02X%02X%02X%02X... "
+                                  "(len=%d, antenna=%d, RSSI=%d)",
+                             event.tag_epc[0], event.tag_epc[1], 
+                             event.tag_epc[2], event.tag_epc[3],
+                             event.epc_length, event.antenna_port, event.rssi);
+                    
+                    // Flash LED to indicate tag detection
+                    gpio_set_level(LED1_PIN, 1);
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                    gpio_set_level(LED1_PIN, 0);
+                    
+                    // Here: POST tag data to backend, update database, etc.
+                    // Example: http_post_attendance_event(event.tag_epc, event.epc_length);
+                    break;
+                    
+                case RFID_EVENT_INVENTORY_COMPLETE:
+                    ESP_LOGI(TAG, "Inventory scan complete");
+                    break;
+                    
+                case RFID_EVENT_ERROR_FRAME:
+                    ESP_LOGW(TAG, "RFID: Frame format error");
+                    break;
+                    
+                case RFID_EVENT_ERROR_TIMEOUT:
+                    ESP_LOGW(TAG, "RFID: Response timeout");
+                    break;
+                    
+                case RFID_EVENT_COMM_ERROR:
+                    ESP_LOGE(TAG, "RFID: Communication error");
+                    break;
+                    
+                default:
+                    ESP_LOGW(TAG, "Unknown RFID event: %d", event.type);
+                    break;
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -287,17 +288,15 @@ static void gpio_init(void)
 
 static void app_main_task(void* pvParameters)
 {
-    ESP_LOGI(TAG, "Starting GPIO Button/LED application");
-    ESP_LOGI(TAG, "Press buttons to toggle LEDs");
+    ESP_LOGI(TAG, "Starting main application task");
     
     while (1) {
-        // Process button states (debounce and logic)
+        // Process GPIO inputs
         process_buttons();
-        
-        // Process PIR sensor
         process_pir();
         
         // Small delay to prevent CPU saturation
+        // FreeRTOS ref: vTaskDelay allows other tasks to run
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
@@ -308,14 +307,33 @@ static void app_main_task(void* pvParameters)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "\n\n====== ESP32 GPIO Button/LED Demo ======");
+    ESP_LOGI(TAG, "\n\n====== ESP32 Attendance System with RFID ======");
     ESP_LOGI(TAG, "Compiled: %s %s", __DATE__, __TIME__);
     
-    // Initialize GPIO pins
+    // Initialize GPIO (buttons, LEDs, PIR)
     gpio_init();
     
-    // Create main task
+    // Initialize UART-based RFID reader
+    // This creates background tasks for UART handling and event processing
+    esp_err_t ret = uart_reader_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize UART reader: %s", esp_err_to_name(ret));
+        return;
+    }
+    
+    // Start RFID reader in real-time inventory mode (continuous tag detection)
+    // This sends 0x89 command to reader for streaming tag data
+    ret = uart_reader_start_inventory(true);  // true = real-time mode
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start inventory: %s", esp_err_to_name(ret));
+    }
+    
+    // Create main GPIO processing task
     xTaskCreate(app_main_task, "gpio_task", 4096, NULL, 5, NULL);
     
+    // Create RFID event handler task
+    xTaskCreate(rfid_event_task, "rfid_event_task", 4096, NULL, 5, NULL);
+    
     ESP_LOGI(TAG, "Application started successfully");
+    // FreeRTOS scheduler takes over here - no return from app_main
 }
