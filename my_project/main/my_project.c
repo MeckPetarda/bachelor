@@ -1,13 +1,17 @@
 /**
- * ESP32 Attendance System with RFID Reader Integration
+ * ESP32 Attendance System - Main Application
  * 
- * Combines GPIO button/LED control with UART-based Y300 UHF RFID reader
- * for hands-free tag detection.
+ * Integrates:
+ *   - GPIO: Buttons, LEDs, PIR sensor
+ *   - RFID: Y300 UHF RFID reader for contactless tag detection
+ * 
+ * Press BUTTON1 to start/stop RFID scanning
+ * Press BUTTON2 to show statistics
  * 
  * DATASHEET REFERENCES:
- * - ESP32 Series Datasheet v5.2, Section 4.8.1: GPIO Interface
- * - ESP32 Technical Reference Manual, Section 7.8: UART Controller
- * - Y300/R300 Communication Interface Specification
+ * - ESP32 Datasheet: Section 4.8.1 (GPIO Interface)
+ * - ESP32 TRM: Section 7.8 (UART Controller)
+ * - R300 Protocol: R300_UHF_RFID_reader_module_protocol_.pdf
  */
 
 #include <stdio.h>
@@ -15,194 +19,103 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
 #include "driver/gpio.h"
-#include "driver/uart.h"
 #include "esp_log.h"
 
 #include "uart_reader.h"
 
 // ============================================================================
-// CONFIGURATION
+// GPIO CONFIGURATION
 // ============================================================================
 
-#define LED1_PIN           GPIO_NUM_5      // GPIO5 - Output LED
-#define LED2_PIN           GPIO_NUM_18     // GPIO18 - Output LED
-#define BUTTON1_PIN        GPIO_NUM_34     // GPIO34 - Input-only button
-#define BUTTON2_PIN        GPIO_NUM_35     // GPIO35 - Input-only button
-#define PIR_SENSOR_PIN     GPIO_NUM_2      // GPIO2 - PIR motion sensor
+#define LED1_PIN           GPIO_NUM_5      // Status LED
+#define LED2_PIN           GPIO_NUM_18     // Activity LED
+#define BUTTON1_PIN        GPIO_NUM_34     // Start/Stop RFID scanning
+#define BUTTON2_PIN        GPIO_NUM_35     // Show statistics
+#define PIR_SENSOR_PIN     GPIO_NUM_2      // Motion detection
 
-#define DEBOUNCE_TIME_MS   20              // 20ms debounce window
-#define PIR_DEBOUNCE_MS    100             // 100ms debounce for PIR
+#define DEBOUNCE_TIME_MS   50
+#define PIR_DEBOUNCE_MS    100
 
-#define LED_PIN_MASK       ((1ULL << LED1_PIN) | (1ULL << LED2_PIN))
-#define BUTTON_PIN_MASK    ((1ULL << BUTTON1_PIN) | (1ULL << BUTTON2_PIN))
-
-static const char* TAG = "MAIN_APP";
+static const char* TAG = "MAIN";
 
 // ============================================================================
 // STATE TRACKING
 // ============================================================================
 
 typedef struct {
-    uint32_t last_interrupt_time;
+    uint32_t last_press_time;
     uint8_t last_stable_state;
     uint8_t press_count;
 } button_state_t;
 
-typedef struct {
-    uint32_t last_change_time;
-    uint8_t last_stable_state;
-} pir_state_t;
-
 static button_state_t button_states[2] = {0};
-static pir_state_t pir_state = {0};
+static bool rfid_scanning = false;
 
 // ============================================================================
-// GPIO INTERRUPT HANDLERS
+// RFID TAG CALLBACK
 // ============================================================================
 
-static void IRAM_ATTR gpio_isr_handler(void* arg)
+/**
+ * Called whenever RFID reader detects a tag
+ * This runs in the UART task context - keep it fast!
+ */
+static void on_tag_detected(const rfid_tag_event_t* event)
 {
-    uint32_t gpio_num = (uint32_t) arg;
-    uint32_t current_time = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
+    // Flash activity LED
+    gpio_set_level(LED2_PIN, 1);
     
-    button_state_t* state = (gpio_num == BUTTON1_PIN) ? 
-        &button_states[0] : &button_states[1];
-    
-    if ((current_time - state->last_interrupt_time) < DEBOUNCE_TIME_MS) {
-        return;
+    // Log tag detection
+    ESP_LOGI(TAG, "══════════════════════════════════");
+    ESP_LOGI(TAG, "  TAG DETECTED!");
+    ESP_LOGI(TAG, "  EPC: ");
+    printf("    ");
+    for (int i = 0; i < event->epc_len; i++) {
+        printf("%02X ", event->epc[i]);
     }
+    printf("\n");
+    ESP_LOGI(TAG, "  RSSI: %d dBm", event->rssi - 129);  // Convert to dBm
+    ESP_LOGI(TAG, "  Antenna: %d", event->antenna_id);
+    ESP_LOGI(TAG, "  Time: %d ms", event->timestamp_ms);
+    ESP_LOGI(TAG, "══════════════════════════════════\n");
     
-    state->last_interrupt_time = current_time;
+    // Turn off LED after brief flash
+    vTaskDelay(pdMS_TO_TICKS(100));
+    gpio_set_level(LED2_PIN, 0);
+    
+    // TODO: Send to Navigo3 via REST API
+    // TODO: Store in local database if offline
 }
 
 // ============================================================================
-// BUTTON AND SENSOR PROCESSING
-// ============================================================================
-
-static void process_buttons(void)
-{
-    static uint32_t last_sample_time = 0;
-    uint32_t current_time = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
-    
-    if ((current_time - last_sample_time) < 5) {
-        return;
-    }
-    last_sample_time = current_time;
-    
-    // Process BUTTON1 (GPIO34)
-    {
-        uint32_t button_level = gpio_get_level(BUTTON1_PIN);
-        button_state_t* state = &button_states[0];
-        
-        if ((current_time - state->last_interrupt_time) >= DEBOUNCE_TIME_MS) {
-            
-            if (button_level == 0 && state->last_stable_state == 1) {
-                state->press_count++;
-                ESP_LOGI(TAG, "BUTTON1 PRESSED (count: %d)", state->press_count);
-                gpio_set_level(LED1_PIN, 1);
-            }
-            else if (button_level == 1 && state->last_stable_state == 0) {
-                ESP_LOGI(TAG, "BUTTON1 RELEASED");
-                gpio_set_level(LED1_PIN, 0);
-            }
-            
-            state->last_stable_state = button_level;
-        }
-    }
-    
-    // Process BUTTON2 (GPIO35)
-    {
-        uint32_t button_level = gpio_get_level(BUTTON2_PIN);
-        button_state_t* state = &button_states[1];
-        
-        if ((current_time - state->last_interrupt_time) >= DEBOUNCE_TIME_MS) {
-            
-            if (button_level == 0 && state->last_stable_state == 1) {
-                state->press_count++;
-                ESP_LOGI(TAG, "BUTTON2 PRESSED (count: %d)", state->press_count);
-                gpio_set_level(LED2_PIN, 1);
-            }
-            else if (button_level == 1 && state->last_stable_state == 0) {
-                ESP_LOGI(TAG, "BUTTON2 RELEASED");
-                gpio_set_level(LED2_PIN, 0);
-            }
-            
-            state->last_stable_state = button_level;
-        }
-    }
-}
-
-static void process_pir(void)
-{
-    static uint32_t last_sample_time = 0;
-    uint32_t current_time = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
-    
-    if ((current_time - last_sample_time) < 10) {
-        return;
-    }
-    last_sample_time = current_time;
-    
-    uint32_t pir_level = gpio_get_level(PIR_SENSOR_PIN);
-    
-    if ((current_time - pir_state.last_change_time) >= PIR_DEBOUNCE_MS) {
-        
-        if (pir_level == 1 && pir_state.last_stable_state == 0) {
-            ESP_LOGI(TAG, "PIR: Motion detected");
-            pir_state.last_change_time = current_time;
-        }
-        else if (pir_level == 0 && pir_state.last_stable_state == 1) {
-            ESP_LOGI(TAG, "PIR: Motion ended");
-            pir_state.last_change_time = current_time;
-        }
-        
-        pir_state.last_stable_state = pir_level;
-    }
-}
-
-// ============================================================================
-// GPIO INITIALIZATION
+// GPIO SETUP
 // ============================================================================
 
 static void gpio_init(void)
 {
-    ESP_LOGI(TAG, "Initializing GPIO pins...");
+    ESP_LOGI(TAG, "Initializing GPIO...");
     
-    // LED output configuration
+    // Configure LEDs (output)
     gpio_config_t led_config = {
-        .pin_bit_mask = LED_PIN_MASK,
+        .pin_bit_mask = (1ULL << LED1_PIN) | (1ULL << LED2_PIN),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    
     gpio_config(&led_config);
-    gpio_set_level(LED1_PIN, 0);
-    gpio_set_level(LED2_PIN, 0);
     
-    ESP_LOGI(TAG, "LED pins configured: GPIO%d (LED1), GPIO%d (LED2)",
-             LED1_PIN, LED2_PIN);
-    
-    // Button input configuration
+    // Configure buttons (input-only pins)
     gpio_config_t button_config = {
-        .pin_bit_mask = BUTTON_PIN_MASK,
+        .pin_bit_mask = (1ULL << BUTTON1_PIN) | (1ULL << BUTTON2_PIN),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_ANYEDGE,
+        .intr_type = GPIO_INTR_DISABLE,
     };
-    
     gpio_config(&button_config);
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(BUTTON1_PIN, gpio_isr_handler, (void*) BUTTON1_PIN);
-    gpio_isr_handler_add(BUTTON2_PIN, gpio_isr_handler, (void*) BUTTON2_PIN);
     
-    ESP_LOGI(TAG, "Button pins configured: GPIO%d (BUTTON1), GPIO%d (BUTTON2)",
-             BUTTON1_PIN, BUTTON2_PIN);
-    
-    // PIR sensor configuration
+    // Configure PIR sensor (input)
     gpio_config_t pir_config = {
         .pin_bit_mask = (1ULL << PIR_SENSOR_PIN),
         .mode = GPIO_MODE_INPUT,
@@ -210,130 +123,169 @@ static void gpio_init(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    
     gpio_config(&pir_config);
-    ESP_LOGI(TAG, "PIR sensor configured: GPIO%d", PIR_SENSOR_PIN);
+    
+    // Initialize LED states
+    gpio_set_level(LED1_PIN, 0);
+    gpio_set_level(LED2_PIN, 0);
+    
+    ESP_LOGI(TAG, "GPIO initialized");
 }
 
 // ============================================================================
-// RFID EVENT PROCESSING
+// BUTTON PROCESSING
 // ============================================================================
 
-/**
- * Task to monitor RFID reader event queue
- * 
- * Processes tag detection events and handles integration with attendance
- * system. Could trigger REST API calls to backend or local data logging.
- */
-static void rfid_event_task(void* pvParameters)
+static void process_buttons(void)
 {
-    QueueHandle_t event_queue = uart_reader_get_event_queue();
+    uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
     
-    if (!event_queue) {
-        ESP_LOGE(TAG, "Failed to get RFID event queue");
-        vTaskDelete(NULL);
-        return;
+    // BUTTON1: Start/Stop RFID scanning
+    {
+        uint32_t level = gpio_get_level(BUTTON1_PIN);
+        button_state_t* state = &button_states[0];
+        
+        if (level == 0 && state->last_stable_state == 1) {
+            if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS) {
+                state->press_count++;
+                state->last_press_time = current_time;
+                
+                // Toggle RFID scanning
+                if (!rfid_scanning) {
+                    ESP_LOGI(TAG, "Starting RFID scan...");
+                    gpio_set_level(LED1_PIN, 1);
+                    rfid_reader_start_inventory(on_tag_detected);
+                    rfid_scanning = true;
+                } else {
+                    ESP_LOGI(TAG, "Stopping RFID scan");
+                    rfid_reader_stop_inventory();
+                    gpio_set_level(LED1_PIN, 0);
+                    rfid_scanning = false;
+                }
+            }
+        }
+        
+        state->last_stable_state = level;
     }
     
-    rfid_event_t event;
-    
-    ESP_LOGI(TAG, "RFID event task started");
-    
-    while (1) {
-        if (xQueueReceive(event_queue, &event, pdMS_TO_TICKS(1000))) {
-            switch (event.type) {
-                case RFID_EVENT_TAG_READ:
-                    ESP_LOGI(TAG, "Tag detected: EPC=%02X%02X%02X%02X... "
-                                  "(len=%d, antenna=%d, RSSI=%d)",
-                             event.tag_epc[0], event.tag_epc[1], 
-                             event.tag_epc[2], event.tag_epc[3],
-                             event.epc_length, event.antenna_port, event.rssi);
-                    
-                    // Flash LED to indicate tag detection
-                    gpio_set_level(LED1_PIN, 1);
-                    vTaskDelay(pdMS_TO_TICKS(100));
-                    gpio_set_level(LED1_PIN, 0);
-                    
-                    // Here: POST tag data to backend, update database, etc.
-                    // Example: http_post_attendance_event(event.tag_epc, event.epc_length);
-                    break;
-                    
-                case RFID_EVENT_INVENTORY_COMPLETE:
-                    ESP_LOGI(TAG, "Inventory scan complete");
-                    break;
-                    
-                case RFID_EVENT_ERROR_FRAME:
-                    ESP_LOGW(TAG, "RFID: Frame format error");
-                    break;
-                    
-                case RFID_EVENT_ERROR_TIMEOUT:
-                    ESP_LOGW(TAG, "RFID: Response timeout");
-                    break;
-                    
-                case RFID_EVENT_COMM_ERROR:
-                    ESP_LOGE(TAG, "RFID: Communication error");
-                    break;
-                    
-                default:
-                    ESP_LOGW(TAG, "Unknown RFID event: %d", event.type);
-                    break;
+    // BUTTON2: Show statistics
+    {
+        uint32_t level = gpio_get_level(BUTTON2_PIN);
+        button_state_t* state = &button_states[1];
+        
+        if (level == 0 && state->last_stable_state == 1) {
+            if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS) {
+                state->press_count++;
+                state->last_press_time = current_time;
+                
+                // Get and display statistics
+                rfid_stats_t stats;
+                if (rfid_reader_get_stats(&stats) == ESP_OK) {
+                    ESP_LOGI(TAG, "═══════ RFID Statistics ═══════");
+                    ESP_LOGI(TAG, "  Tags detected: %d", stats.tags_detected);
+                    ESP_LOGI(TAG, "  Total reads: %d", stats.total_reads);
+                    ESP_LOGI(TAG, "  Errors: %d", stats.errors);
+                    ESP_LOGI(TAG, "  Scanning: %s", stats.inventory_active ? "YES" : "NO");
+                    ESP_LOGI(TAG, "════════════════════════════════\n");
+                }
             }
+        }
+        
+        state->last_stable_state = level;
+    }
+}
+
+// ============================================================================
+// PIR SENSOR PROCESSING
+// ============================================================================
+
+static void process_pir(void)
+{
+    static uint8_t last_state = 0;
+    static uint32_t last_change = 0;
+    uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    
+    uint32_t pir_level = gpio_get_level(PIR_SENSOR_PIN);
+    
+    if (pir_level != last_state && 
+        (current_time - last_change) >= PIR_DEBOUNCE_MS) {
+        
+        last_state = pir_level;
+        last_change = current_time;
+        
+        if (pir_level == 1) {
+            ESP_LOGI(TAG, "Motion detected!");
+            
+            // Auto-start RFID scanning on motion
+            if (!rfid_scanning) {
+                ESP_LOGI(TAG, "Auto-starting RFID scan due to motion");
+                gpio_set_level(LED1_PIN, 1);
+                rfid_reader_start_inventory(on_tag_detected);
+                rfid_scanning = true;
+            }
+        } else {
+            ESP_LOGI(TAG, "Motion stopped");
         }
     }
 }
 
 // ============================================================================
-// MAIN APPLICATION TASK
+// MAIN TASK
 // ============================================================================
 
-static void app_main_task(void* pvParameters)
+static void main_task(void* arg)
 {
-    ESP_LOGI(TAG, "Starting main application task");
+    ESP_LOGI(TAG, "Main task started");
     
     while (1) {
-        // Process GPIO inputs
         process_buttons();
         process_pir();
         
-        // Small delay to prevent CPU saturation
-        // FreeRTOS ref: vTaskDelay allows other tasks to run
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 // ============================================================================
-// ENTRY POINT
+// APPLICATION ENTRY POINT
 // ============================================================================
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "\n\n====== ESP32 Attendance System with RFID ======");
-    ESP_LOGI(TAG, "Compiled: %s %s", __DATE__, __TIME__);
+    ESP_LOGI(TAG, "════════════════════════════════════");
+    ESP_LOGI(TAG, "  ESP32 Attendance System");
+    ESP_LOGI(TAG, "  with UHF RFID Reader");
+    ESP_LOGI(TAG, "════════════════════════════════════\n");
     
-    // Initialize GPIO (buttons, LEDs, PIR)
+    // Initialize GPIO
     gpio_init();
     
-    // Initialize UART-based RFID reader
-    // This creates background tasks for UART handling and event processing
-    esp_err_t ret = uart_reader_init();
+    // Initialize RFID reader
+    esp_err_t ret = rfid_reader_init();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize UART reader: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to initialize RFID reader: %s", 
+                 esp_err_to_name(ret));
         return;
     }
     
-    // Start RFID reader in real-time inventory mode (continuous tag detection)
-    // This sends 0x89 command to reader for streaming tag data
-    ret = uart_reader_start_inventory(true);  // true = real-time mode
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start inventory: %s", esp_err_to_name(ret));
+    // Small delay for module to stabilize
+    vTaskDelay(pdMS_TO_TICKS(500));
+    
+    // Optional: Reset reader on startup
+    ESP_LOGI(TAG, "Resetting RFID reader...");
+    rfid_reader_reset();
+    vTaskDelay(pdMS_TO_TICKS(2000));  // Wait for restart
+    
+    // Optional: Get firmware version
+    uint8_t major, minor;
+    if (rfid_reader_get_firmware(&major, &minor) == ESP_OK) {
+        ESP_LOGI(TAG, "RFID Reader Firmware: %d.%d\n", major, minor);
     }
     
-    // Create main GPIO processing task
-    xTaskCreate(app_main_task, "gpio_task", 4096, NULL, 5, NULL);
+    ESP_LOGI(TAG, "System ready!");
+    ESP_LOGI(TAG, "  Press BUTTON1 to start/stop scanning");
+    ESP_LOGI(TAG, "  Press BUTTON2 to show statistics");
+    ESP_LOGI(TAG, "  PIR sensor enables auto-scanning\n");
     
-    // Create RFID event handler task
-    xTaskCreate(rfid_event_task, "rfid_event_task", 4096, NULL, 5, NULL);
-    
-    ESP_LOGI(TAG, "Application started successfully");
-    // FreeRTOS scheduler takes over here - no return from app_main
+    // Start main task
+    xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
 }
