@@ -22,6 +22,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 
+#include "hal/gpio_types.h"
 #include "uart_reader.h"
 
 // ============================================================================
@@ -76,7 +77,7 @@ static void on_tag_detected(const rfid_tag_event_t* event)
     printf("\n");
     ESP_LOGI(TAG, "  RSSI: %d dBm", event->rssi - 129);  // Convert to dBm
     ESP_LOGI(TAG, "  Antenna: %d", event->antenna_id);
-    ESP_LOGI(TAG, "  Time: %d ms", event->timestamp_ms);
+    ESP_LOGI(TAG, "  Time: %lu ms", event->timestamp_ms);
     ESP_LOGI(TAG, "══════════════════════════════════\n");
     
     // Turn off LED after brief flash
@@ -109,7 +110,7 @@ static void gpio_init(void)
     gpio_config_t button_config = {
         .pin_bit_mask = (1ULL << BUTTON1_PIN) | (1ULL << BUTTON2_PIN),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
@@ -132,6 +133,13 @@ static void gpio_init(void)
     ESP_LOGI(TAG, "GPIO initialized");
 }
 
+static void rfid_reader_start_inventory_wrapper(void) {
+  ESP_LOGI(TAG, "Starting RFID scan...");
+  gpio_set_level(LED1_PIN, 1);
+  rfid_reader_start_inventory(on_tag_detected);
+  rfid_scanning = true;
+}
+
 // ============================================================================
 // BUTTON PROCESSING
 // ============================================================================
@@ -152,10 +160,7 @@ static void process_buttons(void)
                 
                 // Toggle RFID scanning
                 if (!rfid_scanning) {
-                    ESP_LOGI(TAG, "Starting RFID scan...");
-                    gpio_set_level(LED1_PIN, 1);
-                    rfid_reader_start_inventory(on_tag_detected);
-                    rfid_scanning = true;
+                    rfid_reader_start_inventory_wrapper();
                 } else {
                     ESP_LOGI(TAG, "Stopping RFID scan");
                     rfid_reader_stop_inventory();
@@ -182,9 +187,9 @@ static void process_buttons(void)
                 rfid_stats_t stats;
                 if (rfid_reader_get_stats(&stats) == ESP_OK) {
                     ESP_LOGI(TAG, "═══════ RFID Statistics ═══════");
-                    ESP_LOGI(TAG, "  Tags detected: %d", stats.tags_detected);
-                    ESP_LOGI(TAG, "  Total reads: %d", stats.total_reads);
-                    ESP_LOGI(TAG, "  Errors: %d", stats.errors);
+                    ESP_LOGI(TAG, "  Tags detected: %lu", stats.tags_detected);
+                    ESP_LOGI(TAG, "  Total reads: %lu", stats.total_reads);
+                    ESP_LOGI(TAG, "  Errors: %lu", stats.errors);
                     ESP_LOGI(TAG, "  Scanning: %s", stats.inventory_active ? "YES" : "NO");
                     ESP_LOGI(TAG, "════════════════════════════════\n");
                 }
@@ -219,9 +224,7 @@ static void process_pir(void)
             // Auto-start RFID scanning on motion
             if (!rfid_scanning) {
                 ESP_LOGI(TAG, "Auto-starting RFID scan due to motion");
-                gpio_set_level(LED1_PIN, 1);
-                rfid_reader_start_inventory(on_tag_detected);
-                rfid_scanning = true;
+                rfid_reader_start_inventory_wrapper();
             }
         } else {
             ESP_LOGI(TAG, "Motion stopped");
@@ -280,6 +283,43 @@ void app_main(void)
     if (rfid_reader_get_firmware(&major, &minor) == ESP_OK) {
         ESP_LOGI(TAG, "RFID Reader Firmware: %d.%d\n", major, minor);
     }
+    
+    // ============================================================================
+    // CONFIGURE READER FOR MAXIMUM RANGE
+    // ============================================================================
+    
+    ESP_LOGI(TAG, "Configuring reader for maximum range...");
+    
+    // Set maximum RF output power (33 dBm)
+    // Per R300 protocol section 2.1.7, page 12
+    // Valid range: 20-33 dBm
+    ret = rfid_reader_set_power(33);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "  ✓ Power set to 33 dBm (maximum)");
+    } else {
+        ESP_LOGW(TAG, "  ✗ Failed to set power");
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+    
+    // Set frequency region to FCC (902-928 MHz)
+    // Per R300 protocol section 2.1.9, page 13
+    // FCC region provides best range in USA
+    // Frequency table on page 41:
+    //   0x07 = 902.0 MHz
+    //   0x3B = 928.0 MHz
+    ret = rfid_reader_set_frequency_region(RFID_REGION_FCC, 
+                                          RFID_FREQ_902MHZ, 
+                                          RFID_FREQ_928MHZ);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "  ✓ Frequency set to FCC (902-928 MHz)");
+    } else {
+        ESP_LOGW(TAG, "  ✗ Failed to set frequency");
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+    
+    ESP_LOGI(TAG, "Configuration complete!\n");
+    
+    // ============================================================================
     
     ESP_LOGI(TAG, "System ready!");
     ESP_LOGI(TAG, "  Press BUTTON1 to start/stop scanning");

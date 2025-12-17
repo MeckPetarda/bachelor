@@ -2,10 +2,12 @@
  * uart_reader.c - R300/Y300 UHF RFID Reader Implementation
  * 
  * Implements R300 protocol V2.2 for real-time tag detection
+ * Version: 1.2 - Fixed continuous inventory and added range optimization
  */
 
 #include "uart_reader.h"
 #include <string.h>
+#include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -23,7 +25,10 @@ static const char* TAG = "RFID";
 
 #define R300_CMD_RESET          0x70
 #define R300_CMD_GET_FIRMWARE   0x72
+#define R300_CMD_SET_POWER      0x76
+#define R300_CMD_SET_FREQUENCY  0x78
 #define R300_CMD_INVENTORY_RT   0x89
+#define R300_CMD_STOP_INVENTORY 0x70
 
 #define R300_MAX_FRAME_SIZE     256
 #define UART_RX_TASK_STACK      4096
@@ -139,6 +144,33 @@ static bool parse_inventory_response(const uint8_t* data, uint16_t len,
     return true;
 }
 
+/**
+ * Check if frame is inventory completion packet
+ * Per section 2.2.8, page 28:
+ * [Head][Len=0x08][Address][Cmd][Ant_ID][Total_Read(4)][Check]
+ */
+static bool is_inventory_complete(const uint8_t* data, uint16_t len)
+{
+    return (len == 11 && 
+            data[0] == R300_FRAME_HEAD && 
+            data[1] == 0x08 && 
+            data[3] == R300_CMD_INVENTORY_RT);
+}
+
+/**
+ * Restart inventory command
+ * Called automatically when inventory round completes
+ */
+static void restart_inventory(void)
+{
+    if (rfid_state.inventory_active) {
+        // Use 0xFF for fastest inventory (30-50ms per round)
+        // Per section 2.2.8, page 27
+        uint8_t channel = 0xFF;
+        send_command(R300_CMD_INVENTORY_RT, &channel, 1);
+    }
+}
+
 // ============================================================================
 // UART RX TASK
 // ============================================================================
@@ -155,7 +187,19 @@ static void uart_rx_task(void* arg)
                                   pdMS_TO_TICKS(100));
         
         if (len > 0) {
-            // Process inventory responses
+            // Check for inventory completion packet
+            if (is_inventory_complete(rx_buf, len)) {
+                uint32_t total_reads = (rx_buf[5] << 24) | (rx_buf[6] << 16) | 
+                                      (rx_buf[7] << 8) | rx_buf[8];
+                ESP_LOGD(TAG, "Inventory round complete, total_reads=%lu", total_reads);
+                
+                // Auto-restart for continuous operation
+                vTaskDelay(pdMS_TO_TICKS(10));
+                restart_inventory();
+                continue;
+            }
+            
+            // Process tag detection
             if (rfid_state.inventory_active && 
                 rx_buf[0] == R300_FRAME_HEAD && 
                 rx_buf[3] == R300_CMD_INVENTORY_RT) {
@@ -337,6 +381,46 @@ esp_err_t rfid_reader_get_firmware(uint8_t* major, uint8_t* minor)
     return ESP_ERR_TIMEOUT;
 }
 
+esp_err_t rfid_reader_set_power(uint8_t power_dbm)
+{
+    if (!rfid_state.initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    // Clamp to valid range (20-33 dBm)
+    // Per section 2.1.7, page 12
+    if (power_dbm < 20) power_dbm = 20;
+    if (power_dbm > 33) power_dbm = 33;
+    
+    esp_err_t ret = send_command(R300_CMD_SET_POWER, &power_dbm, 1);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Set power to %d dBm", power_dbm);
+    }
+    
+    return ret;
+}
+
+esp_err_t rfid_reader_set_frequency_region(uint8_t region, uint8_t start_freq, uint8_t end_freq)
+{
+    if (!rfid_state.initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    // Per section 2.1.9, page 13
+    // region: 0x01=FCC, 0x02=ETSI, 0x03=CHN
+    uint8_t data[3] = {region, start_freq, end_freq};
+    
+    esp_err_t ret = send_command(R300_CMD_SET_FREQUENCY, data, 3);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Set frequency region=0x%02X, range=0x%02X-0x%02X", 
+                 region, start_freq, end_freq);
+    }
+    
+    return ret;
+}
+
 esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback)
 {
     if (!rfid_state.initialized) {
@@ -352,7 +436,8 @@ esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback)
     
     // Send real-time inventory command
     // Per section 2.2.8: [0xA0][0x04][Address][0x89][Channel][Check]
-    uint8_t channel = 0x01;  // Use 1 frequency hopping channel
+    // Use 0xFF for fastest operation (30-50ms per round with few tags)
+    uint8_t channel = 0xFF;  // CHANGED from 0x01 to 0xFF
     esp_err_t ret = send_command(R300_CMD_INVENTORY_RT, &channel, 1);
     
     if (ret == ESP_OK) {
@@ -361,7 +446,7 @@ esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback)
         rfid_state.stats.inventory_active = true;
         xSemaphoreGive(rfid_state.mutex);
         
-        ESP_LOGI(TAG, "Real-time inventory started");
+        ESP_LOGI(TAG, "Real-time inventory started (channel=0xFF for continuous operation)");
     }
     
     return ret;
@@ -369,19 +454,36 @@ esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback)
 
 esp_err_t rfid_reader_stop_inventory(void)
 {
-    if (!rfid_state.initialized || !rfid_state.inventory_active) {
-        return ESP_OK;
+     if (!rfid_state.initialized) {
+        return ESP_ERR_INVALID_STATE;
     }
     
+    if (!rfid_state.inventory_active) {
+        return ESP_OK;  // Already stopped
+    }
+    
+    ESP_LOGI(TAG, "Stopping inventory...");
+    
+    // Set flag first to prevent auto-restart
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
     rfid_state.inventory_active = false;
     rfid_state.stats.inventory_active = false;
     rfid_state.tag_callback = NULL;
     xSemaphoreGive(rfid_state.mutex);
     
-    ESP_LOGI(TAG, "Inventory stopped");
+    // Give RX task time to see the flag change
+    vTaskDelay(pdMS_TO_TICKS(50));
     
-    return ESP_OK;
+    esp_err_t ret = send_command(R300_CMD_RESET, NULL, 0);
+
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Reset sent (module will beep and restart)");
+        ESP_LOGI(TAG, "Inventory stopped");
+
+        return ESP_OK;
+    }
+
+    return ESP_ERR_INVALID_RESPONSE;
 }
 
 bool rfid_reader_is_inventory_active(void)
