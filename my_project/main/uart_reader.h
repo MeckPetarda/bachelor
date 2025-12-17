@@ -2,16 +2,21 @@
  * uart_reader.h - R300/Y300 UHF RFID Reader Interface
  * 
  * Implements R300 protocol V2.2 for attendance detection system.
+ * Version: 1.2 - Added power and frequency configuration
  * 
  * Key Commands Implemented:
  *   - 0x70: Reset module
- *   - 0x72: Get firmware version  
+ *   - 0x72: Get firmware version
+ *   - 0x76: Set output power (NEW)
+ *   - 0x78: Set frequency region (NEW)
  *   - 0x89: Real-time inventory (continuous tag detection)
  * 
  * Protocol Reference: R300_UHF_RFID_reader_module_protocol_.pdf
  *   - Section 1.2: Data Packet Definition
  *   - Section 2.1.1: Reset Command (page 7)
  *   - Section 2.1.3: Get Firmware (page 8)
+ *   - Section 2.1.7: Set Output Power (page 12)
+ *   - Section 2.1.9: Set Frequency Region (page 13)
  *   - Section 2.2.8: Real-Time Inventory (page 27-28)
  * 
  * Hardware Reference: ESP32 Technical Reference Manual
@@ -34,6 +39,19 @@
 #define RFID_UART_TX_PIN    17          // ESP32 TX → Y300 RX
 #define RFID_UART_RX_PIN    16          // ESP32 RX → Y300 TX  
 #define RFID_UART_BAUD      115200      // R300 default (section 1.1)
+
+// ============================================================================
+// FREQUENCY REGIONS (section 2.1.9, page 13)
+// ============================================================================
+
+#define RFID_REGION_FCC     0x01        // 902-928 MHz (USA) - best range
+#define RFID_REGION_ETSI    0x02        // 865-868 MHz (Europe)
+#define RFID_REGION_CHN     0x03        // 920-925 MHz (China)
+
+// Frequency parameter values (see page 41 for full table)
+#define RFID_FREQ_902MHZ    0x07
+#define RFID_FREQ_915MHZ    0x21
+#define RFID_FREQ_928MHZ    0x3B
 
 // ============================================================================
 // DATA STRUCTURES
@@ -118,10 +136,39 @@ esp_err_t rfid_reader_reset(void);
 esp_err_t rfid_reader_get_firmware(uint8_t* major, uint8_t* minor);
 
 /**
+ * Set RF output power
+ * 
+ * Configure transmit power for maximum range.
+ * Valid range: 20-33 dBm (will be clamped if out of range)
+ * 
+ * Per section 2.1.7, page 12.
+ * 
+ * @param power_dbm Power level in dBm (20-33)
+ * @return ESP_OK on success
+ */
+esp_err_t rfid_reader_set_power(uint8_t power_dbm);
+
+/**
+ * Set frequency region
+ * 
+ * Configure RF spectrum for your region.
+ * 
+ * Per section 2.1.9, page 13.
+ * Frequency table on page 41.
+ * 
+ * @param region RFID_REGION_FCC, RFID_REGION_ETSI, or RFID_REGION_CHN
+ * @param start_freq Starting frequency parameter (see page 41)
+ * @param end_freq Ending frequency parameter (see page 41)
+ * @return ESP_OK on success
+ */
+esp_err_t rfid_reader_set_frequency_region(uint8_t region, uint8_t start_freq, uint8_t end_freq);
+
+/**
  * Start real-time inventory (continuous tag detection)
  * 
  * Sends 0x89 command to start continuous tag scanning.
  * Callback will be invoked for each tag detection.
+ * Automatically restarts after each inventory round completes.
  * 
  * This is the PRIMARY MODE for attendance tracking.
  * 
