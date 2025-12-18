@@ -136,7 +136,8 @@ static void gpio_init(void)
 static void rfid_reader_start_inventory_wrapper(void) {
   ESP_LOGI(TAG, "Starting RFID scan...");
   gpio_set_level(LED1_PIN, 1);
-  rfid_reader_start_inventory(on_tag_detected);
+  // Use default interval of 250ms (pass 0 for default)
+  rfid_reader_start_inventory(on_tag_detected, 0);
   rfid_scanning = true;
 }
 
