@@ -238,10 +238,10 @@ static void uart_rx_task(void* arg)
             // Log raw response for debugging
             ESP_LOGI(TAG, "RX raw (%d bytes):", len);
             printf("    ");
-            for (int i = 0; i < len && i < 32; i++) {
+            for (int i = 0; i < len && i < 64; i++) {
                 printf("%02X ", rx_buf[i]);
             }
-            if (len > 32) {
+            if (len > 64) {
                 printf("...");
             }
             printf("\n");
