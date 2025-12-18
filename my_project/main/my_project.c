@@ -65,25 +65,33 @@ static void on_tag_detected(const rfid_tag_event_t* event)
 {
     // Flash activity LED
     gpio_set_level(LED2_PIN, 1);
-    
-    // Log tag detection
+
+    // Convert RSSI to dBm (per R300 protocol: value 31-98 = -99 to -31 dBm)
+    int rssi_dbm = event->rssi - 129;
+
+    // Log tag detection with improved formatting
     ESP_LOGI(TAG, "══════════════════════════════════");
     ESP_LOGI(TAG, "  TAG DETECTED!");
-    ESP_LOGI(TAG, "  EPC: ");
+    ESP_LOGI(TAG, "  EPC (%d bytes):", event->epc_len);
     printf("    ");
     for (int i = 0; i < event->epc_len; i++) {
         printf("%02X ", event->epc[i]);
+        if ((i + 1) % 16 == 0 && i + 1 < event->epc_len) {
+            printf("\n    ");  // Line break for long EPCs
+        }
     }
     printf("\n");
-    ESP_LOGI(TAG, "  RSSI: %d dBm", event->rssi - 129);  // Convert to dBm
+    ESP_LOGI(TAG, "  PC: %02X %02X", event->pc[0], event->pc[1]);
+    ESP_LOGI(TAG, "  RSSI: %d dBm (raw: %d)", rssi_dbm, event->rssi);
     ESP_LOGI(TAG, "  Antenna: %d", event->antenna_id);
+    ESP_LOGI(TAG, "  Frequency: %d", event->frequency);
     ESP_LOGI(TAG, "  Time: %lu ms", event->timestamp_ms);
     ESP_LOGI(TAG, "══════════════════════════════════\n");
-    
+
     // Turn off LED after brief flash
     vTaskDelay(pdMS_TO_TICKS(100));
     gpio_set_level(LED2_PIN, 0);
-    
+
     // TODO: Send to Navigo3 via REST API
     // TODO: Store in local database if offline
 }
