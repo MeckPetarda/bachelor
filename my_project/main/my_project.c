@@ -223,10 +223,10 @@ static void process_pir(void)
             ESP_LOGI(TAG, "Motion detected!");
             
             // Auto-start RFID scanning on motion
-            if (!rfid_scanning) {
-                ESP_LOGI(TAG, "Auto-starting RFID scan due to motion");
-                rfid_reader_start_inventory_wrapper();
-            }
+            // if (!rfid_scanning) {
+            //     ESP_LOGI(TAG, "Auto-starting RFID scan due to motion");
+            //     rfid_reader_start_inventory_wrapper();
+            // }
         } else {
             ESP_LOGI(TAG, "Motion stopped");
         }
