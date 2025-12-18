@@ -105,48 +105,90 @@ static esp_err_t send_command(uint8_t cmd, const uint8_t* data, uint8_t data_len
  * Parse single inventory response
  * Per section 2.2.6 (command 0x8B):
  * [Head][Len][Address][Cmd][Freq_Ant][PC(2)][EPC(N)][RSSI][Check]
+ *
+ * Validation per R300 protocol V2.2:
+ * - Valid RSSI range: 31-98 (0x1F-0x62) representing -99 to -31 dBm
+ * - Minimum EPC length: 8 bytes (standard C1G2)
+ * - RSSI = 0 indicates invalid/no tag detection
  */
 static bool parse_inventory_response(const uint8_t* data, uint16_t len,
                                      rfid_tag_event_t* event)
 {
     // Minimum valid frame: Head(1) + Len(1) + Addr(1) + Cmd(1) +
-    //                      Freq_Ant(1) + PC(2) + EPC(min 2) + RSSI(1) + Check(1)
-    if (len < 11) {
+    //                      Freq_Ant(1) + PC(2) + EPC(min 8) + RSSI(1) + Check(1)
+    // Total: 1+1+1+1+1+2+8+1+1 = 17 bytes minimum
+    if (len < 17) {
+        ESP_LOGD(TAG, "Frame too short: %d bytes (min 17)", len);
         return false;
     }
 
     // Verify header (accept both 0x8B and 0x89 for backwards compatibility)
     if (data[0] != R300_FRAME_HEAD ||
         (data[3] != R300_CMD_INVENTORY_SINGLE && data[3] != R300_CMD_INVENTORY_RT)) {
+        ESP_LOGD(TAG, "Invalid header: 0x%02X or cmd: 0x%02X", data[0], data[3]);
         return false;
     }
-    
+
+    // Log raw frame for debugging
+    ESP_LOGD(TAG, "Raw frame (%d bytes): %02X %02X %02X %02X %02X %02X %02X %02X...",
+             len, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+
     // Verify checksum
     uint8_t calc_check = r300_checksum(data, len - 1);
     if (calc_check != data[len - 1]) {
-        ESP_LOGW(TAG, "Checksum mismatch: calc=0x%02X, recv=0x%02X", 
+        ESP_LOGW(TAG, "Checksum mismatch: calc=0x%02X, recv=0x%02X",
                  calc_check, data[len - 1]);
         return false;
     }
-    
+
     // Parse fields
     uint8_t freq_ant = data[4];
     event->frequency = (freq_ant >> 2) & 0x3F;  // High 6 bits
     event->antenna_id = freq_ant & 0x03;        // Low 2 bits
-    
+
     event->pc[0] = data[5];
     event->pc[1] = data[6];
-    
+
     // EPC length is remaining data minus RSSI and checksum
     event->epc_len = len - 11;
     if (event->epc_len > sizeof(event->epc)) {
+        ESP_LOGW(TAG, "EPC too long: %d bytes, truncating to %d",
+                 event->epc_len, sizeof(event->epc));
         event->epc_len = sizeof(event->epc);
     }
-    
+
+    // Validate EPC length (minimum 8 bytes per EPC C1G2 standard)
+    if (event->epc_len < 8) {
+        ESP_LOGD(TAG, "EPC too short: %d bytes (min 8)", event->epc_len);
+        return false;
+    }
+
     memcpy(event->epc, &data[7], event->epc_len);
     event->rssi = data[7 + event->epc_len];
+
+    // Validate RSSI (valid range: 31-98 or 0x1F-0x62)
+    // Per R300 protocol V2.2 section 5, page 42
+    // RSSI = 0 indicates invalid/no tag detection
+    if (event->rssi == 0 || event->rssi < 31 || event->rssi > 98) {
+        ESP_LOGD(TAG, "Invalid RSSI: %d (valid range: 31-98)", event->rssi);
+        return false;
+    }
+
+    // Check for all-zero EPC (false detection)
+    bool all_zeros = true;
+    for (int i = 0; i < event->epc_len; i++) {
+        if (event->epc[i] != 0x00) {
+            all_zeros = false;
+            break;
+        }
+    }
+    if (all_zeros) {
+        ESP_LOGD(TAG, "EPC is all zeros - invalid tag");
+        return false;
+    }
+
     event->timestamp_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
-    
+
     return true;
 }
 
@@ -189,13 +231,54 @@ static void uart_rx_task(void* arg)
             }
         }
 
-        // Check for incoming data
+        // Check for incoming data with longer timeout to get complete frames
         int len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf),
-                                  pdMS_TO_TICKS(10));
+                                  pdMS_TO_TICKS(50));
 
         if (len > 0) {
+            // Log raw response for debugging
+            ESP_LOGI(TAG, "RX raw (%d bytes):", len);
+            printf("    ");
+            for (int i = 0; i < len && i < 32; i++) {
+                printf("%02X ", rx_buf[i]);
+            }
+            if (len > 32) {
+                printf("...");
+            }
+            printf("\n");
+
+            // Wait a bit more if we got a frame header but frame seems incomplete
+            if (len >= 2 && rx_buf[0] == R300_FRAME_HEAD) {
+                uint8_t expected_len = rx_buf[1] + 2;  // Len field + Head + Len bytes
+                if (len < expected_len) {
+                    ESP_LOGD(TAG, "Incomplete frame: got %d bytes, expected %d - waiting for more data",
+                             len, expected_len);
+                    vTaskDelay(pdMS_TO_TICKS(20));
+                    // Try to read remaining bytes
+                    int additional = uart_read_bytes(RFID_UART_PORT,
+                                                     &rx_buf[len],
+                                                     sizeof(rx_buf) - len,
+                                                     pdMS_TO_TICKS(30));
+                    if (additional > 0) {
+                        ESP_LOGD(TAG, "Read %d additional bytes", additional);
+                        len += additional;
+                        // Log updated frame
+                        ESP_LOGI(TAG, "RX complete (%d bytes):", len);
+                        printf("    ");
+                        for (int i = 0; i < len && i < 32; i++) {
+                            printf("%02X ", rx_buf[i]);
+                        }
+                        if (len > 32) {
+                            printf("...");
+                        }
+                        printf("\n");
+                    }
+                }
+            }
+
             // Process tag detection response
             if (rfid_state.inventory_active &&
+                len >= 4 &&
                 rx_buf[0] == R300_FRAME_HEAD &&
                 (rx_buf[3] == R300_CMD_INVENTORY_SINGLE || rx_buf[3] == R300_CMD_INVENTORY_RT)) {
 
@@ -210,8 +293,13 @@ static void uart_rx_task(void* arg)
                         rfid_state.tag_callback(&event);
                     }
 
-                    ESP_LOGI(TAG, "Tag detected: EPC_len=%d, RSSI=%d, Ant=%d",
-                             event.epc_len, event.rssi, event.antenna_id);
+                    // Convert RSSI to dBm for logging
+                    // Per R300 protocol: RSSI value range 31-98 maps to -99 to -31 dBm
+                    int rssi_dbm = event.rssi - 129;
+                    ESP_LOGI(TAG, "✓ Valid tag: EPC_len=%d, RSSI=%d (%d dBm), Ant=%d",
+                             event.epc_len, event.rssi, rssi_dbm, event.antenna_id);
+                } else {
+                    ESP_LOGD(TAG, "✗ Invalid tag response (filtered out)");
                 }
             }
         }
