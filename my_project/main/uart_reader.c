@@ -108,7 +108,7 @@ static esp_err_t send_command(uint8_t cmd, const uint8_t* data, uint8_t data_len
  * Validation per R300 protocol V2.2:
  * - Valid RSSI range: 31-98 (0x1F-0x62) representing -99 to -31 dBm
  * - Minimum EPC length: 8 bytes (standard C1G2)
- * - RSSI = 0 indicates invalid/no tag detection
+ * - EPC length is extracted from PC word bits 15-11 (word count)
  */
 static bool parse_inventory_response(const uint8_t* data, uint16_t len,
                                      rfid_tag_event_t* event)
@@ -128,15 +128,27 @@ static bool parse_inventory_response(const uint8_t* data, uint16_t len,
         return false;
     }
 
-    // Log raw frame for debugging
-    ESP_LOGD(TAG, "Raw frame (%d bytes): %02X %02X %02X %02X %02X %02X %02X %02X...",
-             len, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+    // Extract packet length from Len field to handle multiple packets in buffer
+    // (e.g., tag response + completion packet)
+    // Len field = Address + Cmd + Freq_Ant + PC(2) + EPC(N) + RSSI + Check
+    uint8_t packet_len_field = data[1];
+    uint16_t packet_total_len = packet_len_field + 2;  // +2 for Head and Len bytes
 
-    // Verify checksum
-    uint8_t calc_check = r300_checksum(data, len - 1);
-    if (calc_check != data[len - 1]) {
+    // Check if we have at least one complete packet
+    if (len < packet_total_len) {
+        ESP_LOGD(TAG, "Incomplete packet: have %d bytes, need %d", len, packet_total_len);
+        return false;
+    }
+
+    // Log raw frame for debugging (only the tag packet, not completion packet)
+    ESP_LOGD(TAG, "Raw frame (%d bytes): %02X %02X %02X %02X %02X %02X %02X %02X...",
+             packet_total_len, data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+
+    // Verify checksum (only for the tag packet)
+    uint8_t calc_check = r300_checksum(data, packet_total_len - 1);
+    if (calc_check != data[packet_total_len - 1]) {
         ESP_LOGW(TAG, "Checksum mismatch: calc=0x%02X, recv=0x%02X",
-                 calc_check, data[len - 1]);
+                 calc_check, data[packet_total_len - 1]);
         return false;
     }
 
@@ -148,30 +160,41 @@ static bool parse_inventory_response(const uint8_t* data, uint16_t len,
     event->pc[0] = data[5];
     event->pc[1] = data[6];
 
-    // EPC length is remaining data minus RSSI and checksum
-    event->epc_len = len - 11;
-    if (event->epc_len > sizeof(event->epc)) {
-        ESP_LOGW(TAG, "EPC too long: %d bytes, truncating to %d",
-                 event->epc_len, sizeof(event->epc));
-        event->epc_len = sizeof(event->epc);
-    }
+    // Extract EPC length from PC word
+    // PC bits 15-11 contain EPC word count (1 word = 2 bytes)
+    // PC is big-endian: PC[0] is MSB, PC[1] is LSB
+    uint16_t pc_word = (event->pc[0] << 8) | event->pc[1];
+    uint8_t epc_word_count = (pc_word >> 11) & 0x1F;  // Extract bits 15-11
+    event->epc_len = epc_word_count * 2;  // Convert words to bytes
 
-    // Validate EPC length (minimum 8 bytes per EPC C1G2 standard)
-    if (event->epc_len < 8) {
-        ESP_LOGD(TAG, "EPC too short: %d bytes (min 8)", event->epc_len);
+    // Validate EPC length
+    if (event->epc_len < 8 || event->epc_len > sizeof(event->epc)) {
+        ESP_LOGW(TAG, "Invalid EPC length from PC: %d bytes (word count: %d, PC: 0x%04X)",
+                 event->epc_len, epc_word_count, pc_word);
         return false;
     }
 
+    // Verify packet length matches expected size
+    uint16_t expected_len = 3 + 1 + 1 + 2 + event->epc_len + 1 + 1;  // Addr+Cmd+Freq_Ant+PC+EPC+RSSI+Check
+    if (packet_len_field != expected_len - 2) {  // -2 because Len field doesn't include Head and Len itself
+        ESP_LOGW(TAG, "Packet length mismatch: Len field=%d, expected=%d for %d-byte EPC",
+                 packet_len_field, expected_len - 2, event->epc_len);
+        // Continue anyway - some readers might have slight variations
+    }
+
+    // Extract EPC
     memcpy(event->epc, &data[7], event->epc_len);
-    event->rssi = data[7 + event->epc_len];
+
+    // Extract RSSI (positioned after EPC)
+    uint8_t rssi_pos = 7 + event->epc_len;
+    event->rssi = data[rssi_pos];
 
     // Validate RSSI (valid range: 31-98 or 0x1F-0x62)
     // Per R300 protocol V2.2 section 5, page 42
-    // RSSI = 0 indicates invalid/no tag detection
-    // if (event->rssi == 0 || event->rssi < 31 || event->rssi > 98) {
-    //     ESP_LOGD(TAG, "Invalid RSSI: %d (valid range: 31-98)", event->rssi);
-    //     return false;
-    // }
+    if (event->rssi < 31 || event->rssi > 98) {
+        ESP_LOGW(TAG, "RSSI out of range: %d (valid: 31-98)", event->rssi);
+        // Don't fail - just warn
+    }
 
     // Check for all-zero EPC (false detection)
     bool all_zeros = true;
