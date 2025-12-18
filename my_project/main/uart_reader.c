@@ -168,10 +168,10 @@ static bool parse_inventory_response(const uint8_t* data, uint16_t len,
     // Validate RSSI (valid range: 31-98 or 0x1F-0x62)
     // Per R300 protocol V2.2 section 5, page 42
     // RSSI = 0 indicates invalid/no tag detection
-    if (event->rssi == 0 || event->rssi < 31 || event->rssi > 98) {
-        ESP_LOGD(TAG, "Invalid RSSI: %d (valid range: 31-98)", event->rssi);
-        return false;
-    }
+    // if (event->rssi == 0 || event->rssi < 31 || event->rssi > 98) {
+    //     ESP_LOGD(TAG, "Invalid RSSI: %d (valid range: 31-98)", event->rssi);
+    //     return false;
+    // }
 
     // Check for all-zero EPC (false detection)
     bool all_zeros = true;
