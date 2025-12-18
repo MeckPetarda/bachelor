@@ -28,7 +28,6 @@ static const char* TAG = "RFID";
 #define R300_CMD_SET_POWER      0x76
 #define R300_CMD_SET_FREQUENCY  0x78
 #define R300_CMD_INVENTORY_SINGLE 0x8B
-#define R300_CMD_INVENTORY_RT   0x89  // Deprecated - not used
 #define R300_CMD_STOP_INVENTORY 0x70
 
 #define DEFAULT_READ_INTERVAL_MS 250
@@ -124,7 +123,7 @@ static bool parse_inventory_response(const uint8_t* data, uint16_t len,
 
     // Verify header (accept both 0x8B and 0x89 for backwards compatibility)
     if (data[0] != R300_FRAME_HEAD ||
-        (data[3] != R300_CMD_INVENTORY_SINGLE && data[3] != R300_CMD_INVENTORY_RT)) {
+        (data[3] != R300_CMD_INVENTORY_SINGLE)) {
         ESP_LOGD(TAG, "Invalid header: 0x%02X or cmd: 0x%02X", data[0], data[3]);
         return false;
     }
@@ -265,10 +264,10 @@ static void uart_rx_task(void* arg)
                         // Log updated frame
                         ESP_LOGI(TAG, "RX complete (%d bytes):", len);
                         printf("    ");
-                        for (int i = 0; i < len && i < 32; i++) {
+                        for (int i = 0; i < len && i < 64; i++) {
                             printf("%02X ", rx_buf[i]);
                         }
-                        if (len > 32) {
+                        if (len > 64) {
                             printf("...");
                         }
                         printf("\n");
@@ -280,7 +279,7 @@ static void uart_rx_task(void* arg)
             if (rfid_state.inventory_active &&
                 len >= 4 &&
                 rx_buf[0] == R300_FRAME_HEAD &&
-                (rx_buf[3] == R300_CMD_INVENTORY_SINGLE || rx_buf[3] == R300_CMD_INVENTORY_RT)) {
+                (rx_buf[3] == R300_CMD_INVENTORY_SINGLE)) {
 
                 if (parse_inventory_response(rx_buf, len, &event)) {
                     // Update stats
