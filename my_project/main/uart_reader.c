@@ -1,8 +1,8 @@
 /**
  * uart_reader.c - R300/Y300 UHF RFID Reader Implementation
- * 
- * Implements R300 protocol V2.2 for real-time tag detection
- * Version: 1.2 - Fixed continuous inventory and added range optimization
+ *
+ * Implements R300 protocol V2.2 for polling-based tag detection
+ * Version: 1.3 - Changed to command-based polling with configurable interval
  */
 
 #include "uart_reader.h"
@@ -27,8 +27,12 @@ static const char* TAG = "RFID";
 #define R300_CMD_GET_FIRMWARE   0x72
 #define R300_CMD_SET_POWER      0x76
 #define R300_CMD_SET_FREQUENCY  0x78
-#define R300_CMD_INVENTORY_RT   0x89
+#define R300_CMD_INVENTORY_SINGLE 0x8B
+#define R300_CMD_INVENTORY_RT   0x89  // Deprecated - not used
 #define R300_CMD_STOP_INVENTORY 0x70
+
+#define DEFAULT_READ_INTERVAL_MS 250
+#define MIN_READ_INTERVAL_MS     50
 
 #define R300_MAX_FRAME_SIZE     256
 #define UART_RX_TASK_STACK      4096
@@ -45,6 +49,7 @@ static struct {
     rfid_stats_t stats;
     TaskHandle_t rx_task_handle;
     SemaphoreHandle_t mutex;
+    uint32_t read_interval_ms;
 } rfid_state = {0};
 
 // ============================================================================
@@ -97,21 +102,22 @@ static esp_err_t send_command(uint8_t cmd, const uint8_t* data, uint8_t data_len
 }
 
 /**
- * Parse real-time inventory response
- * Per section 2.2.8, page 27:
+ * Parse single inventory response
+ * Per section 2.2.6 (command 0x8B):
  * [Head][Len][Address][Cmd][Freq_Ant][PC(2)][EPC(N)][RSSI][Check]
  */
-static bool parse_inventory_response(const uint8_t* data, uint16_t len, 
+static bool parse_inventory_response(const uint8_t* data, uint16_t len,
                                      rfid_tag_event_t* event)
 {
-    // Minimum valid frame: Head(1) + Len(1) + Addr(1) + Cmd(1) + 
+    // Minimum valid frame: Head(1) + Len(1) + Addr(1) + Cmd(1) +
     //                      Freq_Ant(1) + PC(2) + EPC(min 2) + RSSI(1) + Check(1)
     if (len < 11) {
         return false;
     }
-    
-    // Verify header
-    if (data[0] != R300_FRAME_HEAD || data[3] != R300_CMD_INVENTORY_RT) {
+
+    // Verify header (accept both 0x8B and 0x89 for backwards compatibility)
+    if (data[0] != R300_FRAME_HEAD ||
+        (data[3] != R300_CMD_INVENTORY_SINGLE && data[3] != R300_CMD_INVENTORY_RT)) {
         return false;
     }
     
@@ -145,29 +151,17 @@ static bool parse_inventory_response(const uint8_t* data, uint16_t len,
 }
 
 /**
- * Check if frame is inventory completion packet
- * Per section 2.2.8, page 28:
- * [Head][Len=0x08][Address][Cmd][Ant_ID][Total_Read(4)][Check]
+ * Send single inventory command
+ * Per section 2.2.6 (command 0x8B):
+ * Performs a single read operation and returns the result
  */
-static bool is_inventory_complete(const uint8_t* data, uint16_t len)
-{
-    return (len == 11 && 
-            data[0] == R300_FRAME_HEAD && 
-            data[1] == 0x08 && 
-            data[3] == R300_CMD_INVENTORY_RT);
-}
-
-/**
- * Restart inventory command
- * Called automatically when inventory round completes
- */
-static void restart_inventory(void)
+static void send_inventory_command(void)
 {
     if (rfid_state.inventory_active) {
-        // Use 0xFF for fastest inventory (30-50ms per round)
-        // Per section 2.2.8, page 27
-        uint8_t channel = 0xFF;
-        send_command(R300_CMD_INVENTORY_RT, &channel, 1);
+        // Single inventory command: [0xA0][0x06][0x01][0x8B][0x00][0x00][0x01][Check]
+        // Parameters: antenna mask (0x00), read time (0x00), Q value (0x01)
+        uint8_t params[3] = {0x00, 0x00, 0x01};
+        send_command(R300_CMD_INVENTORY_SINGLE, params, 3);
     }
 }
 
@@ -179,49 +173,50 @@ static void uart_rx_task(void* arg)
 {
     uint8_t rx_buf[R300_MAX_FRAME_SIZE];
     rfid_tag_event_t event;
-    
-    ESP_LOGI(TAG, "RX task started");
-    
+    uint32_t last_read_time = 0;
+
+    ESP_LOGI(TAG, "RX task started (polling mode)");
+
     while (1) {
-        int len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf),
-                                  pdMS_TO_TICKS(100));
-        
-        if (len > 0) {
-            // Check for inventory completion packet
-            if (is_inventory_complete(rx_buf, len)) {
-                uint32_t total_reads = (rx_buf[5] << 24) | (rx_buf[6] << 16) | 
-                                      (rx_buf[7] << 8) | rx_buf[8];
-                ESP_LOGD(TAG, "Inventory round complete, total_reads=%lu", total_reads);
-                
-                // Auto-restart for continuous operation
-                vTaskDelay(pdMS_TO_TICKS(10));
-                restart_inventory();
-                continue;
+        // Send inventory command at configured interval
+        if (rfid_state.inventory_active) {
+            uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+            uint32_t interval = rfid_state.read_interval_ms;
+
+            if ((current_time - last_read_time) >= interval) {
+                send_inventory_command();
+                last_read_time = current_time;
             }
-            
-            // Process tag detection
-            if (rfid_state.inventory_active && 
-                rx_buf[0] == R300_FRAME_HEAD && 
-                rx_buf[3] == R300_CMD_INVENTORY_RT) {
-                
+        }
+
+        // Check for incoming data
+        int len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf),
+                                  pdMS_TO_TICKS(10));
+
+        if (len > 0) {
+            // Process tag detection response
+            if (rfid_state.inventory_active &&
+                rx_buf[0] == R300_FRAME_HEAD &&
+                (rx_buf[3] == R300_CMD_INVENTORY_SINGLE || rx_buf[3] == R300_CMD_INVENTORY_RT)) {
+
                 if (parse_inventory_response(rx_buf, len, &event)) {
                     // Update stats
                     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
                     rfid_state.stats.total_reads++;
                     xSemaphoreGive(rfid_state.mutex);
-                    
+
                     // Call user callback
                     if (rfid_state.tag_callback) {
                         rfid_state.tag_callback(&event);
                     }
-                    
+
                     ESP_LOGI(TAG, "Tag detected: EPC_len=%d, RSSI=%d, Ant=%d",
                              event.epc_len, event.rssi, event.antenna_id);
                 }
             }
         }
-        
-        // Allow other tasks to run
+
+        // Small delay to allow other tasks to run
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -421,69 +416,69 @@ esp_err_t rfid_reader_set_frequency_region(uint8_t region, uint8_t start_freq, u
     return ret;
 }
 
-esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback)
+esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t interval_ms)
 {
     if (!rfid_state.initialized) {
         return ESP_ERR_INVALID_STATE;
     }
-    
+
     if (rfid_state.inventory_active) {
         ESP_LOGW(TAG, "Inventory already active");
         return ESP_OK;
     }
-    
-    rfid_state.tag_callback = callback;
-    
-    // Send real-time inventory command
-    // Per section 2.2.8: [0xA0][0x04][Address][0x89][Channel][Check]
-    // Use 0xFF for fastest operation (30-50ms per round with few tags)
-    uint8_t channel = 0xFF;  // CHANGED from 0x01 to 0xFF
-    esp_err_t ret = send_command(R300_CMD_INVENTORY_RT, &channel, 1);
-    
-    if (ret == ESP_OK) {
-        xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
-        rfid_state.inventory_active = true;
-        rfid_state.stats.inventory_active = true;
-        xSemaphoreGive(rfid_state.mutex);
-        
-        ESP_LOGI(TAG, "Real-time inventory started (channel=0xFF for continuous operation)");
+
+    // Set interval with validation
+    if (interval_ms == 0) {
+        interval_ms = DEFAULT_READ_INTERVAL_MS;
+    } else if (interval_ms < MIN_READ_INTERVAL_MS) {
+        ESP_LOGW(TAG, "Interval %lu ms too low, using minimum %d ms",
+                 interval_ms, MIN_READ_INTERVAL_MS);
+        interval_ms = MIN_READ_INTERVAL_MS;
     }
-    
-    return ret;
+
+    rfid_state.tag_callback = callback;
+    rfid_state.read_interval_ms = interval_ms;
+
+    // Activate polling mode
+    xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
+    rfid_state.inventory_active = true;
+    rfid_state.stats.inventory_active = true;
+    xSemaphoreGive(rfid_state.mutex);
+
+    ESP_LOGI(TAG, "Polling-based inventory started (interval=%lu ms)", interval_ms);
+
+    // Send first command immediately
+    send_inventory_command();
+
+    return ESP_OK;
 }
 
 esp_err_t rfid_reader_stop_inventory(void)
 {
-     if (!rfid_state.initialized) {
+    if (!rfid_state.initialized) {
         return ESP_ERR_INVALID_STATE;
     }
-    
+
     if (!rfid_state.inventory_active) {
         return ESP_OK;  // Already stopped
     }
-    
+
     ESP_LOGI(TAG, "Stopping inventory...");
-    
-    // Set flag first to prevent auto-restart
+
+    // Set flag to stop polling
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
     rfid_state.inventory_active = false;
     rfid_state.stats.inventory_active = false;
     rfid_state.tag_callback = NULL;
+    rfid_state.read_interval_ms = 0;
     xSemaphoreGive(rfid_state.mutex);
-    
+
     // Give RX task time to see the flag change
     vTaskDelay(pdMS_TO_TICKS(50));
-    
-    esp_err_t ret = send_command(R300_CMD_RESET, NULL, 0);
 
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Reset sent (module will beep and restart)");
-        ESP_LOGI(TAG, "Inventory stopped");
+    ESP_LOGI(TAG, "Inventory stopped");
 
-        return ESP_OK;
-    }
-
-    return ESP_ERR_INVALID_RESPONSE;
+    return ESP_OK;
 }
 
 bool rfid_reader_is_inventory_active(void)

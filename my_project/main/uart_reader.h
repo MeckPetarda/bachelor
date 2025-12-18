@@ -9,7 +9,8 @@
  *   - 0x72: Get firmware version
  *   - 0x76: Set output power (NEW)
  *   - 0x78: Set frequency region (NEW)
- *   - 0x89: Real-time inventory (continuous tag detection)
+ *   - 0x8B: Single inventory (polling-based tag detection)
+ *   - 0x89: Real-time inventory (deprecated - not used)
  * 
  * Protocol Reference: R300_UHF_RFID_reader_module_protocol_.pdf
  *   - Section 1.2: Data Packet Definition
@@ -17,7 +18,7 @@
  *   - Section 2.1.3: Get Firmware (page 8)
  *   - Section 2.1.7: Set Output Power (page 12)
  *   - Section 2.1.9: Set Frequency Region (page 13)
- *   - Section 2.2.8: Real-Time Inventory (page 27-28)
+ *   - Section 2.2.6: Single Inventory (command 0x8B)
  * 
  * Hardware Reference: ESP32 Technical Reference Manual
  *   - Section 7.8: UART Controller
@@ -164,23 +165,24 @@ esp_err_t rfid_reader_set_power(uint8_t power_dbm);
 esp_err_t rfid_reader_set_frequency_region(uint8_t region, uint8_t start_freq, uint8_t end_freq);
 
 /**
- * Start real-time inventory (continuous tag detection)
- * 
- * Sends 0x89 command to start continuous tag scanning.
+ * Start polling-based inventory (command-based tag detection)
+ *
+ * Sends 0x8B command at a configurable interval to poll for tags.
  * Callback will be invoked for each tag detection.
- * Automatically restarts after each inventory round completes.
- * 
+ * Interval defaults to 250ms but can be configured.
+ *
  * This is the PRIMARY MODE for attendance tracking.
- * 
- * Per section 2.2.8, page 27-28:
- * - Tag data is transferred in real-time (not buffered)
- * - Includes RSSI and frequency data
+ *
+ * Per section 2.2.6:
+ * - Single inventory command per poll
+ * - Tag data retrieved after each read operation
  * - Continues until rfid_reader_stop_inventory() called
- * 
+ *
  * @param callback Function to call when tag detected
+ * @param interval_ms Polling interval in milliseconds (default: 250ms, min: 50ms)
  * @return ESP_OK on success
  */
-esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback);
+esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t interval_ms);
 
 /**
  * Stop inventory mode
