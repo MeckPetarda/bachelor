@@ -24,6 +24,7 @@
 
 #include "hal/gpio_types.h"
 #include "uart_reader.h"
+#include "wifi_manager.h"
 
 // ============================================================================
 // GPIO CONFIGURATION
@@ -265,16 +266,65 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "════════════════════════════════════");
     ESP_LOGI(TAG, "  ESP32 Attendance System");
-    ESP_LOGI(TAG, "  with UHF RFID Reader");
+    ESP_LOGI(TAG, "  with UHF RFID Reader + WiFi");
     ESP_LOGI(TAG, "════════════════════════════════════\n");
-    
+
     // Initialize GPIO
     gpio_init();
-    
-    // Initialize RFID reader
-    esp_err_t ret = rfid_reader_init();
+
+    // ============================================================================
+    // INITIALIZE WIFI (PoC)
+    // ============================================================================
+
+    ESP_LOGI(TAG, "Initializing WiFi...");
+    esp_err_t ret = wifi_manager_init();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize RFID reader: %s", 
+        ESP_LOGE(TAG, "Failed to initialize WiFi: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Continuing without WiFi...");
+    } else {
+        // Wait for connection (30 second timeout)
+        ret = wifi_manager_wait_for_connection(30000);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "════════════════════════════════════");
+            ESP_LOGI(TAG, "  WiFi Connected Successfully!");
+
+            // Display connection information
+            esp_netif_ip_info_t ip_info;
+            if (wifi_manager_get_ip_info(&ip_info) == ESP_OK) {
+                ESP_LOGI(TAG, "  IP Address: " IPSTR, IP2STR(&ip_info.ip));
+                ESP_LOGI(TAG, "  Gateway: " IPSTR, IP2STR(&ip_info.gw));
+                ESP_LOGI(TAG, "  Netmask: " IPSTR, IP2STR(&ip_info.netmask));
+            }
+
+            // Display signal strength
+            int8_t rssi;
+            if (wifi_manager_get_rssi(&rssi) == ESP_OK) {
+                ESP_LOGI(TAG, "  Signal Strength: %d dBm", rssi);
+                if (rssi >= -50) {
+                    ESP_LOGI(TAG, "  Signal Quality: Excellent");
+                } else if (rssi >= -60) {
+                    ESP_LOGI(TAG, "  Signal Quality: Good");
+                } else if (rssi >= -70) {
+                    ESP_LOGI(TAG, "  Signal Quality: Fair");
+                } else {
+                    ESP_LOGI(TAG, "  Signal Quality: Poor");
+                }
+            }
+
+            ESP_LOGI(TAG, "════════════════════════════════════\n");
+        } else {
+            ESP_LOGW(TAG, "Failed to connect to WiFi");
+            ESP_LOGW(TAG, "Check SSID/password in wifi_manager.h");
+            ESP_LOGW(TAG, "Continuing without WiFi...\n");
+        }
+    }
+
+    // ============================================================================
+
+    // Initialize RFID reader
+    ret = rfid_reader_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize RFID reader: %s",
                  esp_err_to_name(ret));
         return;
     }
