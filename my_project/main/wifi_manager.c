@@ -276,7 +276,7 @@ esp_err_t wifi_manager_init(void)
         ESP_LOGE(TAG, "Failed to set WiFi config: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "  ✓ WiFi credentials configured (SSID: %s)", WIFI_SSID);
+    ESP_LOGI(TAG, "  ✓ WiFi credentials configured");
 
     // ========================================================================
     // STEP 8: Start WiFi Driver
@@ -295,7 +295,7 @@ esp_err_t wifi_manager_init(void)
     esp_log_level_set("wifi", ESP_LOG_INFO);
 
     ESP_LOGI(TAG, "WiFi manager initialized successfully");
-    ESP_LOGI(TAG, "Waiting for connection to %s...", WIFI_SSID);
+    ESP_LOGI(TAG, "Waiting for connection...");
 
     return ESP_OK;
 }
