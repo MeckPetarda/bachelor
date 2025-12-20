@@ -21,17 +21,21 @@
 // ============================================================================
 
 /**
- * Maximum number of reconnection attempts before giving up
- * Per ESP-IDF docs: implement retry logic to prevent infinite loops
+ * WiFi credentials configured via menuconfig (idf.py menuconfig)
+ * See main/Kconfig.projbuild for configuration options
+ *
+ * To configure for production:
+ *   1. Run: idf.py menuconfig
+ *   2. Navigate to: WiFi Configuration
+ *   3. Set SSID and password
+ *   4. Save and exit
+ *   5. Build: idf.py build
+ *
+ * Credentials are stored encrypted in flash and not visible in logs.
  */
-#define WIFI_MAX_RETRY_ATTEMPTS    5
-
-/**
- * WiFi credentials (hardcoded for PoC)
- * TODO: Move to menuconfig for production
- */
-#define WIFI_SSID                  "YOUR_SSID"
-#define WIFI_PASSWORD              "YOUR_PASSWORD"
+#define WIFI_SSID                  CONFIG_WIFI_SSID
+#define WIFI_PASSWORD              CONFIG_WIFI_PASSWORD
+#define WIFI_MAX_RETRY_ATTEMPTS    CONFIG_WIFI_MAXIMUM_RETRY
 
 // ============================================================================
 // EVENT BITS (FreeRTOS Event Groups)
