@@ -1,0 +1,730 @@
+[ 92%] Building C object esp-idf/esp_driver_sdspi/CMakeFiles/__idf_esp_driver_sdspi.dir/src/sdspi_crc.c.obj
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:32:8: error: unknown type name 'esp_mqtt_client_handle_t'
+   32 | static esp_mqtt_client_handle_t s_mqtt_client = NULL;
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:32:49: error: initialization of 'int' from 'void *' makes integer from pointer without a cast [-Wint-conversion]
+   32 | static esp_mqtt_client_handle_t s_mqtt_client = NULL;
+      |                                                 ^~~~
+[ 92%] Built target __idf_esp_driver_sd_intf
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c: In function 'mqtt_event_handler':
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:111:5: error: unknown type name 'esp_mqtt_event_handle_t'; did you mean 'esp_event_handler_t'?
+  111 |     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
+      |     ^~~~~~~~~~~~~~~~~~~~~~~
+      |     esp_event_handler_t
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:111:38: error: 'esp_mqtt_event_handle_t' undeclared (first use in this function); did you mean 'mqtt_event_handler'?
+  111 |     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
+      |                                      ^~~~~~~~~~~~~~~~~~~~~~~
+      |                                      mqtt_event_handler
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:111:38: note: each undeclared identifier is reported only once for each function it appears in
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:111:62: error: expected ',' or ';' before 'event_data'
+  111 |     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
+      |                                                              ^~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:113:14: error: 'esp_mqtt_event_id_t' undeclared (first use in this function)
+  113 |     switch ((esp_mqtt_event_id_t)event_id) {
+      |              ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:113:34: error: expected ')' before 'event_id'
+  113 |     switch ((esp_mqtt_event_id_t)event_id) {
+      |            ~                     ^~~~~~~~
+      |                                  )
+[ 93%] Building C object esp-idf/spiffs/CMakeFiles/__idf_spiffs.dir/spiffs/src/spiffs_hydrogen.c.obj
+[ 93%] Building C object esp-idf/esp_driver_sdspi/CMakeFiles/__idf_esp_driver_sdspi.dir/src/sdspi_host.c.obj
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:114:14: error: 'MQTT_EVENT_BEFORE_CONNECT' undeclared (first use in this function)
+  114 |         case MQTT_EVENT_BEFORE_CONNECT:
+      |              ^~~~~~~~~~~~~~~~~~~~~~~~~
+[ 93%] Building C object esp-idf/esp_driver_sdmmc/CMakeFiles/__idf_esp_driver_sdmmc.dir/legacy/src/sdmmc_transaction.c.obj
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:119:14: error: 'MQTT_EVENT_CONNECTED' undeclared (first use in this function); did you mean 'MQTT_STATE_CONNECTED'?
+  119 |         case MQTT_EVENT_CONNECTED:
+      |              ^~~~~~~~~~~~~~~~~~~~
+      |              MQTT_STATE_CONNECTED
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:126:13: error: implicit declaration of function 'esp_mqtt_client_publish' [-Wimplicit-function-declaration]
+  126 |             esp_mqtt_client_publish(event->client,
+      |             ^~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:126:42: error: invalid type argument of '->' (have 'int')
+  126 |             esp_mqtt_client_publish(event->client,
+      |                                          ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:136:14: error: 'MQTT_EVENT_DISCONNECTED' undeclared (first use in this function); did you mean 'MQTT_STATE_DISCONNECTED'?
+  136 |         case MQTT_EVENT_DISCONNECTED:
+      |              ^~~~~~~~~~~~~~~~~~~~~~~
+      |              MQTT_STATE_DISCONNECTED
+[ 93%] Linking C static library libwear_levelling.a
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:143:14: error: 'MQTT_EVENT_SUBSCRIBED' undeclared (first use in this function)
+  143 |         case MQTT_EVENT_SUBSCRIBED:
+      |              ^~~~~~~~~~~~~~~~~~~~~
+In file included from /media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:16:
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:73: error: invalid type argument of '->' (have 'int')
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |                                                                         ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:220:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  220 |         if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_ERROR)        { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_ERROR),   tag, LOG_FORMAT(E, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:13: note: in expansion of macro 'ESP_LOGI'
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:73: error: invalid type argument of '->' (have 'int')
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |                                                                         ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:221:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  221 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_WARN)    { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_WARN),    tag, LOG_FORMAT(W, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:13: note: in expansion of macro 'ESP_LOGI'
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:73: error: invalid type argument of '->' (have 'int')
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |                                                                         ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:222:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  222 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_DEBUG)   { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_DEBUG),   tag, LOG_FORMAT(D, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:13: note: in expansion of macro 'ESP_LOGI'
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:73: error: invalid type argument of '->' (have 'int')
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |                                                                         ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:223:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  223 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_VERBOSE) { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_VERBOSE), tag, LOG_FORMAT(V, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:13: note: in expansion of macro 'ESP_LOGI'
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:73: error: invalid type argument of '->' (have 'int')
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |                                                                         ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:224:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  224 |         else                                                  { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_INFO),    tag, LOG_FORMAT(I, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:144:13: note: in expansion of macro 'ESP_LOGI'
+  144 |             ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:147:14: error: 'MQTT_EVENT_UNSUBSCRIBED' undeclared (first use in this function)
+  147 |         case MQTT_EVENT_UNSUBSCRIBED:
+      |              ^~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:60: error: invalid type argument of '->' (have 'int')
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |                                                            ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:220:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  220 |         if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_ERROR)        { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_ERROR),   tag, LOG_FORMAT(E, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:13: note: in expansion of macro 'ESP_LOGI'
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:60: error: invalid type argument of '->' (have 'int')
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |                                                            ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:221:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  221 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_WARN)    { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_WARN),    tag, LOG_FORMAT(W, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:13: note: in expansion of macro 'ESP_LOGI'
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:60: error: invalid type argument of '->' (have 'int')
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |                                                            ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:222:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  222 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_DEBUG)   { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_DEBUG),   tag, LOG_FORMAT(D, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:13: note: in expansion of macro 'ESP_LOGI'
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:60: error: invalid type argument of '->' (have 'int')
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |                                                            ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:223:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  223 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_VERBOSE) { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_VERBOSE), tag, LOG_FORMAT(V, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:13: note: in expansion of macro 'ESP_LOGI'
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:60: error: invalid type argument of '->' (have 'int')
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |                                                            ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:224:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  224 |         else                                                  { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_INFO),    tag, LOG_FORMAT(I, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:148:13: note: in expansion of macro 'ESP_LOGI'
+  148 |             ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:151:14: error: 'MQTT_EVENT_PUBLISHED' undeclared (first use in this function)
+  151 |         case MQTT_EVENT_PUBLISHED:
+      |              ^~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:65: error: invalid type argument of '->' (have 'int')
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |                                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:220:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  220 |         if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_ERROR)        { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_ERROR),   tag, LOG_FORMAT(E, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:129:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  129 | #define ESP_LOGD(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_DEBUG, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:13: note: in expansion of macro 'ESP_LOGD'
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:65: error: invalid type argument of '->' (have 'int')
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |                                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:221:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  221 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_WARN)    { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_WARN),    tag, LOG_FORMAT(W, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:129:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  129 | #define ESP_LOGD(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_DEBUG, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:13: note: in expansion of macro 'ESP_LOGD'
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:65: error: invalid type argument of '->' (have 'int')
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |                                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:222:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  222 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_DEBUG)   { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_DEBUG),   tag, LOG_FORMAT(D, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:129:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  129 | #define ESP_LOGD(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_DEBUG, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:13: note: in expansion of macro 'ESP_LOGD'
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:65: error: invalid type argument of '->' (have 'int')
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |                                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:223:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  223 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_VERBOSE) { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_VERBOSE), tag, LOG_FORMAT(V, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:129:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  129 | #define ESP_LOGD(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_DEBUG, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:13: note: in expansion of macro 'ESP_LOGD'
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:65: error: invalid type argument of '->' (have 'int')
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |                                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:224:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  224 |         else                                                  { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_INFO),    tag, LOG_FORMAT(I, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:129:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  129 | #define ESP_LOGD(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_DEBUG, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:152:13: note: in expansion of macro 'ESP_LOGD'
+  152 |             ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:156:14: error: 'MQTT_EVENT_DATA' undeclared (first use in this function)
+  156 |         case MQTT_EVENT_DATA:
+      |              ^~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:27: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                           ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:220:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  220 |         if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_ERROR)        { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_ERROR),   tag, LOG_FORMAT(E, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:45: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                                             ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:220:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  220 |         if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_ERROR)        { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_ERROR),   tag, LOG_FORMAT(E, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:27: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                           ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:221:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  221 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_WARN)    { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_WARN),    tag, LOG_FORMAT(W, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:45: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                                             ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:221:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  221 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_WARN)    { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_WARN),    tag, LOG_FORMAT(W, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+[ 93%] Building C object esp-idf/spiffs/CMakeFiles/__idf_spiffs.dir/spiffs/src/spiffs_nucleus.c.obj
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:27: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                           ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:222:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  222 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_DEBUG)   { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_DEBUG),   tag, LOG_FORMAT(D, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:45: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                                             ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:222:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  222 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_DEBUG)   { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_DEBUG),   tag, LOG_FORMAT(D, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:27: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                           ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:223:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  223 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_VERBOSE) { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_VERBOSE), tag, LOG_FORMAT(V, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:45: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                                             ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:223:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  223 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_VERBOSE) { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_VERBOSE), tag, LOG_FORMAT(V, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:27: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                           ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:224:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  224 |         else                                                  { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_INFO),    tag, LOG_FORMAT(I, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:159:45: error: invalid type argument of '->' (have 'int')
+  159 |                      event->topic_len, event->topic);
+      |                                             ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:224:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  224 |         else                                                  { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_INFO),    tag, LOG_FORMAT(I, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:158:13: note: in expansion of macro 'ESP_LOGI'
+  158 |             ESP_LOGI(TAG, "Received message on topic: %.*s",
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:49: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:220:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  220 |         if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_ERROR)        { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_ERROR),   tag, LOG_FORMAT(E, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:66: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                                  ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:220:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  220 |         if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_ERROR)        { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_ERROR),   tag, LOG_FORMAT(E, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:49: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:221:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  221 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_WARN)    { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_WARN),    tag, LOG_FORMAT(W, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:66: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                                  ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:221:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  221 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_WARN)    { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_WARN),    tag, LOG_FORMAT(W, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:49: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:222:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  222 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_DEBUG)   { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_DEBUG),   tag, LOG_FORMAT(D, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:66: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                                  ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:222:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  222 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_DEBUG)   { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_DEBUG),   tag, LOG_FORMAT(D, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:49: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:223:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  223 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_VERBOSE) { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_VERBOSE), tag, LOG_FORMAT(V, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:66: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                                  ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:223:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  223 |         else if (ESP_LOG_GET_LEVEL(configs)==ESP_LOG_VERBOSE) { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_VERBOSE), tag, LOG_FORMAT(V, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:49: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                 ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:224:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  224 |         else                                                  { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_INFO),    tag, LOG_FORMAT(I, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:66: error: invalid type argument of '->' (have 'int')
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |                                                                  ^~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:224:167: note: in definition of macro 'ESP_LOG_LEVEL'
+  224 |         else                                                  { esp_log(ESP_LOG_CONFIG_INIT(ESP_LOG_INFO),    tag, LOG_FORMAT(I, format), esp_log_timestamp(), tag, ##__VA_ARGS__); } \
+      |                                                                                                                                                                       ^~~~~~~~~~~
+/home/kuba/code/esp-idf/components/log/include/esp_log.h:127:41: note: in expansion of macro 'ESP_LOG_LEVEL_LOCAL'
+  127 | #define ESP_LOGI(tag, format, ...) do { ESP_LOG_LEVEL_LOCAL(ESP_LOG_INFO, tag, format, ##__VA_ARGS__); } while(0)
+      |                                         ^~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:160:13: note: in expansion of macro 'ESP_LOGI'
+  160 |             ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+      |             ^~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:170:38: error: invalid type argument of '->' (have 'int')
+  170 |                 int topic_len = event->topic_len < 255 ? event->topic_len : 255;
+      |                                      ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:170:63: error: invalid type argument of '->' (have 'int')
+  170 |                 int topic_len = event->topic_len < 255 ? event->topic_len : 255;
+      |                                                               ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:171:37: error: invalid type argument of '->' (have 'int')
+  171 |                 int data_len = event->data_len < 511 ? event->data_len : 511;
+      |                                     ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:171:61: error: invalid type argument of '->' (have 'int')
+  171 |                 int data_len = event->data_len < 511 ? event->data_len : 511;
+      |                                                             ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:173:36: error: invalid type argument of '->' (have 'int')
+  173 |                 memcpy(topic, event->topic, topic_len);
+      |                                    ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:176:38: error: invalid type argument of '->' (have 'int')
+  176 |                 memcpy(payload, event->data, data_len);
+      |                                      ^~
+[ 93%] Built target __idf_wear_levelling
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:184:14: error: 'MQTT_EVENT_ERROR' undeclared (first use in this function); did you mean 'MQTT_STATE_ERROR'?
+  184 |         case MQTT_EVENT_ERROR:
+      |              ^~~~~~~~~~~~~~~~
+      |              MQTT_STATE_ERROR
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:188:22: error: invalid type argument of '->' (have 'int')
+  188 |             if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+      |                      ^~
+[ 93%] Building C object esp-idf/esp_driver_sdmmc/CMakeFiles/__idf_esp_driver_sdmmc.dir/legacy/src/sdmmc_host.c.obj
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:188:52: error: 'MQTT_ERROR_TYPE_TCP_TRANSPORT' undeclared (first use in this function)
+  188 |             if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+      |                                                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:190:29: error: invalid type argument of '->' (have 'int')
+  190 |             } else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+      |                             ^~
+[ 93%] Building C object esp-idf/spiffs/CMakeFiles/__idf_spiffs.dir/esp_spiffs.c.obj
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:190:59: error: 'MQTT_ERROR_TYPE_CONNECTION_REFUSED' undeclared (first use in this function)
+  190 |             } else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+      |                                                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c: In function 'mqtt_client_init':
+[ 93%] Building C object esp-idf/esp_driver_sdspi/CMakeFiles/__idf_esp_driver_sdspi.dir/src/sdspi_transaction.c.obj
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:224:5: error: unknown type name 'esp_mqtt_client_config_t'
+  224 |     esp_mqtt_client_config_t mqtt_cfg = {
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:226:9: error: field name not in record or union initializer
+  226 |         .broker.address.uri = MQTT_BROKER_URI,
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:226:9: note: (near initialization for 'mqtt_cfg')
+In file included from /media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:14:
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.h:39:33: error: initialization of 'int' from 'char *' makes integer from pointer without a cast [-Wint-conversion]
+   39 | #define MQTT_BROKER_URI         "mqtt://10.0.0.222:1883"
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:226:31: note: in expansion of macro 'MQTT_BROKER_URI'
+  226 |         .broker.address.uri = MQTT_BROKER_URI,
+      |                               ^~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.h:39:33: note: (near initialization for 'mqtt_cfg')
+   39 | #define MQTT_BROKER_URI         "mqtt://10.0.0.222:1883"
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:226:31: note: in expansion of macro 'MQTT_BROKER_URI'
+  226 |         .broker.address.uri = MQTT_BROKER_URI,
+      |                               ^~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:229:9: error: field name not in record or union initializer
+  229 |         .credentials.client_id = MQTT_CLIENT_ID,
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:229:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.h:41:33: error: excess elements in scalar initializer [-Werror]
+   41 | #define MQTT_CLIENT_ID          "ESP32_ATTENDANCE_01"
+      |                                 ^~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:229:34: note: in expansion of macro 'MQTT_CLIENT_ID'
+  229 |         .credentials.client_id = MQTT_CLIENT_ID,
+      |                                  ^~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.h:41:33: note: (near initialization for 'mqtt_cfg')
+   41 | #define MQTT_CLIENT_ID          "ESP32_ATTENDANCE_01"
+      |                                 ^~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:229:34: note: in expansion of macro 'MQTT_CLIENT_ID'
+  229 |         .credentials.client_id = MQTT_CLIENT_ID,
+      |                                  ^~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:230:9: error: field name not in record or union initializer
+  230 |         .credentials.username = NULL,  // No authentication for testing
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:230:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:230:33: error: excess elements in scalar initializer [-Werror]
+  230 |         .credentials.username = NULL,  // No authentication for testing
+      |                                 ^~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:230:33: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:231:9: error: field name not in record or union initializer
+  231 |         .credentials.password = NULL,
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:231:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:231:33: error: excess elements in scalar initializer [-Werror]
+  231 |         .credentials.password = NULL,
+      |                                 ^~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:231:33: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:234:9: error: field name not in record or union initializer
+  234 |         .session.protocol_ver = MQTT_PROTOCOL_V_3_1_1,
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:234:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:234:33: error: 'MQTT_PROTOCOL_V_3_1_1' undeclared (first use in this function)
+  234 |         .session.protocol_ver = MQTT_PROTOCOL_V_3_1_1,
+      |                                 ^~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:234:33: error: excess elements in scalar initializer [-Werror]
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:234:33: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:235:9: error: field name not in record or union initializer
+  235 |         .session.keepalive = 60,  // Keep-alive interval (seconds)
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:235:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:235:30: error: excess elements in scalar initializer [-Werror]
+  235 |         .session.keepalive = 60,  // Keep-alive interval (seconds)
+      |                              ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:235:30: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:238:9: error: field name not in record or union initializer
+  238 |         .session.last_will = {
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:238:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:238:9: error: braces around scalar initializer [-Werror]
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:238:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:239:13: error: field name not in record or union initializer
+  239 |             .topic = MQTT_TOPIC_DEVICE_STATUS,
+      |             ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:239:13: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.h:53:37: error: initialization of 'int' from 'char *' makes integer from pointer without a cast [-Wint-conversion]
+   53 | #define MQTT_TOPIC_DEVICE_STATUS    "attendance/device/ESP32_ATTENDANCE_01/status"
+      |                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:239:22: note: in expansion of macro 'MQTT_TOPIC_DEVICE_STATUS'
+  239 |             .topic = MQTT_TOPIC_DEVICE_STATUS,
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.h:53:37: note: (near initialization for 'mqtt_cfg')
+   53 | #define MQTT_TOPIC_DEVICE_STATUS    "attendance/device/ESP32_ATTENDANCE_01/status"
+      |                                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:239:22: note: in expansion of macro 'MQTT_TOPIC_DEVICE_STATUS'
+  239 |             .topic = MQTT_TOPIC_DEVICE_STATUS,
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:240:13: error: field name not in record or union initializer
+  240 |             .msg = "offline",
+      |             ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:240:13: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:240:20: error: excess elements in scalar initializer [-Werror]
+  240 |             .msg = "offline",
+      |                    ^~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:240:20: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:241:13: error: field name not in record or union initializer
+  241 |             .msg_len = 0,  // Use default (null-terminated)
+      |             ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:241:13: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:241:24: error: excess elements in scalar initializer [-Werror]
+  241 |             .msg_len = 0,  // Use default (null-terminated)
+      |                        ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:241:24: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:242:13: error: field name not in record or union initializer
+  242 |             .qos = 2,      // QoS 2 for critical status
+      |             ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:242:13: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:242:20: error: excess elements in scalar initializer [-Werror]
+  242 |             .qos = 2,      // QoS 2 for critical status
+      |                    ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:242:20: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:243:13: error: field name not in record or union initializer
+  243 |             .retain = 1,   // Retain offline status
+      |             ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:243:13: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:243:23: error: excess elements in scalar initializer [-Werror]
+  243 |             .retain = 1,   // Retain offline status
+      |                       ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:243:23: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:238:30: error: excess elements in scalar initializer [-Werror]
+  238 |         .session.last_will = {
+      |                              ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:238:30: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:247:9: error: field name not in record or union initializer
+  247 |         .network.reconnect_timeout_ms = 4000,  // Wait 4s before retry
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:247:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:247:41: error: excess elements in scalar initializer [-Werror]
+  247 |         .network.reconnect_timeout_ms = 4000,  // Wait 4s before retry
+      |                                         ^~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:247:41: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:248:9: error: field name not in record or union initializer
+  248 |         .network.refresh_connection_after_ms = 0,  // 0 = disabled
+      |         ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:248:9: note: (near initialization for 'mqtt_cfg')
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:248:48: error: excess elements in scalar initializer [-Werror]
+  248 |         .network.refresh_connection_after_ms = 0,  // 0 = disabled
+      |                                                ^
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:248:48: note: (near initialization for 'mqtt_cfg')
+[ 93%] Building C object esp-idf/esp_driver_sdmmc/CMakeFiles/__idf_esp_driver_sdmmc.dir/src/sd_trans_sdmmc.c.obj
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:259:21: error: implicit declaration of function 'esp_mqtt_client_init'; did you mean 'mqtt_client_init'? [-Wimplicit-function-declaration]
+  259 |     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+      |                     ^~~~~~~~~~~~~~~~~~~~
+      |                     mqtt_client_init
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:260:23: error: comparison between pointer and integer [-Werror]
+  260 |     if (s_mqtt_client == NULL) {
+      |                       ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:270:21: error: implicit declaration of function 'esp_mqtt_client_register_event' [-Wimplicit-function-declaration]
+  270 |     esp_err_t ret = esp_mqtt_client_register_event(s_mqtt_client,
+      |                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:285:11: error: implicit declaration of function 'esp_mqtt_client_start' [-Wimplicit-function-declaration]
+  285 |     ret = esp_mqtt_client_start(s_mqtt_client);
+      |           ^~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c: In function 'mqtt_client_publish_tag_event':
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:335:23: error: comparison between pointer and integer [-Werror]
+  335 |     if (s_mqtt_client == NULL) {
+      |                       ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c: In function 'mqtt_client_publish_health_metrics':
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:402:23: error: comparison between pointer and integer [-Werror]
+  402 |     if (s_mqtt_client == NULL) {
+      |                       ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c: In function 'mqtt_client_subscribe_config':
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:449:23: error: comparison between pointer and integer [-Werror]
+  449 |     if (s_mqtt_client == NULL) {
+      |                       ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:465:18: error: implicit declaration of function 'esp_mqtt_client_subscribe' [-Wimplicit-function-declaration]
+  465 |     int msg_id = esp_mqtt_client_subscribe(s_mqtt_client,
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c: In function 'mqtt_client_disconnect':
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:481:23: error: comparison between pointer and integer [-Werror]
+  481 |     if (s_mqtt_client == NULL) {
+      |                       ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:495:12: error: implicit declaration of function 'esp_mqtt_client_disconnect'; did you mean 'mqtt_client_disconnect'? [-Wimplicit-function-declaration]
+  495 |     return esp_mqtt_client_disconnect(s_mqtt_client);
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~~~
+      |            mqtt_client_disconnect
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c: In function 'mqtt_client_destroy':
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:500:23: error: comparison between pointer and integer [-Werror]
+  500 |     if (s_mqtt_client == NULL) {
+      |                       ^~
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:506:21: error: implicit declaration of function 'esp_mqtt_client_stop' [-Wimplicit-function-declaration]
+  506 |     esp_err_t ret = esp_mqtt_client_stop(s_mqtt_client);
+      |                     ^~~~~~~~~~~~~~~~~~~~
+[ 93%] Linking C static library libprotobuf-c.a
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:511:11: error: implicit declaration of function 'esp_mqtt_client_destroy'; did you mean 'mqtt_client_destroy'? [-Wimplicit-function-declaration]
+  511 |     ret = esp_mqtt_client_destroy(s_mqtt_client);
+      |           ^~~~~~~~~~~~~~~~~~~~~~~
+      |           mqtt_client_destroy
+/media/kuba/Games/Documents/VUT/bachelor/my_project/main/mqtt_client.c:517:19: error: assignment to 'int' from 'void *' makes integer from pointer without a cast [-Wint-conversion]
+  517 |     s_mqtt_client = NULL;
+      |                   ^
+cc1: all warnings being treated as errors
+make[2]: *** [esp-idf/main/CMakeFiles/__idf_main.dir/build.make:121: esp-idf/main/CMakeFiles/__idf_main.dir/mqtt_client.c.obj] Error 1
+make[1]: *** [CMakeFiles/Makefile2:8002: esp-idf/main/CMakeFiles/__idf_main.dir/all] Error 2
+make[1]: *** Waiting for unfinished jobs....
+[ 93%] Built target __idf_protobuf-c
+[ 93%] Linking C static library libesp_driver_sdspi.a
+[ 93%] Built target __idf_esp_driver_sdspi
+[ 93%] Linking C static library libesp_driver_sdmmc.a
+[ 94%] Built target __idf_esp_driver_sdmmc
+[ 94%] Linking C static library libspiffs.a
+[ 94%] Built target __idf_spiffs
+make: *** [Makefile:136: all] Error 2
+make failed with exit code 2, output of the command is in the /media/kuba/Games/Documents/VUT/bachelor/my_project/build/log/idf_py_stderr_output_168203 and /media/kuba/Games/Documents/VUT/bachelor/my_project/build/log/idf_py_stdout_output_168203
