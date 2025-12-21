@@ -25,7 +25,7 @@
 #include "hal/gpio_types.h"
 #include "uart_reader.h"
 #include "wifi_manager.h"
-#include "mqtt_client.h"
+#include "my_mqtt_client.h"
 
 // ============================================================================
 // GPIO CONFIGURATION

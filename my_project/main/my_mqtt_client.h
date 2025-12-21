@@ -23,6 +23,7 @@
 #include "uart_reader.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <mqtt_client.h>
 
 // ============================================================================
 // CONFIGURATION
