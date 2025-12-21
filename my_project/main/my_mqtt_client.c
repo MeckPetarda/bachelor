@@ -11,8 +11,7 @@
  * - FreeRTOS event groups for synchronization
  */
 
-#include "mqtt_client.h"
-#include "mqtt_client.h"  // ESP-IDF MQTT client library
+#include "my_mqtt_client.h"
 #include "esp_log.h"
 #include "esp_event.h"
 #include "freertos/FreeRTOS.h"
@@ -228,7 +227,7 @@ esp_err_t mqtt_client_init(void)
         // Client credentials
         .credentials.client_id = MQTT_CLIENT_ID,
         .credentials.username = NULL,  // No authentication for testing
-        .credentials.password = NULL,
+        .credentials.authentication.password = NULL,
 
         // Session configuration
         .session.protocol_ver = MQTT_PROTOCOL_V_3_1_1,
