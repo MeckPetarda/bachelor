@@ -25,6 +25,7 @@
 #include "hal/gpio_types.h"
 #include "uart_reader.h"
 #include "wifi_manager.h"
+#include "mqtt_client.h"
 
 // ============================================================================
 // GPIO CONFIGURATION
@@ -53,6 +54,31 @@ typedef struct {
 
 static button_state_t button_states[2] = {0};
 static bool rfid_scanning = false;
+static bool mqtt_initialized = false;
+
+// ============================================================================
+// MQTT CONFIGURATION CALLBACK
+// ============================================================================
+
+/**
+ * Called when a configuration message is received from MQTT broker
+ * This runs in the MQTT event handler context - keep it fast!
+ */
+static void on_mqtt_config_message(const char* topic, const char* payload)
+{
+    ESP_LOGI(TAG, "╔════════════════════════════════════╗");
+    ESP_LOGI(TAG, "║  Configuration Message Received   ║");
+    ESP_LOGI(TAG, "╠════════════════════════════════════╣");
+    ESP_LOGI(TAG, "║  Topic: %s", topic);
+    ESP_LOGI(TAG, "║  Payload: %s", payload);
+    ESP_LOGI(TAG, "╚════════════════════════════════════╝");
+
+    // TODO: Parse and apply configuration
+    // Examples:
+    // - attendance/config/ESP32_ATTENDANCE_01/led -> control LED
+    // - attendance/config/ESP32_ATTENDANCE_01/scan -> start/stop scanning
+    // - attendance/config/ESP32_ATTENDANCE_01/power -> set RFID power level
+}
 
 // ============================================================================
 // RFID TAG CALLBACK
@@ -89,12 +115,22 @@ static void on_tag_detected(const rfid_tag_event_t* event)
     ESP_LOGI(TAG, "  Time: %lu ms", event->timestamp_ms);
     ESP_LOGI(TAG, "══════════════════════════════════\n");
 
+    // Publish tag event to MQTT broker (if connected)
+    if (mqtt_initialized && mqtt_client_is_connected()) {
+        esp_err_t ret = mqtt_client_publish_tag_event(event);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "  ✓ Tag event published to MQTT broker");
+        } else {
+            ESP_LOGW(TAG, "  ✗ Failed to publish tag event to MQTT");
+        }
+    } else {
+        ESP_LOGW(TAG, "  ⚠ MQTT not connected - event not published");
+        // TODO: Store in local database for later transmission
+    }
+
     // Turn off LED after brief flash
     vTaskDelay(pdMS_TO_TICKS(100));
     gpio_set_level(LED2_PIN, 0);
-
-    // TODO: Send to Navigo3 via REST API
-    // TODO: Store in local database if offline
 }
 
 // ============================================================================
@@ -249,11 +285,24 @@ static void process_pir(void)
 static void main_task(void* arg)
 {
     ESP_LOGI(TAG, "Main task started");
-    
+
+    uint32_t health_publish_counter = 0;
+    const uint32_t HEALTH_PUBLISH_INTERVAL = 60000 / 10;  // 60 seconds / 10ms delay = 6000 iterations
+
     while (1) {
         process_buttons();
         process_pir();
-        
+
+        // Publish health metrics every 60 seconds (if MQTT connected)
+        health_publish_counter++;
+        if (health_publish_counter >= HEALTH_PUBLISH_INTERVAL) {
+            health_publish_counter = 0;
+
+            if (mqtt_initialized && mqtt_client_is_connected()) {
+                mqtt_client_publish_health_metrics();
+            }
+        }
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -312,6 +361,40 @@ void app_main(void)
             }
 
             ESP_LOGI(TAG, "════════════════════════════════════\n");
+
+            // ================================================================
+            // INITIALIZE MQTT (PoC)
+            // ================================================================
+
+            ESP_LOGI(TAG, "Initializing MQTT client...");
+            ret = mqtt_client_init();
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to initialize MQTT: %s", esp_err_to_name(ret));
+                ESP_LOGW(TAG, "Continuing without MQTT...\n");
+            } else {
+                // Wait for MQTT connection (10 second timeout)
+                ret = mqtt_client_wait_for_connection(10000);
+                if (ret == ESP_OK) {
+                    ESP_LOGI(TAG, "════════════════════════════════════");
+                    ESP_LOGI(TAG, "  MQTT Connected Successfully!");
+                    ESP_LOGI(TAG, "════════════════════════════════════\n");
+
+                    mqtt_initialized = true;
+
+                    // Subscribe to configuration topics
+                    ret = mqtt_client_subscribe_config(on_mqtt_config_message);
+                    if (ret == ESP_OK) {
+                        ESP_LOGI(TAG, "Subscribed to configuration topics");
+                    }
+
+                    // Publish initial health metrics
+                    mqtt_client_publish_health_metrics();
+                } else {
+                    ESP_LOGW(TAG, "MQTT connection timeout");
+                    ESP_LOGW(TAG, "Check broker URI in mqtt_client.h");
+                    ESP_LOGW(TAG, "Continuing without MQTT...\n");
+                }
+            }
         } else {
             ESP_LOGW(TAG, "Failed to connect to WiFi");
             ESP_LOGW(TAG, "Check SSID/password in wifi_manager.h");
