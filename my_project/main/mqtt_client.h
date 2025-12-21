@@ -36,7 +36,7 @@
  *
  * For production, configure via menuconfig or change these defaults:
  */
-#define MQTT_BROKER_URI         "mqtt://192.168.1.100:1883"
+#define MQTT_BROKER_URI         "mqtt://10.0.0.222:1883"
 #define MQTT_BROKER_PORT        1883
 #define MQTT_CLIENT_ID          "ESP32_ATTENDANCE_01"
 
