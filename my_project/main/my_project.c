@@ -34,6 +34,7 @@
 #define WIFI_STATUS_LED    GPIO_NUM_5      // WiFi connection status (ON = connected)
 #define MQTT_STATUS_LED    GPIO_NUM_18     // MQTT broker status (ON = connected)
 #define ACTIVITY_LED       GPIO_NUM_19     // Tag detection activity (flashes on detection)
+#define SCANNING_LED       GPIO_NUM_23     // RFID scanning active (ON = scanning)
 #define BUTTON1_PIN        GPIO_NUM_34     // Start/Stop RFID scanning
 #define BUTTON2_PIN        GPIO_NUM_35     // Show statistics
 #define PIR_SENSOR_PIN     GPIO_NUM_2      // Motion detection
@@ -144,7 +145,8 @@ static void gpio_init(void)
 
     // Configure LEDs (output)
     gpio_config_t led_config = {
-        .pin_bit_mask = (1ULL << WIFI_STATUS_LED) | (1ULL << MQTT_STATUS_LED) | (1ULL << ACTIVITY_LED),
+        .pin_bit_mask = (1ULL << WIFI_STATUS_LED) | (1ULL << MQTT_STATUS_LED) |
+                        (1ULL << ACTIVITY_LED) | (1ULL << SCANNING_LED),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -176,15 +178,18 @@ static void gpio_init(void)
     gpio_set_level(WIFI_STATUS_LED, 0);
     gpio_set_level(MQTT_STATUS_LED, 0);
     gpio_set_level(ACTIVITY_LED, 0);
+    gpio_set_level(SCANNING_LED, 0);
 
     ESP_LOGI(TAG, "GPIO initialized");
     ESP_LOGI(TAG, "  WiFi Status LED: GPIO %d", WIFI_STATUS_LED);
     ESP_LOGI(TAG, "  MQTT Status LED: GPIO %d", MQTT_STATUS_LED);
     ESP_LOGI(TAG, "  Activity LED: GPIO %d", ACTIVITY_LED);
+    ESP_LOGI(TAG, "  Scanning LED: GPIO %d", SCANNING_LED);
 }
 
 static void rfid_reader_start_inventory_wrapper(void) {
   ESP_LOGI(TAG, "Starting RFID scan...");
+  gpio_set_level(SCANNING_LED, 1);  // Turn on scanning indicator
   // Use default interval of 250ms (pass 0 for default)
   rfid_reader_start_inventory(on_tag_detected, 0);
   rfid_scanning = true;
@@ -214,6 +219,7 @@ static void process_buttons(void)
                 } else {
                     ESP_LOGI(TAG, "Stopping RFID scan");
                     rfid_reader_stop_inventory();
+                    gpio_set_level(SCANNING_LED, 0);  // Turn off scanning indicator
                     rfid_scanning = false;
                 }
             }
