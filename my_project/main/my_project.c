@@ -392,6 +392,9 @@ void app_main(void)
                 ESP_LOGE(TAG, "Failed to initialize MQTT: %s", esp_err_to_name(ret));
                 ESP_LOGW(TAG, "Continuing without MQTT...\n");
             } else {
+                // Mark MQTT as initialized (automatic reconnection is now active)
+                mqtt_initialized = true;
+
                 // Wait for MQTT connection (10 second timeout)
                 ret = mqtt_client_wait_for_connection(10000);
                 if (ret == ESP_OK) {
@@ -401,8 +404,6 @@ void app_main(void)
                     ESP_LOGI(TAG, "════════════════════════════════════");
                     ESP_LOGI(TAG, "  MQTT Connected Successfully!");
                     ESP_LOGI(TAG, "════════════════════════════════════\n");
-
-                    mqtt_initialized = true;
 
                     // Subscribe to configuration topics
                     ret = mqtt_client_subscribe_config(on_mqtt_config_message);
@@ -414,7 +415,7 @@ void app_main(void)
                     mqtt_client_publish_health_metrics();
                 } else {
                     ESP_LOGW(TAG, "MQTT connection timeout");
-                    ESP_LOGW(TAG, "Check broker URI in mqtt_client.h");
+                    ESP_LOGW(TAG, "Broker will auto-reconnect when available");
                     ESP_LOGW(TAG, "Continuing without MQTT...\n");
                 }
             }
