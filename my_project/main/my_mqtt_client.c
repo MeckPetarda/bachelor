@@ -130,6 +130,22 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base,
                                    1); // Retain flag
 
             ESP_LOGI(TAG, "Published online status");
+
+            // Re-subscribe to configuration topics if callback is registered
+            // This ensures subscriptions are restored after broker restart or reconnection
+            if (s_config_callback != NULL) {
+                char topic[128];
+                snprintf(topic, sizeof(topic), "%s+", MQTT_TOPIC_CONFIG_BASE);
+
+                int msg_id = esp_mqtt_client_subscribe(event->client,
+                                                      topic,
+                                                      MQTT_QOS_CONFIG_COMMANDS);
+                if (msg_id >= 0) {
+                    ESP_LOGI(TAG, "Re-subscribed to config topics: %s", topic);
+                } else {
+                    ESP_LOGW(TAG, "Failed to re-subscribe to config topics");
+                }
+            }
             break;
 
         case MQTT_EVENT_DISCONNECTED:
@@ -338,6 +354,12 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event)
 
     if (event == NULL) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    // Check if connected before attempting to publish
+    if (!mqtt_client_is_connected()) {
+        ESP_LOGW(TAG, "Cannot publish tag event - not connected to broker");
+        return ESP_FAIL;
     }
 
     // ========================================================================
