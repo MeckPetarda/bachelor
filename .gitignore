@@ -14,9 +14,4 @@ logs/
 *.tmp
 temp/
 
-# Asset source files (optional - uncomment if you don't want to track source assets)
-# *.blend
-# *.blend1
-# *.psd
-# *.xcf
-# *.ai
+*.zip

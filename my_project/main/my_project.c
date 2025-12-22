@@ -32,9 +32,9 @@
 // ============================================================================
 
 #define WIFI_STATUS_LED    GPIO_NUM_5      // WiFi connection status (ON = connected)
-#define MQTT_STATUS_LED    GPIO_NUM_18     // MQTT broker status (ON = connected)
+#define MQTT_STATUS_LED    GPIO_NUM_23     // MQTT broker status (ON = connected)
 #define ACTIVITY_LED       GPIO_NUM_19     // Tag detection activity (flashes on detection)
-#define SCANNING_LED       GPIO_NUM_23     // RFID scanning active (ON = scanning)
+#define SCANNING_LED       GPIO_NUM_18     // RFID scanning active (ON = scanning)
 #define BUTTON1_PIN        GPIO_NUM_34     // Start/Stop RFID scanning
 #define BUTTON2_PIN        GPIO_NUM_35     // Show statistics
 #define PIR_SENSOR_PIN     GPIO_NUM_2      // Motion detection
@@ -458,9 +458,12 @@ void app_main(void)
     // Set maximum RF output power (33 dBm)
     // Per R300 protocol section 2.1.7, page 12
     // Valid range: 20-33 dBm
-    ret = rfid_reader_set_power(33);
+    
+    uint8_t power_level = 33;
+
+    ret = rfid_reader_set_power(power_level);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "  ✓ Power set to 33 dBm (maximum)");
+        ESP_LOGI(TAG, "  ✓ Power set to %d dBm", power_level);
     } else {
         ESP_LOGW(TAG, "  ✗ Failed to set power");
     }
