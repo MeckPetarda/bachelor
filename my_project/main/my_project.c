@@ -26,6 +26,7 @@
 #include "uart_reader.h"
 #include "wifi_manager.h"
 #include "my_mqtt_client.h"
+#include "offline_event_logger.h"
 
 // ============================================================================
 // GPIO CONFIGURATION
@@ -119,15 +120,22 @@ static void on_tag_detected(const rfid_tag_event_t* event)
 
     // Publish tag event to MQTT broker (if connected)
     if (mqtt_initialized && mqtt_client_is_connected()) {
-        esp_err_t ret = mqtt_client_publish_tag_event(event);
+        esp_err_t ret = mqtt_client_publish_tag_event(event, false);
         if (ret == ESP_OK) {
             ESP_LOGI(TAG, "  ✓ Tag event published to MQTT broker");
         } else {
             ESP_LOGW(TAG, "  ✗ Failed to publish tag event to MQTT");
         }
     } else {
-        ESP_LOGW(TAG, "  ⚠ MQTT not connected - event not published");
-        // TODO: Store in local database for later transmission
+        ESP_LOGW(TAG, "  ⚠ MQTT not connected - storing event offline");
+        // Store in offline logger for later transmission
+        esp_err_t ret = offline_logger_store_event(event);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "  ✓ Tag event stored offline (%lu pending)",
+                    offline_logger_get_pending_count());
+        } else {
+            ESP_LOGE(TAG, "  ✗ Failed to store event offline");
+        }
     }
 
     // Turn off LED after brief flash
@@ -335,6 +343,17 @@ void app_main(void)
     ESP_LOGI(TAG, "  with UHF RFID Reader + WiFi");
     ESP_LOGI(TAG, "════════════════════════════════════\n");
 
+    // ============================================================================
+    // INITIALIZE OFFLINE EVENT LOGGER
+    // ============================================================================
+
+    ESP_LOGI(TAG, "Initializing offline event logger...");
+    esp_err_t ret = offline_logger_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize offline logger: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Continuing without offline logging...\n");
+    }
+
     // Initialize GPIO
     gpio_init();
 
@@ -343,7 +362,7 @@ void app_main(void)
     // ============================================================================
 
     ESP_LOGI(TAG, "Initializing WiFi...");
-    esp_err_t ret = wifi_manager_init();
+    ret = wifi_manager_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize WiFi: %s", esp_err_to_name(ret));
         ESP_LOGW(TAG, "Continuing without WiFi...");

@@ -157,7 +157,7 @@ bool mqtt_client_is_connected(void);
  * Publishes an RFID tag detection event to the broker with QoS 2
  * (exactly once delivery) as required by the thesis specification.
  *
- * Message format (JSON):
+ * Message format (JSON) for real-time events:
  * ```json
  * {
  *   "tag_id": "E12345678901",
@@ -165,17 +165,33 @@ bool mqtt_client_is_connected(void);
  *   "rssi_dbm": -65,
  *   "antenna_id": 1,
  *   "frequency": 915,
- *   "device_id": "ESP32_ATTENDANCE_01"
+ *   "device_id": "ESP32_ATTENDANCE_01",
+ *   "offline": false
+ * }
+ * ```
+ *
+ * Message format (JSON) for offline replay events:
+ * ```json
+ * {
+ *   "tag_id": "E12345678901",
+ *   "timestamp": 1702000000,
+ *   "rssi_dbm": -65,
+ *   "antenna_id": 1,
+ *   "frequency": 915,
+ *   "device_id": "ESP32_ATTENDANCE_01",
+ *   "offline": true,
+ *   "replay_time": 1702001000
  * }
  * ```
  *
  * @param event Tag detection event from RFID reader
+ * @param offline Set to true if this is a replayed offline event
  * @return ESP_OK on success, error code otherwise
  *
  * Note: This function formats the event into JSON and publishes it.
  * The publish is asynchronous - MQTT_EVENT_PUBLISHED confirms delivery.
  */
-esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event);
+esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event, bool offline);
 
 /**
  * Publish health metrics
