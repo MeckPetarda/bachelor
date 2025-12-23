@@ -95,7 +95,7 @@ static esp_err_t send_command(uint8_t cmd, const uint8_t* data, uint8_t data_len
     // Send
     int written = uart_write_bytes(RFID_UART_PORT, frame, frame_len);
     
-    ESP_LOGI(TAG, "TX cmd=0x%02X, len=%d", cmd, frame_len);
+    ESP_LOGD(TAG, "TX cmd=0x%02X, len=%d", cmd, frame_len);
     
     return (written == frame_len) ? ESP_OK : ESP_FAIL;
 }
@@ -259,15 +259,7 @@ static void uart_rx_task(void* arg)
 
         if (len > 0) {
             // Log raw response for debugging
-            ESP_LOGI(TAG, "RX raw (%d bytes):", len);
-            printf("    ");
-            for (int i = 0; i < len && i < 64; i++) {
-                printf("%02X ", rx_buf[i]);
-            }
-            if (len > 64) {
-                printf("...");
-            }
-            printf("\n");
+            ESP_LOGD(TAG, "RX raw (%d bytes):", len);
 
             // Wait a bit more if we got a frame header but frame seems incomplete
             if (len >= 2 && rx_buf[0] == R300_FRAME_HEAD) {
@@ -285,7 +277,7 @@ static void uart_rx_task(void* arg)
                         ESP_LOGD(TAG, "Read %d additional bytes", additional);
                         len += additional;
                         // Log updated frame
-                        ESP_LOGI(TAG, "RX complete (%d bytes):", len);
+                        ESP_LOGD(TAG, "RX complete (%d bytes):", len);
                         printf("    ");
                         for (int i = 0; i < len && i < 64; i++) {
                             printf("%02X ", rx_buf[i]);
