@@ -14,8 +14,10 @@
 #include "my_mqtt_client.h"
 #include "esp_log.h"
 #include "esp_event.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "offline_event_logger.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -87,6 +89,29 @@ static int rssi_to_dbm(uint8_t rssi)
     return rssi - 129;
 }
 
+/**
+ * Offline event replay callback
+ *
+ * Called by the offline logger for each event during replay.
+ * Publishes the event with offline=true flag.
+ *
+ * @param event RFID tag event to replay
+ * @param offline_timestamp Original detection timestamp
+ * @param replay_timestamp Current replay timestamp
+ * @return ESP_OK if published successfully
+ */
+static esp_err_t replay_offline_event(
+    const rfid_tag_event_t* event,
+    uint64_t offline_timestamp,
+    uint64_t replay_timestamp)
+{
+    ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms)",
+            event->epc[0], event->epc[1], offline_timestamp);
+
+    // Publish with offline flag set to true
+    return mqtt_client_publish_tag_event(event, true);
+}
+
 // ============================================================================
 // MQTT EVENT HANDLER
 // ============================================================================
@@ -144,6 +169,28 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base,
                     ESP_LOGI(TAG, "Re-subscribed to config topics: %s", topic);
                 } else {
                     ESP_LOGW(TAG, "Failed to re-subscribe to config topics");
+                }
+            }
+
+            // Check for pending offline events and start replay
+            uint32_t pending_events = offline_logger_get_pending_count();
+            if (pending_events > 0) {
+                ESP_LOGI(TAG, "════════════════════════════════════");
+                ESP_LOGI(TAG, "  Network Restored!");
+                ESP_LOGI(TAG, "  Found %lu offline events to replay", pending_events);
+                ESP_LOGI(TAG, "════════════════════════════════════");
+
+                // Start replay with grace period (default: 30 seconds)
+                esp_err_t replay_ret = offline_logger_start_replay(
+                    replay_offline_event,
+                    OFFLINE_REPLAY_GRACE_PERIOD
+                );
+
+                if (replay_ret == ESP_OK) {
+                    ESP_LOGI(TAG, "Offline event replay initiated");
+                } else {
+                    ESP_LOGW(TAG, "Failed to start offline event replay: %s",
+                            esp_err_to_name(replay_ret));
                 }
             }
             break;
@@ -345,7 +392,7 @@ bool mqtt_client_is_connected(void)
     return s_connection_state == MQTT_STATE_CONNECTED;
 }
 
-esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event)
+esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event, bool offline)
 {
     if (s_mqtt_client == NULL) {
         ESP_LOGE(TAG, "MQTT client not initialized");
@@ -375,22 +422,50 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event)
 
     // Build JSON payload
     char payload[512];
-    int len = snprintf(payload, sizeof(payload),
-        "{"
-        "\"tag_id\":\"%s\","
-        "\"timestamp\":%lu,"
-        "\"rssi_dbm\":%d,"
-        "\"antenna_id\":%u,"
-        "\"frequency\":%u,"
-        "\"device_id\":\"%s\""
-        "}",
-        epc_hex,
-        event->timestamp_ms,
-        rssi_dbm,
-        event->antenna_id,
-        event->frequency,
-        MQTT_CLIENT_ID
-    );
+    int len;
+
+    if (offline) {
+        // Include offline flag and replay timestamp
+        uint64_t replay_time = esp_timer_get_time() / 1000;  // Current time in ms
+        len = snprintf(payload, sizeof(payload),
+            "{"
+            "\"tag_id\":\"%s\","
+            "\"timestamp\":%lu,"
+            "\"rssi_dbm\":%d,"
+            "\"antenna_id\":%u,"
+            "\"frequency\":%u,"
+            "\"device_id\":\"%s\","
+            "\"offline\":true,"
+            "\"replay_time\":%llu"
+            "}",
+            epc_hex,
+            event->timestamp_ms,
+            rssi_dbm,
+            event->antenna_id,
+            event->frequency,
+            MQTT_CLIENT_ID,
+            replay_time
+        );
+    } else {
+        // Real-time event (offline = false)
+        len = snprintf(payload, sizeof(payload),
+            "{"
+            "\"tag_id\":\"%s\","
+            "\"timestamp\":%lu,"
+            "\"rssi_dbm\":%d,"
+            "\"antenna_id\":%u,"
+            "\"frequency\":%u,"
+            "\"device_id\":\"%s\","
+            "\"offline\":false"
+            "}",
+            epc_hex,
+            event->timestamp_ms,
+            rssi_dbm,
+            event->antenna_id,
+            event->frequency,
+            MQTT_CLIENT_ID
+        );
+    }
 
     if (len >= sizeof(payload)) {
         ESP_LOGW(TAG, "Payload truncated");
