@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "driver/uart.h"
+#include "driver/gpio.h"
 #include "esp_log.h"
 
 static const char* TAG = "RFID";
@@ -404,7 +405,24 @@ esp_err_t rfid_reader_init(void)
         ESP_LOGE(TAG, "Failed to set UART pins: %s", esp_err_to_name(ret));
         return ret;
     }
-    
+
+    // Configure GPIO for power status monitoring
+    gpio_config_t pwr_config = {
+        .pin_bit_mask = (1ULL << RFID_POWER_STATUS_PIN),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_ENABLE,  // Safe default when unpowered
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ret = gpio_config(&pwr_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure power status GPIO: %s", esp_err_to_name(ret));
+        uart_driver_delete(RFID_UART_PORT);
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Power status monitoring configured on GPIO%d", RFID_POWER_STATUS_PIN);
+
     // Flush any startup garbage
     uart_flush(RFID_UART_PORT);
     
@@ -539,14 +557,34 @@ esp_err_t rfid_reader_handshake(uint8_t* major, uint8_t* minor)
         return ESP_ERR_INVALID_STATE;
     }
 
-    uint8_t fw_major = 0, fw_minor = 0;
+    // Check power rail status first
+    bool power_present = gpio_get_level(RFID_POWER_STATUS_PIN);
 
-    // Attempt handshake using get_firmware_version command
-    esp_err_t ret = rfid_reader_get_firmware(&fw_major, &fw_minor);
-
-    // Update health metrics
+    // Update health metrics with power status
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
     rfid_state.health.last_check_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    rfid_state.health.power_rail_present = power_present;
+    xSemaphoreGive(rfid_state.mutex);
+
+    if (!power_present) {
+        // Power rail is down - skip handshake attempt
+        ESP_LOGW(TAG, "✗ RFID power rail down - skipping handshake");
+
+        xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
+        rfid_state.health.is_responsive = false;
+        rfid_state.health.last_error = ESP_ERR_INVALID_STATE;
+        rfid_state.state = RFID_STATE_POWERED_OFF;
+        xSemaphoreGive(rfid_state.mutex);
+
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Power is present - attempt handshake
+    uint8_t fw_major = 0, fw_minor = 0;
+    esp_err_t ret = rfid_reader_get_firmware(&fw_major, &fw_minor);
+
+    // Update health metrics with handshake result
+    xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
     rfid_state.health.last_error = ret;
 
     if (ret == ESP_OK) {
@@ -563,11 +601,11 @@ esp_err_t rfid_reader_handshake(uint8_t* major, uint8_t* minor)
         if (major) *major = fw_major;
         if (minor) *minor = fw_minor;
     } else {
-        // Handshake failed
+        // Handshake failed - power present but reader unresponsive
         rfid_state.health.is_responsive = false;
         rfid_state.state = RFID_STATE_UNRESPONSIVE;
 
-        ESP_LOGW(TAG, "✗ Reader handshake failed - error: %s (0x%X)",
+        ESP_LOGW(TAG, "✗ Reader powered but unresponsive - error: %s (0x%X)",
                  esp_err_to_name(ret), ret);
     }
 
