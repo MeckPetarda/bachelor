@@ -38,8 +38,6 @@
 #define SCANNING_LED       GPIO_NUM_18     // RFID scanning active (ON = scanning)
 #define BUTTON1_PIN        GPIO_NUM_34     // Start/Stop RFID scanning
 #define BUTTON2_PIN        GPIO_NUM_35     // Show statistics
-// PIR sensor disabled - GPIO 2 now used for RFID power status monitoring
-// #define PIR_SENSOR_PIN     GPIO_NUM_2      // Motion detection
 
 #define DEBOUNCE_TIME_MS   50
 // #define PIR_DEBOUNCE_MS    100
@@ -76,12 +74,6 @@ static void on_mqtt_config_message(const char* topic, const char* payload)
     ESP_LOGI(TAG, "║  Topic: %s", topic);
     ESP_LOGI(TAG, "║  Payload: %s", payload);
     ESP_LOGI(TAG, "╚════════════════════════════════════╝");
-
-    // TODO: Parse and apply configuration
-    // Examples:
-    // - attendance/config/ESP32_ATTENDANCE_01/led -> control LED
-    // - attendance/config/ESP32_ATTENDANCE_01/scan -> start/stop scanning
-    // - attendance/config/ESP32_ATTENDANCE_01/power -> set RFID power level
 }
 
 // ============================================================================
@@ -173,16 +165,6 @@ static void gpio_init(void)
     };
     gpio_config(&button_config);
 
-    // PIR sensor disabled - GPIO 2 now used for RFID power status monitoring in uart_reader.c
-    // gpio_config_t pir_config = {
-    //     .pin_bit_mask = (1ULL << PIR_SENSOR_PIN),
-    //     .mode = GPIO_MODE_INPUT,
-    //     .pull_up_en = GPIO_PULLUP_DISABLE,
-    //     .pull_down_en = GPIO_PULLDOWN_DISABLE,
-    //     .intr_type = GPIO_INTR_DISABLE,
-    // };
-    // gpio_config(&pir_config);
-
     // Initialize LED states (all OFF at startup)
     gpio_set_level(WIFI_STATUS_LED, 0);
     gpio_set_level(MQTT_STATUS_LED, 0);
@@ -263,38 +245,6 @@ static void process_buttons(void)
         state->last_stable_state = level;
     }
 }
-
-// ============================================================================
-// PIR SENSOR PROCESSING (DISABLED - GPIO 2 used for RFID power monitoring)
-// ============================================================================
-
-// static void process_pir(void)
-// {
-//     static uint8_t last_state = 0;
-//     static uint32_t last_change = 0;
-//     uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
-//
-//     uint32_t pir_level = gpio_get_level(PIR_SENSOR_PIN);
-//
-//     if (pir_level != last_state &&
-//         (current_time - last_change) >= PIR_DEBOUNCE_MS) {
-//
-//         last_state = pir_level;
-//         last_change = current_time;
-//
-//         if (pir_level == 1) {
-//             ESP_LOGI(TAG, "Motion detected!");
-//
-//             // Auto-start RFID scanning on motion
-//             // if (!rfid_scanning) {
-//             //     ESP_LOGI(TAG, "Auto-starting RFID scan due to motion");
-//             //     rfid_reader_start_inventory_wrapper();
-//             // }
-//         } else {
-//             ESP_LOGI(TAG, "Motion stopped");
-//         }
-//     }
-// }
 
 // ============================================================================
 // MAIN TASK
