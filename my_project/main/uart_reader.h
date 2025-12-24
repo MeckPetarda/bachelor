@@ -38,8 +38,10 @@
 
 #define RFID_UART_PORT      UART_NUM_2
 #define RFID_UART_TX_PIN    17          // ESP32 TX → Y300 RX
-#define RFID_UART_RX_PIN    16          // ESP32 RX → Y300 TX  
+#define RFID_UART_RX_PIN    16          // ESP32 RX → Y300 TX
 #define RFID_UART_BAUD      115200      // R300 default (section 1.1)
+
+#define RFID_POWER_STATUS_PIN GPIO_NUM_2  // 3.3V rail feedback from reader power supply (pin 24)
 
 // ============================================================================
 // FREQUENCY REGIONS (section 2.1.9, page 13)
@@ -80,6 +82,7 @@ typedef struct {
     uint8_t  fw_minor;                  // Firmware minor version
     esp_err_t last_error;               // Last error code from handshake
     bool     is_responsive;             // True if reader is responsive
+    bool     power_rail_present;        // True if 3.3V power rail is present
 } rfid_health_t;
 
 /**
