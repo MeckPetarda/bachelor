@@ -179,11 +179,41 @@ static void gpio_init(void)
 }
 
 static void rfid_reader_start_inventory_wrapper(void) {
-  ESP_LOGI(TAG, "Starting RFID scan...");
-  gpio_set_level(SCANNING_LED, 1);  // Turn on scanning indicator
-  // Use default interval of 250ms (pass 0 for default)
-  rfid_reader_start_inventory(on_tag_detected, 0);
-  rfid_scanning = true;
+    ESP_LOGI(TAG, "Attempting to start RFID scan...");
+
+    // Step 1: Check power rail on GPIO 2 FIRST (proactive check)
+    bool power_present = gpio_get_level(RFID_POWER_STATUS_PIN);
+    if (!power_present) {
+        ESP_LOGE(TAG, "✗ Cannot start scanning - RFID power rail is down (GPIO %d)", RFID_POWER_STATUS_PIN);
+        ESP_LOGE(TAG, "  Check 3.3V power supply to reader");
+        return;
+    }
+
+    ESP_LOGD(TAG, "✓ Power rail present on GPIO %d", RFID_POWER_STATUS_PIN);
+
+    // Step 2: Perform handshake to verify reader communication
+    ESP_LOGI(TAG, "Performing reader handshake...");
+    esp_err_t handshake_result = rfid_reader_handshake(NULL, NULL);
+
+    if (handshake_result != ESP_OK) {
+        ESP_LOGE(TAG, "✗ Cannot start scanning - reader powered but unresponsive");
+        ESP_LOGE(TAG, "  Handshake error: %s (0x%X)", esp_err_to_name(handshake_result), handshake_result);
+        return;
+    }
+
+    ESP_LOGI(TAG, "✓ Reader handshake successful");
+
+    // Step 3: Start inventory (reader is verified responsive)
+    esp_err_t ret = rfid_reader_start_inventory(on_tag_detected, 0);
+
+    if (ret == ESP_OK) {
+        // Step 4: Only now activate scanning indicators
+        gpio_set_level(SCANNING_LED, 1);
+        rfid_scanning = true;
+        ESP_LOGI(TAG, "✓ RFID scanning active");
+    } else {
+        ESP_LOGE(TAG, "✗ Failed to start inventory: %s", esp_err_to_name(ret));
+    }
 }
 
 // ============================================================================
