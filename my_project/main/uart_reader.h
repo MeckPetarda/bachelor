@@ -38,8 +38,10 @@
 
 #define RFID_UART_PORT      UART_NUM_2
 #define RFID_UART_TX_PIN    17          // ESP32 TX → Y300 RX
-#define RFID_UART_RX_PIN    16          // ESP32 RX → Y300 TX  
+#define RFID_UART_RX_PIN    16          // ESP32 RX → Y300 TX
 #define RFID_UART_BAUD      115200      // R300 default (section 1.1)
+
+#define RFID_POWER_STATUS_PIN GPIO_NUM_2  // 3.3V rail feedback from reader power supply (pin 24)
 
 // ============================================================================
 // FREQUENCY REGIONS (section 2.1.9, page 13)
@@ -59,8 +61,33 @@
 // ============================================================================
 
 /**
+ * Reader State Machine
+ * Tracks reader communication health and readiness
+ */
+typedef enum {
+    RFID_STATE_UNINITIALIZED,           // Not initialized yet
+    RFID_STATE_POWERED_OFF,             // Powered off or disconnected
+    RFID_STATE_STARTUP_PENDING,         // Powering up, handshake pending
+    RFID_STATE_RESPONSIVE,              // Communication verified, ready to use
+    RFID_STATE_UNRESPONSIVE             // Communication failed
+} rfid_reader_state_t;
+
+/**
+ * Reader Health Metrics
+ * Used for diagnostics and MQTT health reporting
+ */
+typedef struct {
+    uint32_t last_check_ms;             // Timestamp of last health check
+    uint8_t  fw_major;                  // Firmware major version
+    uint8_t  fw_minor;                  // Firmware minor version
+    esp_err_t last_error;               // Last error code from handshake
+    bool     is_responsive;             // True if reader is responsive
+    bool     power_rail_present;        // True if 3.3V power rail is present
+} rfid_health_t;
+
+/**
  * RFID Tag Detection Event
- * 
+ *
  * Per section 2.2.8 (Real-Time Inventory Response):
  * [Head][Len][Address][Cmd][Freq_Ant][PC(2)][EPC(N)][RSSI][Check]
  */
@@ -123,13 +150,43 @@ void rfid_reader_deinit(void);
 esp_err_t rfid_reader_reset(void);
 
 /**
+ * Perform handshake with reader
+ *
+ * Verifies reader communication using get_firmware_version (0x72).
+ * Should be called at startup, power-on events, and during health checks.
+ * Updates reader state to RESPONSIVE or UNRESPONSIVE based on result.
+ *
+ * @param major Output: firmware major version (optional, can be NULL)
+ * @param minor Output: firmware minor version (optional, can be NULL)
+ * @return ESP_OK if reader is responsive, ESP_ERR_TIMEOUT if unresponsive
+ */
+esp_err_t rfid_reader_handshake(uint8_t* major, uint8_t* minor);
+
+/**
+ * Get current reader state
+ *
+ * @return Current state from state machine
+ */
+rfid_reader_state_t rfid_reader_get_state(void);
+
+/**
+ * Get reader health metrics
+ *
+ * Retrieves health information for diagnostics and MQTT reporting.
+ *
+ * @param health Output: health metrics structure
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG if health is NULL
+ */
+esp_err_t rfid_reader_get_health(rfid_health_t* health);
+
+/**
  * Get firmware version
- * 
+ *
  * Queries reader firmware version (command 0x72).
  * Useful for verifying communication is working.
- * 
+ *
  * Per section 2.1.3, page 8.
- * 
+ *
  * @param major Output: major version number
  * @param minor Output: minor version number
  * @return ESP_OK on success, ESP_ERR_TIMEOUT if no response
