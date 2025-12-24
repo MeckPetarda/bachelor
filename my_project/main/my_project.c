@@ -199,38 +199,34 @@ static void gpio_init(void)
 static void rfid_reader_start_inventory_wrapper(void) {
     ESP_LOGI(TAG, "Attempting to start RFID scan...");
 
-    // Get current reader state
-    rfid_reader_state_t state = rfid_reader_get_state();
-
-    // If not responsive, perform a handshake to verify reader is ready
-    if (state != RFID_STATE_RESPONSIVE) {
-        ESP_LOGI(TAG, "Reader not responsive (state=%d), performing handshake...", state);
-        esp_err_t handshake_result = rfid_reader_handshake(NULL, NULL);
-
-        if (handshake_result != ESP_OK) {
-            // Handshake failed - get health info to provide detailed error
-            rfid_health_t health;
-            rfid_reader_get_health(&health);
-
-            if (!health.power_rail_present) {
-                ESP_LOGE(TAG, "✗ Cannot start scanning - RFID power rail is down");
-                ESP_LOGE(TAG, "  Check 3.3V power supply to reader");
-            } else {
-                ESP_LOGE(TAG, "✗ Cannot start scanning - reader powered but unresponsive");
-                ESP_LOGE(TAG, "  Error: %s (0x%X)", esp_err_to_name(handshake_result), handshake_result);
-            }
-            return;
-        }
-
-        ESP_LOGI(TAG, "✓ Handshake successful, reader is now responsive");
+    // Step 1: Check power rail on GPIO 2 FIRST (proactive check)
+    bool power_present = gpio_get_level(RFID_POWER_STATUS_PIN);
+    if (!power_present) {
+        ESP_LOGE(TAG, "✗ Cannot start scanning - RFID power rail is down (GPIO %d)", RFID_POWER_STATUS_PIN);
+        ESP_LOGE(TAG, "  Check 3.3V power supply to reader");
+        return;
     }
 
-    // Reader is responsive - start inventory
+    ESP_LOGD(TAG, "✓ Power rail present on GPIO %d", RFID_POWER_STATUS_PIN);
+
+    // Step 2: Perform handshake to verify reader communication
+    ESP_LOGI(TAG, "Performing reader handshake...");
+    esp_err_t handshake_result = rfid_reader_handshake(NULL, NULL);
+
+    if (handshake_result != ESP_OK) {
+        ESP_LOGE(TAG, "✗ Cannot start scanning - reader powered but unresponsive");
+        ESP_LOGE(TAG, "  Handshake error: %s (0x%X)", esp_err_to_name(handshake_result), handshake_result);
+        return;
+    }
+
+    ESP_LOGI(TAG, "✓ Reader handshake successful");
+
+    // Step 3: Start inventory (reader is verified responsive)
     esp_err_t ret = rfid_reader_start_inventory(on_tag_detected, 0);
 
     if (ret == ESP_OK) {
-        // Successfully started scanning
-        gpio_set_level(SCANNING_LED, 1);  // Turn on scanning indicator
+        // Step 4: Only now activate scanning indicators
+        gpio_set_level(SCANNING_LED, 1);
         rfid_scanning = true;
         ESP_LOGI(TAG, "✓ RFID scanning active");
     } else {
