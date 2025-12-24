@@ -32,10 +32,15 @@ static const char* TAG = "RFID";
 
 #define DEFAULT_READ_INTERVAL_MS 250
 #define MIN_READ_INTERVAL_MS     50
+#define HANDSHAKE_TIMEOUT_MS     1000
+#define POWER_ON_GRACE_PERIOD_MS 500
+#define HEALTH_CHECK_INTERVAL_MS 60000
 
 #define R300_MAX_FRAME_SIZE     256
 #define UART_RX_TASK_STACK      4096
 #define UART_RX_TASK_PRIORITY   10
+#define HEALTH_CHECK_TASK_STACK 3072
+#define HEALTH_CHECK_TASK_PRIORITY 5
 
 // ============================================================================
 // MODULE STATE
@@ -47,9 +52,17 @@ static struct {
     rfid_tag_callback_t tag_callback;
     rfid_stats_t stats;
     TaskHandle_t rx_task_handle;
+    TaskHandle_t health_check_task_handle;
     SemaphoreHandle_t mutex;
     uint32_t read_interval_ms;
-} rfid_state = {0};
+
+    // State machine and health tracking
+    rfid_reader_state_t state;
+    rfid_health_t health;
+} rfid_state = {
+    .state = RFID_STATE_UNINITIALIZED,
+    .health = {0}
+};
 
 // ============================================================================
 // R300 PROTOCOL HELPERS
@@ -230,6 +243,24 @@ static void send_inventory_command(void)
 }
 
 // ============================================================================
+// HEALTH CHECK TASK
+// ============================================================================
+
+static void health_check_task(void* arg)
+{
+    ESP_LOGI(TAG, "Health check task started (interval=%d ms)", HEALTH_CHECK_INTERVAL_MS);
+
+    while (1) {
+        // Wait for the health check interval
+        vTaskDelay(pdMS_TO_TICKS(HEALTH_CHECK_INTERVAL_MS));
+
+        // Perform handshake to verify reader responsiveness
+        ESP_LOGD(TAG, "Performing periodic health check...");
+        rfid_reader_handshake(NULL, NULL);
+    }
+}
+
+// ============================================================================
 // UART RX TASK
 // ============================================================================
 
@@ -378,21 +409,39 @@ esp_err_t rfid_reader_init(void)
     uart_flush(RFID_UART_PORT);
     
     // Start RX task
-    BaseType_t task_ret = xTaskCreate(uart_rx_task, "rfid_rx", 
-                                       UART_RX_TASK_STACK, NULL, 
-                                       UART_RX_TASK_PRIORITY, 
+    BaseType_t task_ret = xTaskCreate(uart_rx_task, "rfid_rx",
+                                       UART_RX_TASK_STACK, NULL,
+                                       UART_RX_TASK_PRIORITY,
                                        &rfid_state.rx_task_handle);
     if (task_ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create RX task");
         uart_driver_delete(RFID_UART_PORT);
         return ESP_ERR_NO_MEM;
     }
-    
+
+    // Start health check task
+    task_ret = xTaskCreate(health_check_task, "rfid_health",
+                           HEALTH_CHECK_TASK_STACK, NULL,
+                           HEALTH_CHECK_TASK_PRIORITY,
+                           &rfid_state.health_check_task_handle);
+    if (task_ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create health check task");
+        vTaskDelete(rfid_state.rx_task_handle);
+        uart_driver_delete(RFID_UART_PORT);
+        return ESP_ERR_NO_MEM;
+    }
+
     rfid_state.initialized = true;
-    
+    rfid_state.state = RFID_STATE_STARTUP_PENDING;
+
     ESP_LOGI(TAG, "RFID reader initialized (UART%d, TX=%d, RX=%d, Baud=%d)",
              RFID_UART_PORT, RFID_UART_TX_PIN, RFID_UART_RX_PIN, RFID_UART_BAUD);
-    
+
+    // Perform initial handshake to verify reader is responsive
+    ESP_LOGI(TAG, "Performing startup handshake...");
+    vTaskDelay(pdMS_TO_TICKS(POWER_ON_GRACE_PERIOD_MS));
+    rfid_reader_handshake(NULL, NULL);
+
     return ESP_OK;
 }
 
@@ -401,23 +450,29 @@ void rfid_reader_deinit(void)
     if (!rfid_state.initialized) {
         return;
     }
-    
+
     rfid_reader_stop_inventory();
-    
+
     if (rfid_state.rx_task_handle) {
         vTaskDelete(rfid_state.rx_task_handle);
         rfid_state.rx_task_handle = NULL;
     }
-    
+
+    if (rfid_state.health_check_task_handle) {
+        vTaskDelete(rfid_state.health_check_task_handle);
+        rfid_state.health_check_task_handle = NULL;
+    }
+
     uart_driver_delete(RFID_UART_PORT);
-    
+
     if (rfid_state.mutex) {
         vSemaphoreDelete(rfid_state.mutex);
         rfid_state.mutex = NULL;
     }
-    
+
     memset(&rfid_state, 0, sizeof(rfid_state));
-    
+    rfid_state.state = RFID_STATE_UNINITIALIZED;
+
     ESP_LOGI(TAG, "RFID reader deinitialized");
 }
 
@@ -447,35 +502,96 @@ esp_err_t rfid_reader_get_firmware(uint8_t* major, uint8_t* minor)
     if (!rfid_state.initialized) {
         return ESP_ERR_INVALID_STATE;
     }
-    
+
     if (!major || !minor) {
         return ESP_ERR_INVALID_ARG;
     }
-    
+
     // Flush RX buffer
     uart_flush(RFID_UART_PORT);
-    
+
     // Send command
     esp_err_t ret = send_command(R300_CMD_GET_FIRMWARE, NULL, 0);
     if (ret != ESP_OK) {
         return ret;
     }
-    
+
     // Wait for response
     // Expected: [0xA0][0x05][Address][0x72][Major][Minor][Check]
     uint8_t rx_buf[32];
     int len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf),
                               pdMS_TO_TICKS(1000));
-    
+
     if (len >= 7 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_GET_FIRMWARE) {
         *major = rx_buf[4];
         *minor = rx_buf[5];
         ESP_LOGI(TAG, "Firmware version: %d.%d", *major, *minor);
         return ESP_OK;
     }
-    
+
     ESP_LOGW(TAG, "No firmware response (len=%d)", len);
     return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t rfid_reader_handshake(uint8_t* major, uint8_t* minor)
+{
+    if (!rfid_state.initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    uint8_t fw_major = 0, fw_minor = 0;
+
+    // Attempt handshake using get_firmware_version command
+    esp_err_t ret = rfid_reader_get_firmware(&fw_major, &fw_minor);
+
+    // Update health metrics
+    xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
+    rfid_state.health.last_check_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    rfid_state.health.last_error = ret;
+
+    if (ret == ESP_OK) {
+        // Handshake successful
+        rfid_state.health.fw_major = fw_major;
+        rfid_state.health.fw_minor = fw_minor;
+        rfid_state.health.is_responsive = true;
+        rfid_state.state = RFID_STATE_RESPONSIVE;
+
+        ESP_LOGI(TAG, "✓ Reader handshake successful - firmware v%d.%d",
+                 fw_major, fw_minor);
+
+        // Return firmware version if requested
+        if (major) *major = fw_major;
+        if (minor) *minor = fw_minor;
+    } else {
+        // Handshake failed
+        rfid_state.health.is_responsive = false;
+        rfid_state.state = RFID_STATE_UNRESPONSIVE;
+
+        ESP_LOGW(TAG, "✗ Reader handshake failed - error: %s (0x%X)",
+                 esp_err_to_name(ret), ret);
+    }
+
+    xSemaphoreGive(rfid_state.mutex);
+
+    return ret;
+}
+
+rfid_reader_state_t rfid_reader_get_state(void)
+{
+    return rfid_state.state;
+}
+
+esp_err_t rfid_reader_get_health(rfid_health_t* health)
+{
+    if (!health) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
+    memcpy(health, &rfid_state.health, sizeof(rfid_health_t));
+    xSemaphoreGive(rfid_state.mutex);
+
+    return ESP_OK;
 }
 
 esp_err_t rfid_reader_set_power(uint8_t power_dbm)
@@ -521,6 +637,13 @@ esp_err_t rfid_reader_set_frequency_region(uint8_t region, uint8_t start_freq, u
 esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t interval_ms)
 {
     if (!rfid_state.initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Check if reader is responsive before starting inventory
+    if (rfid_state.state != RFID_STATE_RESPONSIVE) {
+        ESP_LOGE(TAG, "Cannot start inventory - reader state is %d (not RESPONSIVE)",
+                 rfid_state.state);
         return ESP_ERR_INVALID_STATE;
     }
 
