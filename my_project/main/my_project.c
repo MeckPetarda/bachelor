@@ -258,7 +258,7 @@ static void process_buttons(void)
             if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS) {
                 state->press_count++;
                 state->last_press_time = current_time;
-                
+
                 // Get and display statistics
                 rfid_stats_t stats;
                 if (rfid_reader_get_stats(&stats) == ESP_OK) {
@@ -268,6 +268,14 @@ static void process_buttons(void)
                     ESP_LOGI(TAG, "  Errors: %lu", stats.errors);
                     ESP_LOGI(TAG, "  Scanning: %s", stats.inventory_active ? "YES" : "NO");
                     ESP_LOGI(TAG, "════════════════════════════════\n");
+                }
+
+                // Publish health metrics via MQTT
+                if (mqtt_client_is_connected()) {
+                    ESP_LOGI(TAG, "Publishing health metrics to MQTT...");
+                    mqtt_client_publish_health_metrics();
+                } else {
+                    ESP_LOGW(TAG, "MQTT not connected - skipping health metrics publish");
                 }
             }
         }
