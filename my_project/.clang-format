@@ -1,0 +1,10 @@
+BasedOnStyle: Microsoft
+IndentWidth: 4
+AccessModifierOffset: -4
+AlignConsecutiveAssignments: Consecutive 
+AlignConsecutiveBitFields: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2

@@ -12,8 +12,8 @@
  */
 
 #include "my_mqtt_client.h"
-#include "esp_log.h"
 #include "esp_event.h"
+#include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -26,7 +26,7 @@
 // CONSTANTS & STATE
 // ============================================================================
 
-static const char* TAG = "MQTT_CLIENT";
+static const char *TAG = "MQTT_CLIENT";
 
 /**
  * MQTT client handle
@@ -69,9 +69,10 @@ static mqtt_config_callback_t s_config_callback = NULL;
  * @param len EPC length
  * @param output Output buffer (must be at least len*2 + 1 bytes)
  */
-static void epc_to_hex_string(const uint8_t* epc, uint8_t len, char* output)
+static void epc_to_hex_string(const uint8_t *epc, uint8_t len, char *output)
 {
-    for (int i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++)
+    {
         sprintf(output + (i * 2), "%02X", epc[i]);
     }
     output[len * 2] = '\0';
@@ -101,13 +102,11 @@ static int rssi_to_dbm(uint8_t rssi)
  * @param replay_timestamp Current replay timestamp
  * @return ESP_OK if published successfully
  */
-static esp_err_t replay_offline_event(
-    const rfid_tag_event_t* event,
-    uint64_t offline_timestamp,
-    uint64_t replay_timestamp)
+static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t offline_timestamp,
+                                      uint64_t replay_timestamp)
 {
-    ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms)",
-            event->epc[0], event->epc[1], offline_timestamp);
+    ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms)", event->epc[0], event->epc[1],
+             offline_timestamp);
 
     // Publish with offline flag set to true
     return mqtt_client_publish_tag_event(event, true);
@@ -130,134 +129,138 @@ static esp_err_t replay_offline_event(
  * - MQTT_EVENT_PUBLISHED: Confirm message delivery (QoS > 0)
  * - MQTT_EVENT_ERROR: Handle connection/protocol errors
  */
-static void mqtt_event_handler(void* handler_args, esp_event_base_t base,
-                                int32_t event_id, void* event_data)
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
 
-    switch ((esp_mqtt_event_id_t)event_id) {
-        case MQTT_EVENT_BEFORE_CONNECT:
-            ESP_LOGI(TAG, "Connecting to MQTT broker...");
-            s_connection_state = MQTT_STATE_CONNECTING;
-            break;
+    switch ((esp_mqtt_event_id_t)event_id)
+    {
+    case MQTT_EVENT_BEFORE_CONNECT:
+        ESP_LOGI(TAG, "Connecting to MQTT broker...");
+        s_connection_state = MQTT_STATE_CONNECTING;
+        break;
 
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "✓ Connected to MQTT broker");
-            s_connection_state = MQTT_STATE_CONNECTED;
-            s_stats.connection_count++;
-            xEventGroupSetBits(s_mqtt_event_group, MQTT_CONNECTED_BIT);
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG, "✓ Connected to MQTT broker");
+        s_connection_state = MQTT_STATE_CONNECTED;
+        s_stats.connection_count++;
+        xEventGroupSetBits(s_mqtt_event_group, MQTT_CONNECTED_BIT);
 
-            // Publish online status
-            esp_mqtt_client_publish(event->client,
-                                   MQTT_TOPIC_DEVICE_STATUS,
-                                   "online",
-                                   0,  // Use default length (null-terminated)
-                                   1,  // QoS 1
-                                   1); // Retain flag
+        // Publish online status
+        esp_mqtt_client_publish(event->client, MQTT_TOPIC_DEVICE_STATUS, "online",
+                                0,  // Use default length (null-terminated)
+                                1,  // QoS 1
+                                1); // Retain flag
 
-            ESP_LOGI(TAG, "Published online status");
+        ESP_LOGI(TAG, "Published online status");
 
-            // Re-subscribe to configuration topics if callback is registered
-            // This ensures subscriptions are restored after broker restart or reconnection
-            if (s_config_callback != NULL) {
-                char topic[128];
-                snprintf(topic, sizeof(topic), "%s+", MQTT_TOPIC_CONFIG_BASE);
+        // Re-subscribe to configuration topics if callback is registered
+        // This ensures subscriptions are restored after broker restart or
+        // reconnection
+        if (s_config_callback != NULL)
+        {
+            char topic[128];
+            snprintf(topic, sizeof(topic), "%s+", MQTT_TOPIC_CONFIG_BASE);
 
-                int msg_id = esp_mqtt_client_subscribe(event->client,
-                                                      topic,
-                                                      MQTT_QOS_CONFIG_COMMANDS);
-                if (msg_id >= 0) {
-                    ESP_LOGI(TAG, "Re-subscribed to config topics: %s", topic);
-                } else {
-                    ESP_LOGW(TAG, "Failed to re-subscribe to config topics");
-                }
+            int msg_id = esp_mqtt_client_subscribe(event->client, topic, MQTT_QOS_CONFIG_COMMANDS);
+            if (msg_id >= 0)
+            {
+                ESP_LOGI(TAG, "Re-subscribed to config topics: %s", topic);
             }
-
-            // Check for pending offline events and start replay
-            uint32_t pending_events = offline_logger_get_pending_count();
-            if (pending_events > 0) {
-                ESP_LOGI(TAG, "════════════════════════════════════");
-                ESP_LOGI(TAG, "  Network Restored!");
-                ESP_LOGI(TAG, "  Found %lu offline events to replay", pending_events);
-                ESP_LOGI(TAG, "════════════════════════════════════");
-
-                // Start replay with grace period (default: 30 seconds)
-                esp_err_t replay_ret = offline_logger_start_replay(
-                    replay_offline_event,
-                    OFFLINE_REPLAY_GRACE_PERIOD
-                );
-
-                if (replay_ret == ESP_OK) {
-                    ESP_LOGI(TAG, "Offline event replay initiated");
-                } else {
-                    ESP_LOGW(TAG, "Failed to start offline event replay: %s",
-                            esp_err_to_name(replay_ret));
-                }
+            else
+            {
+                ESP_LOGW(TAG, "Failed to re-subscribe to config topics");
             }
-            break;
+        }
 
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGW(TAG, "Disconnected from MQTT broker");
-            s_connection_state = MQTT_STATE_DISCONNECTED;
-            s_stats.disconnection_count++;
-            xEventGroupClearBits(s_mqtt_event_group, MQTT_CONNECTED_BIT);
-            break;
+        // Check for pending offline events and start replay
+        uint32_t pending_events = offline_logger_get_pending_count();
+        if (pending_events > 0)
+        {
+            ESP_LOGI(TAG, "════════════════════════════════════");
+            ESP_LOGI(TAG, "  Network Restored!");
+            ESP_LOGI(TAG, "  Found %lu offline events to replay", pending_events);
+            ESP_LOGI(TAG, "════════════════════════════════════");
 
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
-            break;
+            // Start replay with grace period (default: 30 seconds)
+            esp_err_t replay_ret = offline_logger_start_replay(replay_offline_event, OFFLINE_REPLAY_GRACE_PERIOD);
 
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
-            break;
-
-        case MQTT_EVENT_PUBLISHED:
-            ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
-            s_stats.messages_published++;
-            break;
-
-        case MQTT_EVENT_DATA:
-            // Incoming message on subscribed topic
-            ESP_LOGI(TAG, "Received message on topic: %.*s",
-                     event->topic_len, event->topic);
-            ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
-
-            s_stats.messages_received++;
-
-            // Null-terminate topic and data for callback
-            if (s_config_callback != NULL) {
-                char topic[256];
-                char payload[512];
-
-                // Copy and null-terminate
-                int topic_len = event->topic_len < 255 ? event->topic_len : 255;
-                int data_len = event->data_len < 511 ? event->data_len : 511;
-
-                memcpy(topic, event->topic, topic_len);
-                topic[topic_len] = '\0';
-
-                memcpy(payload, event->data, data_len);
-                payload[data_len] = '\0';
-
-                // Invoke callback
-                s_config_callback(topic, payload);
+            if (replay_ret == ESP_OK)
+            {
+                ESP_LOGI(TAG, "Offline event replay initiated");
             }
-            break;
-
-        case MQTT_EVENT_ERROR:
-            ESP_LOGE(TAG, "MQTT Error occurred");
-            s_connection_state = MQTT_STATE_ERROR;
-
-            if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
-                ESP_LOGE(TAG, "TCP transport error");
-            } else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
-                ESP_LOGE(TAG, "Connection refused by broker");
+            else
+            {
+                ESP_LOGW(TAG, "Failed to start offline event replay: %s", esp_err_to_name(replay_ret));
             }
-            break;
+        }
+        break;
 
-        default:
-            ESP_LOGD(TAG, "Unhandled MQTT event: %d", event_id);
-            break;
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGW(TAG, "Disconnected from MQTT broker");
+        s_connection_state = MQTT_STATE_DISCONNECTED;
+        s_stats.disconnection_count++;
+        xEventGroupClearBits(s_mqtt_event_group, MQTT_CONNECTED_BIT);
+        break;
+
+    case MQTT_EVENT_SUBSCRIBED:
+        ESP_LOGI(TAG, "Subscription acknowledged (msg_id=%d)", event->msg_id);
+        break;
+
+    case MQTT_EVENT_UNSUBSCRIBED:
+        ESP_LOGI(TAG, "Unsubscribed (msg_id=%d)", event->msg_id);
+        break;
+
+    case MQTT_EVENT_PUBLISHED:
+        ESP_LOGD(TAG, "Message published (msg_id=%d)", event->msg_id);
+        s_stats.messages_published++;
+        break;
+
+    case MQTT_EVENT_DATA:
+        // Incoming message on subscribed topic
+        ESP_LOGI(TAG, "Received message on topic: %.*s", event->topic_len, event->topic);
+        ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
+
+        s_stats.messages_received++;
+
+        // Null-terminate topic and data for callback
+        if (s_config_callback != NULL)
+        {
+            char topic[256];
+            char payload[512];
+
+            // Copy and null-terminate
+            int topic_len = event->topic_len < 255 ? event->topic_len : 255;
+            int data_len  = event->data_len < 511 ? event->data_len : 511;
+
+            memcpy(topic, event->topic, topic_len);
+            topic[topic_len] = '\0';
+
+            memcpy(payload, event->data, data_len);
+            payload[data_len] = '\0';
+
+            // Invoke callback
+            s_config_callback(topic, payload);
+        }
+        break;
+
+    case MQTT_EVENT_ERROR:
+        ESP_LOGE(TAG, "MQTT Error occurred");
+        s_connection_state = MQTT_STATE_ERROR;
+
+        if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT)
+        {
+            ESP_LOGE(TAG, "TCP transport error");
+        }
+        else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED)
+        {
+            ESP_LOGE(TAG, "Connection refused by broker");
+        }
+        break;
+
+    default:
+        ESP_LOGD(TAG, "Unhandled MQTT event: %d", event_id);
+        break;
     }
 }
 
@@ -274,7 +277,8 @@ esp_err_t mqtt_client_init(void)
     // ========================================================================
 
     s_mqtt_event_group = xEventGroupCreate();
-    if (s_mqtt_event_group == NULL) {
+    if (s_mqtt_event_group == NULL)
+    {
         ESP_LOGE(TAG, "Failed to create event group");
         return ESP_FAIL;
     }
@@ -289,26 +293,27 @@ esp_err_t mqtt_client_init(void)
         .broker.address.uri = MQTT_BROKER_URI,
 
         // Client credentials
-        .credentials.client_id = MQTT_CLIENT_ID,
-        .credentials.username = NULL,  // No authentication for testing
+        .credentials.client_id               = MQTT_CLIENT_ID,
+        .credentials.username                = NULL, // No authentication for testing
         .credentials.authentication.password = NULL,
 
         // Session configuration
         .session.protocol_ver = MQTT_PROTOCOL_V_3_1_1,
-        .session.keepalive = 60,  // Keep-alive interval (seconds)
+        .session.keepalive    = 60, // Keep-alive interval (seconds)
 
         // Last Will & Testament - published when device disconnects unexpectedly
-        .session.last_will = {
-            .topic = MQTT_TOPIC_DEVICE_STATUS,
-            .msg = "offline",
-            .msg_len = 0,  // Use default (null-terminated)
-            .qos = 2,      // QoS 2 for critical status
-            .retain = 1,   // Retain offline status
-        },
+        .session.last_will =
+            {
+                .topic   = MQTT_TOPIC_DEVICE_STATUS,
+                .msg     = "offline",
+                .msg_len = 0, // Use default (null-terminated)
+                .qos     = 2, // QoS 2 for critical status
+                .retain  = 1, // Retain offline status
+            },
 
         // Network configuration
-        .network.reconnect_timeout_ms = 4000,  // Wait 4s before retry
-        .network.refresh_connection_after_ms = 0,  // 0 = disabled
+        .network.reconnect_timeout_ms        = 4000, // Wait 4s before retry
+        .network.refresh_connection_after_ms = 0,    // 0 = disabled
     };
 
     ESP_LOGI(TAG, "  ✓ MQTT configuration created");
@@ -320,7 +325,8 @@ esp_err_t mqtt_client_init(void)
     // ========================================================================
 
     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-    if (s_mqtt_client == NULL) {
+    if (s_mqtt_client == NULL)
+    {
         ESP_LOGE(TAG, "Failed to initialize MQTT client");
         return ESP_FAIL;
     }
@@ -330,13 +336,10 @@ esp_err_t mqtt_client_init(void)
     // STEP 4: Register Event Handler
     // ========================================================================
 
-    esp_err_t ret = esp_mqtt_client_register_event(s_mqtt_client,
-                                                   ESP_EVENT_ANY_ID,
-                                                   mqtt_event_handler,
-                                                   NULL);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register event handler: %s",
-                 esp_err_to_name(ret));
+    esp_err_t ret = esp_mqtt_client_register_event(s_mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to register event handler: %s", esp_err_to_name(ret));
         return ret;
     }
     ESP_LOGI(TAG, "  ✓ Event handler registered");
@@ -346,9 +349,9 @@ esp_err_t mqtt_client_init(void)
     // ========================================================================
 
     ret = esp_mqtt_client_start(s_mqtt_client);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start MQTT client: %s",
-                 esp_err_to_name(ret));
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start MQTT client: %s", esp_err_to_name(ret));
         return ret;
     }
     ESP_LOGI(TAG, "  ✓ MQTT client started");
@@ -365,24 +368,26 @@ esp_err_t mqtt_client_init(void)
 
 esp_err_t mqtt_client_wait_for_connection(uint32_t timeout_ms)
 {
-    if (s_mqtt_event_group == NULL) {
+    if (s_mqtt_event_group == NULL)
+    {
         ESP_LOGE(TAG, "MQTT client not initialized");
         return ESP_FAIL;
     }
 
-    TickType_t timeout_ticks = (timeout_ms == 0) ? portMAX_DELAY :
-                               pdMS_TO_TICKS(timeout_ms);
+    TickType_t timeout_ticks = (timeout_ms == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
 
-    EventBits_t bits = xEventGroupWaitBits(s_mqtt_event_group,
-                                          MQTT_CONNECTED_BIT,
-                                          pdFALSE,  // Don't clear on exit
-                                          pdFALSE,  // Wait for bit
-                                          timeout_ticks);
+    EventBits_t bits = xEventGroupWaitBits(s_mqtt_event_group, MQTT_CONNECTED_BIT,
+                                           pdFALSE, // Don't clear on exit
+                                           pdFALSE, // Wait for bit
+                                           timeout_ticks);
 
-    if (bits & MQTT_CONNECTED_BIT) {
+    if (bits & MQTT_CONNECTED_BIT)
+    {
         ESP_LOGI(TAG, "✓ MQTT connection established");
         return ESP_OK;
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "✗ MQTT connection timeout");
         return ESP_ERR_TIMEOUT;
     }
@@ -393,19 +398,22 @@ bool mqtt_client_is_connected(void)
     return s_connection_state == MQTT_STATE_CONNECTED;
 }
 
-esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event, bool offline)
+esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offline)
 {
-    if (s_mqtt_client == NULL) {
+    if (s_mqtt_client == NULL)
+    {
         ESP_LOGE(TAG, "MQTT client not initialized");
         return ESP_FAIL;
     }
 
-    if (event == NULL) {
+    if (event == NULL)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
     // Check if connected before attempting to publish
-    if (!mqtt_client_is_connected()) {
+    if (!mqtt_client_is_connected())
+    {
         ESP_LOGW(TAG, "Cannot publish tag event - not connected to broker");
         return ESP_FAIL;
     }
@@ -415,7 +423,7 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event, bool offl
     // ========================================================================
 
     // Convert EPC to hex string
-    char epc_hex[65];  // Max 32 bytes * 2 + null terminator
+    char epc_hex[65]; // Max 32 bytes * 2 + null terminator
     epc_to_hex_string(event->epc, event->epc_len, epc_hex);
 
     // Convert RSSI to dBm
@@ -423,52 +431,44 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event, bool offl
 
     // Build JSON payload
     char payload[512];
-    int len;
+    int  len;
 
-    if (offline) {
+    if (offline)
+    {
         // Include offline flag and replay timestamp
-        uint64_t replay_time = esp_timer_get_time() / 1000;  // Current time in ms
-        len = snprintf(payload, sizeof(payload),
-            "{"
-            "\"tag_id\":\"%s\","
-            "\"timestamp\":%lu,"
-            "\"rssi_dbm\":%d,"
-            "\"antenna_id\":%u,"
-            "\"frequency\":%u,"
-            "\"device_id\":\"%s\","
-            "\"offline\":true,"
-            "\"replay_time\":%llu"
-            "}",
-            epc_hex,
-            event->timestamp_ms,
-            rssi_dbm,
-            event->antenna_id,
-            event->frequency,
-            MQTT_CLIENT_ID,
-            replay_time
-        );
-    } else {
+        uint64_t replay_time = esp_timer_get_time() / 1000; // Current time in ms
+        len                  = snprintf(payload, sizeof(payload),
+                                        "{"
+                                                         "\"tag_id\":\"%s\","
+                                                         "\"timestamp\":%lu,"
+                                                         "\"rssi_dbm\":%d,"
+                                                         "\"antenna_id\":%u,"
+                                                         "\"frequency\":%u,"
+                                                         "\"device_id\":\"%s\","
+                                                         "\"offline\":true,"
+                                                         "\"replay_time\":%llu"
+                                                         "}",
+                                        epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, MQTT_CLIENT_ID,
+                                        replay_time);
+    }
+    else
+    {
         // Real-time event (offline = false)
         len = snprintf(payload, sizeof(payload),
-            "{"
-            "\"tag_id\":\"%s\","
-            "\"timestamp\":%lu,"
-            "\"rssi_dbm\":%d,"
-            "\"antenna_id\":%u,"
-            "\"frequency\":%u,"
-            "\"device_id\":\"%s\","
-            "\"offline\":false"
-            "}",
-            epc_hex,
-            event->timestamp_ms,
-            rssi_dbm,
-            event->antenna_id,
-            event->frequency,
-            MQTT_CLIENT_ID
-        );
+                       "{"
+                       "\"tag_id\":\"%s\","
+                       "\"timestamp\":%lu,"
+                       "\"rssi_dbm\":%d,"
+                       "\"antenna_id\":%u,"
+                       "\"frequency\":%u,"
+                       "\"device_id\":\"%s\","
+                       "\"offline\":false"
+                       "}",
+                       epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, MQTT_CLIENT_ID);
     }
 
-    if (len >= sizeof(payload)) {
+    if (len >= sizeof(payload))
+    {
         ESP_LOGW(TAG, "Payload truncated");
     }
 
@@ -476,14 +476,13 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event, bool offl
     // Publish to MQTT Broker with QoS 2
     // ========================================================================
 
-    int msg_id = esp_mqtt_client_publish(s_mqtt_client,
-                                        MQTT_TOPIC_TAG_DETECTED,
-                                        payload,
-                                        0,  // Use default length
-                                        MQTT_QOS_TAG_EVENTS,  // QoS 2
-                                        0); // Don't retain
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_TAG_DETECTED, payload,
+                                         0,                   // Use default length
+                                         MQTT_QOS_TAG_EVENTS, // QoS 2
+                                         0);                  // Don't retain
 
-    if (msg_id < 0) {
+    if (msg_id < 0)
+    {
         ESP_LOGE(TAG, "Failed to publish tag event");
         s_stats.publish_errors++;
         return ESP_FAIL;
@@ -496,12 +495,14 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event, bool offl
 
 esp_err_t mqtt_client_publish_health_metrics(void)
 {
-    if (s_mqtt_client == NULL) {
+    if (s_mqtt_client == NULL)
+    {
         ESP_LOGE(TAG, "MQTT client not initialized");
         return ESP_FAIL;
     }
 
-    if (!mqtt_client_is_connected()) {
+    if (!mqtt_client_is_connected())
+    {
         ESP_LOGW(TAG, "Cannot publish health metrics - not connected");
         return ESP_FAIL;
     }
@@ -511,48 +512,54 @@ esp_err_t mqtt_client_publish_health_metrics(void)
     // ========================================================================
 
     uint32_t free_heap = esp_get_free_heap_size();
-    char memory_payload[64];
+    char     memory_payload[64];
     snprintf(memory_payload, sizeof(memory_payload), "{\"free_heap\":%lu}", free_heap);
 
-    esp_mqtt_client_publish(s_mqtt_client,
-                           MQTT_TOPIC_HEALTH_BASE "memory",
-                           memory_payload,
-                           0,
-                           MQTT_QOS_HEALTH_METRICS,
-                           0);
+    esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_HEALTH_BASE "memory", memory_payload, 0, MQTT_QOS_HEALTH_METRICS,
+                            0);
 
     // ========================================================================
     // Publish Uptime
     // ========================================================================
 
     uint32_t uptime_sec = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
-    char uptime_payload[64];
+    char     uptime_payload[64];
     snprintf(uptime_payload, sizeof(uptime_payload), "{\"uptime_sec\":%lu}", uptime_sec);
 
-    esp_mqtt_client_publish(s_mqtt_client,
-                           MQTT_TOPIC_HEALTH_BASE "uptime",
-                           uptime_payload,
-                           0,
-                           MQTT_QOS_HEALTH_METRICS,
-                           0);
+    esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_HEALTH_BASE "uptime", uptime_payload, 0, MQTT_QOS_HEALTH_METRICS,
+                            0);
 
     // ========================================================================
     // Publish RFID Reader Health Status
     // ========================================================================
 
-    rfid_health_t rfid_health;
+    rfid_health_t       rfid_health;
     rfid_reader_state_t rfid_state = rfid_reader_get_state();
 
-    if (rfid_reader_get_health(&rfid_health) == ESP_OK) {
+    if (rfid_reader_get_health(&rfid_health) == ESP_OK)
+    {
         // Convert state enum to string for readability
-        const char* state_str;
-        switch (rfid_state) {
-            case RFID_STATE_UNINITIALIZED:   state_str = "UNINITIALIZED"; break;
-            case RFID_STATE_POWERED_OFF:     state_str = "POWERED_OFF"; break;
-            case RFID_STATE_STARTUP_PENDING: state_str = "STARTUP_PENDING"; break;
-            case RFID_STATE_RESPONSIVE:      state_str = "RESPONSIVE"; break;
-            case RFID_STATE_UNRESPONSIVE:    state_str = "UNRESPONSIVE"; break;
-            default:                         state_str = "UNKNOWN"; break;
+        const char *state_str;
+        switch (rfid_state)
+        {
+        case RFID_STATE_UNINITIALIZED:
+            state_str = "UNINITIALIZED";
+            break;
+        case RFID_STATE_POWERED_OFF:
+            state_str = "POWERED_OFF";
+            break;
+        case RFID_STATE_STARTUP_PENDING:
+            state_str = "STARTUP_PENDING";
+            break;
+        case RFID_STATE_RESPONSIVE:
+            state_str = "RESPONSIVE";
+            break;
+        case RFID_STATE_UNRESPONSIVE:
+            state_str = "UNRESPONSIVE";
+            break;
+        default:
+            state_str = "UNKNOWN";
+            break;
         }
 
         // Build JSON payload with all health metrics
@@ -560,21 +567,15 @@ esp_err_t mqtt_client_publish_health_metrics(void)
         snprintf(rfid_payload, sizeof(rfid_payload),
                  "{\"state\":\"%s\",\"is_responsive\":%s,\"power_rail_present\":%s,"
                  "\"fw_version\":\"%u.%u\",\"last_error\":%d,\"last_check_ms\":%lu}",
-                 state_str,
-                 rfid_health.is_responsive ? "true" : "false",
-                 rfid_health.power_rail_present ? "true" : "false",
-                 rfid_health.fw_major,
-                 rfid_health.fw_minor,
-                 rfid_health.last_error,
-                 rfid_health.last_check_ms);
+                 state_str, rfid_health.is_responsive ? "true" : "false",
+                 rfid_health.power_rail_present ? "true" : "false", rfid_health.fw_major, rfid_health.fw_minor,
+                 rfid_health.last_error, rfid_health.last_check_ms);
 
-        esp_mqtt_client_publish(s_mqtt_client,
-                               MQTT_TOPIC_HEALTH_BASE "rfid_status",
-                               rfid_payload,
-                               0,
-                               MQTT_QOS_HEALTH_METRICS,
-                               0);
-    } else {
+        esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_HEALTH_BASE "rfid_status", rfid_payload, 0,
+                                MQTT_QOS_HEALTH_METRICS, 0);
+    }
+    else
+    {
         ESP_LOGW(TAG, "Failed to get RFID health data");
     }
 
@@ -585,12 +586,14 @@ esp_err_t mqtt_client_publish_health_metrics(void)
 
 esp_err_t mqtt_client_subscribe_config(mqtt_config_callback_t callback)
 {
-    if (s_mqtt_client == NULL) {
+    if (s_mqtt_client == NULL)
+    {
         ESP_LOGE(TAG, "MQTT client not initialized");
         return ESP_FAIL;
     }
 
-    if (callback == NULL) {
+    if (callback == NULL)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -601,11 +604,10 @@ esp_err_t mqtt_client_subscribe_config(mqtt_config_callback_t callback)
     char topic[128];
     snprintf(topic, sizeof(topic), "%s+", MQTT_TOPIC_CONFIG_BASE);
 
-    int msg_id = esp_mqtt_client_subscribe(s_mqtt_client,
-                                          topic,
-                                          MQTT_QOS_CONFIG_COMMANDS);
+    int msg_id = esp_mqtt_client_subscribe(s_mqtt_client, topic, MQTT_QOS_CONFIG_COMMANDS);
 
-    if (msg_id < 0) {
+    if (msg_id < 0)
+    {
         ESP_LOGE(TAG, "Failed to subscribe to config topics");
         return ESP_FAIL;
     }
@@ -617,46 +619,48 @@ esp_err_t mqtt_client_subscribe_config(mqtt_config_callback_t callback)
 
 esp_err_t mqtt_client_disconnect(void)
 {
-    if (s_mqtt_client == NULL) {
+    if (s_mqtt_client == NULL)
+    {
         return ESP_FAIL;
     }
 
     ESP_LOGI(TAG, "Disconnecting from MQTT broker...");
 
     // Publish offline status before disconnecting
-    esp_mqtt_client_publish(s_mqtt_client,
-                           MQTT_TOPIC_DEVICE_STATUS,
-                           "offline",
-                           0,
-                           2,  // QoS 2
-                           1); // Retain
+    esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_DEVICE_STATUS, "offline", 0,
+                            2,  // QoS 2
+                            1); // Retain
 
     return esp_mqtt_client_disconnect(s_mqtt_client);
 }
 
 esp_err_t mqtt_client_destroy(void)
 {
-    if (s_mqtt_client == NULL) {
+    if (s_mqtt_client == NULL)
+    {
         return ESP_FAIL;
     }
 
     ESP_LOGI(TAG, "Destroying MQTT client...");
 
     esp_err_t ret = esp_mqtt_client_stop(s_mqtt_client);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGW(TAG, "Failed to stop MQTT client: %s", esp_err_to_name(ret));
     }
 
     ret = esp_mqtt_client_destroy(s_mqtt_client);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to destroy MQTT client: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    s_mqtt_client = NULL;
+    s_mqtt_client      = NULL;
     s_connection_state = MQTT_STATE_DISCONNECTED;
 
-    if (s_mqtt_event_group != NULL) {
+    if (s_mqtt_event_group != NULL)
+    {
         vEventGroupDelete(s_mqtt_event_group);
         s_mqtt_event_group = NULL;
     }
@@ -666,9 +670,10 @@ esp_err_t mqtt_client_destroy(void)
     return ESP_OK;
 }
 
-esp_err_t mqtt_client_get_stats(mqtt_stats_t* stats)
+esp_err_t mqtt_client_get_stats(mqtt_stats_t *stats)
 {
-    if (stats == NULL) {
+    if (stats == NULL)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
