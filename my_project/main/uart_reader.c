@@ -625,6 +625,10 @@ esp_err_t rfid_reader_get_health(rfid_health_t* health)
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (!rfid_state.initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
     memcpy(health, &rfid_state.health, sizeof(rfid_health_t));
     xSemaphoreGive(rfid_state.mutex);
