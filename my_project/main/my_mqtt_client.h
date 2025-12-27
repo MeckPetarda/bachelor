@@ -21,9 +21,9 @@
 
 #include "esp_err.h"
 #include "uart_reader.h"
+#include <mqtt_client.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <mqtt_client.h>
 
 // ============================================================================
 // CONFIGURATION
@@ -37,9 +37,9 @@
  *
  * For production, configure via menuconfig or change these defaults:
  */
-#define MQTT_BROKER_URI         "mqtt://10.0.0.222:1883"
-#define MQTT_BROKER_PORT        1883
-#define MQTT_CLIENT_ID          "ESP32_ATTENDANCE_01"
+#define MQTT_BROKER_URI  "mqtt://10.0.0.222:1883"
+#define MQTT_BROKER_PORT 1883
+#define MQTT_CLIENT_ID   "ESP32_ATTENDANCE_01"
 
 /**
  * MQTT Topic Structure
@@ -50,19 +50,19 @@
  * ├── config/{device_id}/+       - Configuration updates (subscribe)
  * └── health/{device_id}/+       - Health metrics (QoS 0)
  */
-#define MQTT_TOPIC_TAG_DETECTED     "attendance/tags/detected"
-#define MQTT_TOPIC_DEVICE_STATUS    "attendance/device/ESP32_ATTENDANCE_01/status"
-#define MQTT_TOPIC_CONFIG_BASE      "attendance/config/ESP32_ATTENDANCE_01/"
-#define MQTT_TOPIC_HEALTH_BASE      "attendance/health/ESP32_ATTENDANCE_01/"
+#define MQTT_TOPIC_TAG_DETECTED  "attendance/tags/detected"
+#define MQTT_TOPIC_DEVICE_STATUS "attendance/device/ESP32_ATTENDANCE_01/status"
+#define MQTT_TOPIC_CONFIG_BASE   "attendance/config/ESP32_ATTENDANCE_01/"
+#define MQTT_TOPIC_HEALTH_BASE   "attendance/health/ESP32_ATTENDANCE_01/"
 
 /**
  * Quality of Service Levels
  *
  * Per thesis requirement: QoS 2 for attendance events (guaranteed delivery)
  */
-#define MQTT_QOS_TAG_EVENTS         2    // QoS 2: Exactly Once
-#define MQTT_QOS_HEALTH_METRICS     0    // QoS 0: At Most Once
-#define MQTT_QOS_CONFIG_COMMANDS    1    // QoS 1: At Least Once
+#define MQTT_QOS_TAG_EVENTS      2 // QoS 2: Exactly Once
+#define MQTT_QOS_HEALTH_METRICS  0 // QoS 0: At Most Once
+#define MQTT_QOS_CONFIG_COMMANDS 1 // QoS 1: At Least Once
 
 // ============================================================================
 // DATA STRUCTURES
@@ -71,7 +71,8 @@
 /**
  * MQTT Connection State
  */
-typedef enum {
+typedef enum
+{
     MQTT_STATE_DISCONNECTED = 0,
     MQTT_STATE_CONNECTING,
     MQTT_STATE_CONNECTED,
@@ -81,13 +82,14 @@ typedef enum {
 /**
  * MQTT Statistics
  */
-typedef struct {
-    uint32_t messages_published;        // Total messages sent
-    uint32_t messages_received;         // Total messages received
-    uint32_t publish_errors;            // Failed publish attempts
-    uint32_t connection_count;          // Times connected
-    uint32_t disconnection_count;       // Times disconnected
-    mqtt_connection_state_t state;      // Current connection state
+typedef struct
+{
+    uint32_t                messages_published;  // Total messages sent
+    uint32_t                messages_received;   // Total messages received
+    uint32_t                publish_errors;      // Failed publish attempts
+    uint32_t                connection_count;    // Times connected
+    uint32_t                disconnection_count; // Times disconnected
+    mqtt_connection_state_t state;               // Current connection state
 } mqtt_stats_t;
 
 /**
@@ -98,7 +100,7 @@ typedef struct {
  * @param topic Topic name (null-terminated)
  * @param payload Message payload (null-terminated)
  */
-typedef void (*mqtt_config_callback_t)(const char* topic, const char* payload);
+typedef void (*mqtt_config_callback_t)(const char *topic, const char *payload);
 
 // ============================================================================
 // PUBLIC API
@@ -191,7 +193,7 @@ bool mqtt_client_is_connected(void);
  * Note: This function formats the event into JSON and publishes it.
  * The publish is asynchronous - MQTT_EVENT_PUBLISHED confirms delivery.
  */
-esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t* event, bool offline);
+esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offline);
 
 /**
  * Publish health metrics
@@ -245,7 +247,7 @@ esp_err_t mqtt_client_destroy(void);
  * @param stats Pointer to structure to receive statistics
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if stats is NULL
  */
-esp_err_t mqtt_client_get_stats(mqtt_stats_t* stats);
+esp_err_t mqtt_client_get_stats(mqtt_stats_t *stats);
 
 /**
  * Clear statistics counters

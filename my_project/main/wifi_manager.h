@@ -33,9 +33,9 @@
  *
  * Credentials are stored encrypted in flash and not visible in logs.
  */
-#define WIFI_SSID                  CONFIG_WIFI_SSID
-#define WIFI_PASSWORD              CONFIG_WIFI_PASSWORD
-#define WIFI_MAX_RETRY_ATTEMPTS    CONFIG_WIFI_MAXIMUM_RETRY
+#define WIFI_SSID               CONFIG_WIFI_SSID
+#define WIFI_PASSWORD           CONFIG_WIFI_PASSWORD
+#define WIFI_MAX_RETRY_ATTEMPTS CONFIG_WIFI_MAXIMUM_RETRY
 
 // ============================================================================
 // EVENT BITS (FreeRTOS Event Groups)
@@ -44,12 +44,12 @@
 /**
  * Event bit indicating successful WiFi connection
  */
-#define WIFI_CONNECTED_BIT         BIT0
+#define WIFI_CONNECTED_BIT BIT0
 
 /**
  * Event bit indicating WiFi connection failure
  */
-#define WIFI_FAIL_BIT              BIT1
+#define WIFI_FAIL_BIT BIT1
 
 // ============================================================================
 // PUBLIC API
@@ -123,7 +123,7 @@ esp_err_t wifi_manager_disconnect(void);
  * @param ip_info Pointer to structure to receive IP information
  * @return ESP_OK on success, ESP_FAIL if not connected
  */
-esp_err_t wifi_manager_get_ip_info(esp_netif_ip_info_t* ip_info);
+esp_err_t wifi_manager_get_ip_info(esp_netif_ip_info_t *ip_info);
 
 /**
  * Get WiFi RSSI (signal strength)
@@ -137,6 +137,6 @@ esp_err_t wifi_manager_get_ip_info(esp_netif_ip_info_t* ip_info);
  * - Fair: -60 to -70 dBm
  * - Poor: -70 dBm and below
  */
-esp_err_t wifi_manager_get_rssi(int8_t* rssi);
+esp_err_t wifi_manager_get_rssi(int8_t *rssi);
 
 #endif // WIFI_MANAGER_H

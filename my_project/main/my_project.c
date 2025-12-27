@@ -14,49 +14,50 @@
  * - R300 Protocol: R300_UHF_RFID_reader_module_protocol_.pdf
  */
 
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "hal/gpio_types.h"
-#include "uart_reader.h"
-#include "wifi_manager.h"
 #include "my_mqtt_client.h"
 #include "offline_event_logger.h"
+#include "uart_reader.h"
+#include "wifi_manager.h"
 
 // ============================================================================
 // GPIO CONFIGURATION
 // ============================================================================
 
-#define WIFI_STATUS_LED    GPIO_NUM_5      // WiFi connection status (ON = connected)
-#define MQTT_STATUS_LED    GPIO_NUM_23     // MQTT broker status (ON = connected)
-#define ACTIVITY_LED       GPIO_NUM_19     // Tag detection activity (flashes on detection)
-#define SCANNING_LED       GPIO_NUM_18     // RFID scanning active (ON = scanning)
-#define BUTTON1_PIN        GPIO_NUM_34     // Start/Stop RFID scanning
-#define BUTTON2_PIN        GPIO_NUM_35     // Show statistics
+#define WIFI_STATUS_LED GPIO_NUM_5  // WiFi connection status (ON = connected)
+#define MQTT_STATUS_LED GPIO_NUM_23 // MQTT broker status (ON = connected)
+#define ACTIVITY_LED    GPIO_NUM_19 // Tag detection activity (flashes on detection)
+#define SCANNING_LED    GPIO_NUM_18 // RFID scanning active (ON = scanning)
+#define BUTTON1_PIN     GPIO_NUM_34 // Start/Stop RFID scanning
+#define BUTTON2_PIN     GPIO_NUM_35 // Show statistics
 
-#define DEBOUNCE_TIME_MS   50
+#define DEBOUNCE_TIME_MS 50
 // #define PIR_DEBOUNCE_MS    100
 
-static const char* TAG = "MAIN";
+static const char *TAG = "MAIN";
 
 // ============================================================================
 // STATE TRACKING
 // ============================================================================
 
-typedef struct {
+typedef struct
+{
     uint32_t last_press_time;
-    uint8_t last_stable_state;
-    uint8_t press_count;
+    uint8_t  last_stable_state;
+    uint8_t  press_count;
 } button_state_t;
 
 static button_state_t button_states[2] = {0};
-static bool rfid_scanning = false;
-static bool mqtt_initialized = false;
+static bool           rfid_scanning    = false;
+static bool           mqtt_initialized = false;
 
 // ============================================================================
 // MQTT CONFIGURATION CALLBACK
@@ -66,7 +67,7 @@ static bool mqtt_initialized = false;
  * Called when a configuration message is received from MQTT broker
  * This runs in the MQTT event handler context - keep it fast!
  */
-static void on_mqtt_config_message(const char* topic, const char* payload)
+static void on_mqtt_config_message(const char *topic, const char *payload)
 {
     ESP_LOGI(TAG, "╔════════════════════════════════════╗");
     ESP_LOGI(TAG, "║  Configuration Message Received   ║");
@@ -84,7 +85,7 @@ static void on_mqtt_config_message(const char* topic, const char* payload)
  * Called whenever RFID reader detects a tag
  * This runs in the UART task context - keep it fast!
  */
-static void on_tag_detected(const rfid_tag_event_t* event)
+static void on_tag_detected(const rfid_tag_event_t *event)
 {
     // Flash activity LED
     gpio_set_level(ACTIVITY_LED, 1);
@@ -97,10 +98,12 @@ static void on_tag_detected(const rfid_tag_event_t* event)
     ESP_LOGI(TAG, "  TAG DETECTED!");
     ESP_LOGI(TAG, "  EPC (%d bytes):", event->epc_len);
     printf("    ");
-    for (int i = 0; i < event->epc_len; i++) {
+    for (int i = 0; i < event->epc_len; i++)
+    {
         printf("%02X ", event->epc[i]);
-        if ((i + 1) % 16 == 0 && i + 1 < event->epc_len) {
-            printf("\n    ");  // Line break for long EPCs
+        if ((i + 1) % 16 == 0 && i + 1 < event->epc_len)
+        {
+            printf("\n    "); // Line break for long EPCs
         }
     }
     printf("\n");
@@ -112,21 +115,29 @@ static void on_tag_detected(const rfid_tag_event_t* event)
     ESP_LOGI(TAG, "══════════════════════════════════\n");
 
     // Publish tag event to MQTT broker (if connected)
-    if (mqtt_initialized && mqtt_client_is_connected()) {
+    if (mqtt_initialized && mqtt_client_is_connected())
+    {
         esp_err_t ret = mqtt_client_publish_tag_event(event, false);
-        if (ret == ESP_OK) {
+        if (ret == ESP_OK)
+        {
             ESP_LOGI(TAG, "  ✓ Tag event published to MQTT broker");
-        } else {
+        }
+        else
+        {
             ESP_LOGW(TAG, "  ✗ Failed to publish tag event to MQTT");
         }
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "  ⚠ MQTT not connected - storing event offline");
         // Store in offline logger for later transmission
         esp_err_t ret = offline_logger_store_event(event);
-        if (ret == ESP_OK) {
-            ESP_LOGI(TAG, "  ✓ Tag event stored offline (%lu pending)",
-                    offline_logger_get_pending_count());
-        } else {
+        if (ret == ESP_OK)
+        {
+            ESP_LOGI(TAG, "  ✓ Tag event stored offline (%lu pending)", offline_logger_get_pending_count());
+        }
+        else
+        {
             ESP_LOGE(TAG, "  ✗ Failed to store event offline");
         }
     }
@@ -146,22 +157,22 @@ static void gpio_init(void)
 
     // Configure LEDs (output)
     gpio_config_t led_config = {
-        .pin_bit_mask = (1ULL << WIFI_STATUS_LED) | (1ULL << MQTT_STATUS_LED) |
-                        (1ULL << ACTIVITY_LED) | (1ULL << SCANNING_LED),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pin_bit_mask =
+            (1ULL << WIFI_STATUS_LED) | (1ULL << MQTT_STATUS_LED) | (1ULL << ACTIVITY_LED) | (1ULL << SCANNING_LED),
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&led_config);
 
     // Configure buttons (input-only pins)
     gpio_config_t button_config = {
         .pin_bit_mask = (1ULL << BUTTON1_PIN) | (1ULL << BUTTON2_PIN),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&button_config);
 
@@ -178,12 +189,14 @@ static void gpio_init(void)
     ESP_LOGI(TAG, "  Scanning LED: GPIO %d", SCANNING_LED);
 }
 
-static void rfid_reader_start_inventory_wrapper(void) {
+static void rfid_reader_start_inventory_wrapper(void)
+{
     ESP_LOGI(TAG, "Attempting to start RFID scan...");
 
     // Step 1: Check power rail on GPIO 2 FIRST (proactive check)
     bool power_present = gpio_get_level(RFID_POWER_STATUS_PIN);
-    if (!power_present) {
+    if (!power_present)
+    {
         ESP_LOGE(TAG, "✗ Cannot start scanning - RFID power rail is down (GPIO %d)", RFID_POWER_STATUS_PIN);
         ESP_LOGE(TAG, "  Check 3.3V power supply to reader");
         return;
@@ -195,7 +208,8 @@ static void rfid_reader_start_inventory_wrapper(void) {
     ESP_LOGI(TAG, "Performing reader handshake...");
     esp_err_t handshake_result = rfid_reader_handshake(NULL, NULL);
 
-    if (handshake_result != ESP_OK) {
+    if (handshake_result != ESP_OK)
+    {
         ESP_LOGE(TAG, "✗ Cannot start scanning - reader powered but unresponsive");
         ESP_LOGE(TAG, "  Handshake error: %s (0x%X)", esp_err_to_name(handshake_result), handshake_result);
         return;
@@ -206,12 +220,15 @@ static void rfid_reader_start_inventory_wrapper(void) {
     // Step 3: Start inventory (reader is verified responsive)
     esp_err_t ret = rfid_reader_start_inventory(on_tag_detected, 0);
 
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         // Step 4: Only now activate scanning indicators
         gpio_set_level(SCANNING_LED, 1);
         rfid_scanning = true;
         ESP_LOGI(TAG, "✓ RFID scanning active");
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "✗ Failed to start inventory: %s", esp_err_to_name(ret));
     }
 }
@@ -223,45 +240,53 @@ static void rfid_reader_start_inventory_wrapper(void) {
 static void process_buttons(void)
 {
     uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
-    
+
     // BUTTON1: Start/Stop RFID scanning
     {
-        uint32_t level = gpio_get_level(BUTTON1_PIN);
-        button_state_t* state = &button_states[0];
-        
-        if (level == 0 && state->last_stable_state == 1) {
-            if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS) {
+        uint32_t        level = gpio_get_level(BUTTON1_PIN);
+        button_state_t *state = &button_states[0];
+
+        if (level == 0 && state->last_stable_state == 1)
+        {
+            if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS)
+            {
                 state->press_count++;
                 state->last_press_time = current_time;
-                
+
                 // Toggle RFID scanning
-                if (!rfid_scanning) {
+                if (!rfid_scanning)
+                {
                     rfid_reader_start_inventory_wrapper();
-                } else {
+                }
+                else
+                {
                     ESP_LOGI(TAG, "Stopping RFID scan");
                     rfid_reader_stop_inventory();
-                    gpio_set_level(SCANNING_LED, 0);  // Turn off scanning indicator
+                    gpio_set_level(SCANNING_LED, 0); // Turn off scanning indicator
                     rfid_scanning = false;
                 }
             }
         }
-        
+
         state->last_stable_state = level;
     }
-    
+
     // BUTTON2: Show statistics
     {
-        uint32_t level = gpio_get_level(BUTTON2_PIN);
-        button_state_t* state = &button_states[1];
-        
-        if (level == 0 && state->last_stable_state == 1) {
-            if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS) {
+        uint32_t        level = gpio_get_level(BUTTON2_PIN);
+        button_state_t *state = &button_states[1];
+
+        if (level == 0 && state->last_stable_state == 1)
+        {
+            if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS)
+            {
                 state->press_count++;
                 state->last_press_time = current_time;
 
                 // Get and display statistics
                 rfid_stats_t stats;
-                if (rfid_reader_get_stats(&stats) == ESP_OK) {
+                if (rfid_reader_get_stats(&stats) == ESP_OK)
+                {
                     ESP_LOGI(TAG, "═══════ RFID Statistics ═══════");
                     ESP_LOGI(TAG, "  Tags detected: %lu", stats.tags_detected);
                     ESP_LOGI(TAG, "  Total reads: %lu", stats.total_reads);
@@ -271,15 +296,18 @@ static void process_buttons(void)
                 }
 
                 // Publish health metrics via MQTT
-                if (mqtt_client_is_connected()) {
+                if (mqtt_client_is_connected())
+                {
                     ESP_LOGI(TAG, "Publishing health metrics to MQTT...");
                     mqtt_client_publish_health_metrics();
-                } else {
+                }
+                else
+                {
                     ESP_LOGW(TAG, "MQTT not connected - skipping health metrics publish");
                 }
             }
         }
-        
+
         state->last_stable_state = level;
     }
 }
@@ -288,14 +316,15 @@ static void process_buttons(void)
 // MAIN TASK
 // ============================================================================
 
-static void main_task(void* arg)
+static void main_task(void *arg)
 {
     ESP_LOGI(TAG, "Main task started");
 
-    uint32_t health_publish_counter = 0;
-    const uint32_t HEALTH_PUBLISH_INTERVAL = 60000 / 10;  // 60 seconds / 10ms delay = 6000 iterations
+    uint32_t       health_publish_counter  = 0;
+    const uint32_t HEALTH_PUBLISH_INTERVAL = 60000 / 10; // 60 seconds / 10ms delay = 6000 iterations
 
-    while (1) {
+    while (1)
+    {
         process_buttons();
         // process_pir();  // Disabled - GPIO 2 used for RFID power monitoring
 
@@ -309,10 +338,12 @@ static void main_task(void* arg)
 
         // Publish health metrics every 60 seconds (if MQTT connected)
         health_publish_counter++;
-        if (health_publish_counter >= HEALTH_PUBLISH_INTERVAL) {
+        if (health_publish_counter >= HEALTH_PUBLISH_INTERVAL)
+        {
             health_publish_counter = 0;
 
-            if (mqtt_connected) {
+            if (mqtt_connected)
+            {
                 mqtt_client_publish_health_metrics();
             }
         }
@@ -338,7 +369,8 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Initializing offline event logger...");
     esp_err_t ret = offline_logger_init();
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to initialize offline logger: %s", esp_err_to_name(ret));
         ESP_LOGW(TAG, "Continuing without offline logging...\n");
     }
@@ -352,13 +384,17 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Initializing WiFi...");
     ret = wifi_manager_init();
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to initialize WiFi: %s", esp_err_to_name(ret));
         ESP_LOGW(TAG, "Continuing without WiFi...");
-    } else {
+    }
+    else
+    {
         // Wait for connection (30 second timeout)
         ret = wifi_manager_wait_for_connection(30000);
-        if (ret == ESP_OK) {
+        if (ret == ESP_OK)
+        {
             // Turn on WiFi status LED
             gpio_set_level(WIFI_STATUS_LED, 1);
 
@@ -367,7 +403,8 @@ void app_main(void)
 
             // Display connection information
             esp_netif_ip_info_t ip_info;
-            if (wifi_manager_get_ip_info(&ip_info) == ESP_OK) {
+            if (wifi_manager_get_ip_info(&ip_info) == ESP_OK)
+            {
                 ESP_LOGI(TAG, "  IP Address: " IPSTR, IP2STR(&ip_info.ip));
                 ESP_LOGI(TAG, "  Gateway: " IPSTR, IP2STR(&ip_info.gw));
                 ESP_LOGI(TAG, "  Netmask: " IPSTR, IP2STR(&ip_info.netmask));
@@ -375,15 +412,23 @@ void app_main(void)
 
             // Display signal strength
             int8_t rssi;
-            if (wifi_manager_get_rssi(&rssi) == ESP_OK) {
+            if (wifi_manager_get_rssi(&rssi) == ESP_OK)
+            {
                 ESP_LOGI(TAG, "  Signal Strength: %d dBm", rssi);
-                if (rssi >= -50) {
+                if (rssi >= -50)
+                {
                     ESP_LOGI(TAG, "  Signal Quality: Excellent");
-                } else if (rssi >= -60) {
+                }
+                else if (rssi >= -60)
+                {
                     ESP_LOGI(TAG, "  Signal Quality: Good");
-                } else if (rssi >= -70) {
+                }
+                else if (rssi >= -70)
+                {
                     ESP_LOGI(TAG, "  Signal Quality: Fair");
-                } else {
+                }
+                else
+                {
                     ESP_LOGI(TAG, "  Signal Quality: Poor");
                 }
             }
@@ -396,16 +441,20 @@ void app_main(void)
 
             ESP_LOGI(TAG, "Initializing MQTT client...");
             ret = mqtt_client_init();
-            if (ret != ESP_OK) {
+            if (ret != ESP_OK)
+            {
                 ESP_LOGE(TAG, "Failed to initialize MQTT: %s", esp_err_to_name(ret));
                 ESP_LOGW(TAG, "Continuing without MQTT...\n");
-            } else {
+            }
+            else
+            {
                 // Mark MQTT as initialized (automatic reconnection is now active)
                 mqtt_initialized = true;
 
                 // Wait for MQTT connection (10 second timeout)
                 ret = mqtt_client_wait_for_connection(10000);
-                if (ret == ESP_OK) {
+                if (ret == ESP_OK)
+                {
                     // Turn on MQTT status LED
                     gpio_set_level(MQTT_STATUS_LED, 1);
 
@@ -415,19 +464,24 @@ void app_main(void)
 
                     // Subscribe to configuration topics
                     ret = mqtt_client_subscribe_config(on_mqtt_config_message);
-                    if (ret == ESP_OK) {
+                    if (ret == ESP_OK)
+                    {
                         ESP_LOGI(TAG, "Subscribed to configuration topics");
                     }
 
                     // Publish initial health metrics
                     mqtt_client_publish_health_metrics();
-                } else {
+                }
+                else
+                {
                     ESP_LOGW(TAG, "MQTT connection timeout");
                     ESP_LOGW(TAG, "Broker will auto-reconnect when available");
                     ESP_LOGW(TAG, "Continuing without MQTT...\n");
                 }
             }
-        } else {
+        }
+        else
+        {
             ESP_LOGW(TAG, "Failed to connect to WiFi");
             ESP_LOGW(TAG, "Check SSID/password in wifi_manager.h");
             ESP_LOGW(TAG, "Continuing without WiFi...\n");
@@ -438,71 +492,76 @@ void app_main(void)
 
     // Initialize RFID reader
     ret = rfid_reader_init();
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize RFID reader: %s",
-                 esp_err_to_name(ret));
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to initialize RFID reader: %s", esp_err_to_name(ret));
         return;
     }
-    
+
     // Small delay for module to stabilize
     vTaskDelay(pdMS_TO_TICKS(500));
-    
+
     // Optional: Reset reader on startup
     ESP_LOGI(TAG, "Resetting RFID reader...");
     rfid_reader_reset();
-    vTaskDelay(pdMS_TO_TICKS(2000));  // Wait for restart
-    
+    vTaskDelay(pdMS_TO_TICKS(2000)); // Wait for restart
+
     // Optional: Get firmware version
     uint8_t major, minor;
-    if (rfid_reader_get_firmware(&major, &minor) == ESP_OK) {
+    if (rfid_reader_get_firmware(&major, &minor) == ESP_OK)
+    {
         ESP_LOGI(TAG, "RFID Reader Firmware: %d.%d\n", major, minor);
     }
-    
+
     // ============================================================================
     // CONFIGURE READER FOR MAXIMUM RANGE
     // ============================================================================
-    
+
     ESP_LOGI(TAG, "Configuring reader for maximum range...");
-    
+
     // Set maximum RF output power (33 dBm)
     // Per R300 protocol section 2.1.7, page 12
     // Valid range: 20-33 dBm
-    
+
     uint8_t power_level = 33;
 
     ret = rfid_reader_set_power(power_level);
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         ESP_LOGI(TAG, "  ✓ Power set to %d dBm", power_level);
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "  ✗ Failed to set power");
     }
     vTaskDelay(pdMS_TO_TICKS(200));
-    
+
     // Set frequency region to FCC (902-928 MHz)
     // Per R300 protocol section 2.1.9, page 13
     // FCC region provides best range in USA
     // Frequency table on page 41:
     //   0x07 = 902.0 MHz
     //   0x3B = 928.0 MHz
-    ret = rfid_reader_set_frequency_region(RFID_REGION_FCC, 
-                                          RFID_FREQ_902MHZ, 
-                                          RFID_FREQ_928MHZ);
-    if (ret == ESP_OK) {
+    ret = rfid_reader_set_frequency_region(RFID_REGION_FCC, RFID_FREQ_902MHZ, RFID_FREQ_928MHZ);
+    if (ret == ESP_OK)
+    {
         ESP_LOGI(TAG, "  ✓ Frequency set to FCC (902-928 MHz)");
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "  ✗ Failed to set frequency");
     }
     vTaskDelay(pdMS_TO_TICKS(200));
-    
+
     ESP_LOGI(TAG, "Configuration complete!\n");
-    
+
     // ============================================================================
-    
+
     ESP_LOGI(TAG, "System ready!");
     ESP_LOGI(TAG, "  Press BUTTON1 to start/stop scanning");
     ESP_LOGI(TAG, "  Press BUTTON2 to show statistics");
     ESP_LOGI(TAG, "  RFID power monitoring active on GPIO 2\n");
-    
+
     // Start main task
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
 }

@@ -26,10 +26,10 @@
 #ifndef OFFLINE_EVENT_LOGGER_H
 #define OFFLINE_EVENT_LOGGER_H
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
 #include "uart_reader.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 // ============================================================================
 // CONFIGURATION
@@ -43,25 +43,25 @@
  * Event Record Size (48 bytes aligned)
  * Per technical report Appendix A, section 5.1
  */
-#define OFFLINE_EVENT_RECORD_SIZE      48
+#define OFFLINE_EVENT_RECORD_SIZE 48
 
 /**
  * Maximum events in 2 MB partition
  * 2,097,152 bytes / 48 bytes = 43,690 events
  */
-#define OFFLINE_MAX_EVENTS             43690
+#define OFFLINE_MAX_EVENTS 43690
 
 /**
  * Event replay throttle rate (events per second)
  * Per technical report section 6.1
  */
-#define OFFLINE_REPLAY_RATE_LIMIT      10
+#define OFFLINE_REPLAY_RATE_LIMIT 10
 
 /**
  * Grace period before starting replay (seconds)
  * Allows server to prepare for offline event ingestion
  */
-#define OFFLINE_REPLAY_GRACE_PERIOD    30
+#define OFFLINE_REPLAY_GRACE_PERIOD 30
 
 // ============================================================================
 // DATA STRUCTURES
@@ -79,28 +79,30 @@
  * - rssi: Signal strength (raw value)
  * - crc32: CRC32 checksum for integrity verification
  */
-typedef struct __attribute__((packed)) {
-    uint64_t timestamp_ms;          // 8 bytes - milliseconds since boot
-    uint32_t rtc_timestamp_s;       // 4 bytes - Unix time (0 if unavailable)
-    uint8_t  epc[24];               // 24 bytes - EPC buffer (96-bit max)
-    uint8_t  epc_length;            // 1 byte - actual EPC length
-    uint8_t  reader_id;             // 1 byte - reader ID (1=A, 2=B)
-    uint16_t rssi;                  // 2 bytes - signal strength
-    uint32_t crc32;                 // 4 bytes - CRC32 checksum
-    uint8_t  reserved[4];           // 4 bytes - padding to 48 bytes
+typedef struct __attribute__((packed))
+{
+    uint64_t timestamp_ms;    // 8 bytes - milliseconds since boot
+    uint32_t rtc_timestamp_s; // 4 bytes - Unix time (0 if unavailable)
+    uint8_t  epc[24];         // 24 bytes - EPC buffer (96-bit max)
+    uint8_t  epc_length;      // 1 byte - actual EPC length
+    uint8_t  reader_id;       // 1 byte - reader ID (1=A, 2=B)
+    uint16_t rssi;            // 2 bytes - signal strength
+    uint32_t crc32;           // 4 bytes - CRC32 checksum
+    uint8_t  reserved[4];     // 4 bytes - padding to 48 bytes
 } offline_event_t;
 
 /**
  * Offline Logger Statistics
  */
-typedef struct {
-    uint32_t events_written;        // Total events written to storage
-    uint32_t events_replayed;       // Total events replayed to server
-    uint32_t write_errors;          // Failed write operations
-    uint32_t crc_errors;            // Corrupted events detected
-    uint32_t buffer_overflows;      // Times buffer wrapped around
-    uint32_t pending_events;        // Events waiting to be replayed
-    bool     replay_in_progress;    // Currently replaying events
+typedef struct
+{
+    uint32_t events_written;     // Total events written to storage
+    uint32_t events_replayed;    // Total events replayed to server
+    uint32_t write_errors;       // Failed write operations
+    uint32_t crc_errors;         // Corrupted events detected
+    uint32_t buffer_overflows;   // Times buffer wrapped around
+    uint32_t pending_events;     // Events waiting to be replayed
+    bool     replay_in_progress; // Currently replaying events
 } offline_logger_stats_t;
 
 /**
@@ -114,11 +116,8 @@ typedef struct {
  * @param replay_timestamp Current time (when being replayed)
  * @return ESP_OK if event published successfully
  */
-typedef esp_err_t (*offline_replay_callback_t)(
-    const rfid_tag_event_t* event,
-    uint64_t offline_timestamp,
-    uint64_t replay_timestamp
-);
+typedef esp_err_t (*offline_replay_callback_t)(const rfid_tag_event_t *event, uint64_t offline_timestamp,
+                                               uint64_t replay_timestamp);
 
 // ============================================================================
 // PUBLIC API
@@ -189,7 +188,7 @@ esp_err_t offline_logger_deinit(void);
  * }
  * ```
  */
-esp_err_t offline_logger_store_event(const rfid_tag_event_t* event);
+esp_err_t offline_logger_store_event(const rfid_tag_event_t *event);
 
 /**
  * Start event replay process
@@ -216,10 +215,7 @@ esp_err_t offline_logger_store_event(const rfid_tag_event_t* event);
  * }
  * ```
  */
-esp_err_t offline_logger_start_replay(
-    offline_replay_callback_t callback,
-    uint32_t grace_period_s
-);
+esp_err_t offline_logger_start_replay(offline_replay_callback_t callback, uint32_t grace_period_s);
 
 /**
  * Stop event replay process
@@ -251,7 +247,7 @@ uint32_t offline_logger_get_pending_count(void);
  * @param stats Pointer to structure to receive statistics
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if stats is NULL
  */
-esp_err_t offline_logger_get_stats(offline_logger_stats_t* stats);
+esp_err_t offline_logger_get_stats(offline_logger_stats_t *stats);
 
 /**
  * Clear all stored events (DESTRUCTIVE)

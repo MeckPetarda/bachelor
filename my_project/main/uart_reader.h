@@ -1,9 +1,9 @@
 /**
  * uart_reader.h - R300/Y300 UHF RFID Reader Interface
- * 
+ *
  * Implements R300 protocol V2.2 for attendance detection system.
  * Version: 1.2 - Added power and frequency configuration
- * 
+ *
  * Key Commands Implemented:
  *   - 0x70: Reset module
  *   - 0x72: Get firmware version
@@ -11,7 +11,7 @@
  *   - 0x78: Set frequency region (NEW)
  *   - 0x8B: Single inventory (polling-based tag detection)
  *   - 0x89: Real-time inventory (deprecated - not used)
- * 
+ *
  * Protocol Reference: R300_UHF_RFID_reader_module_protocol_.pdf
  *   - Section 1.2: Data Packet Definition
  *   - Section 2.1.1: Reset Command (page 7)
@@ -19,7 +19,7 @@
  *   - Section 2.1.7: Set Output Power (page 12)
  *   - Section 2.1.9: Set Frequency Region (page 13)
  *   - Section 2.2.6: Single Inventory (command 0x8B)
- * 
+ *
  * Hardware Reference: ESP32 Technical Reference Manual
  *   - Section 7.8: UART Controller
  *   - UART2 on GPIO16/17 (safe pins, no conflicts)
@@ -28,33 +28,33 @@
 #ifndef UART_READER_H
 #define UART_READER_H
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 // ============================================================================
 // HARDWARE CONFIGURATION
 // ============================================================================
 
-#define RFID_UART_PORT      UART_NUM_2
-#define RFID_UART_TX_PIN    17          // ESP32 TX → Y300 RX
-#define RFID_UART_RX_PIN    16          // ESP32 RX → Y300 TX
-#define RFID_UART_BAUD      115200      // R300 default (section 1.1)
+#define RFID_UART_PORT   UART_NUM_2
+#define RFID_UART_TX_PIN 17              // ESP32 TX → Y300 RX
+#define RFID_UART_RX_PIN 16              // ESP32 RX → Y300 TX
+#define RFID_UART_BAUD   115200          // R300 default (section 1.1)
 
-#define RFID_POWER_STATUS_PIN GPIO_NUM_2  // 3.3V rail feedback from reader power supply (pin 24)
+#define RFID_POWER_STATUS_PIN GPIO_NUM_2 // 3.3V rail feedback from reader power supply (pin 24)
 
 // ============================================================================
 // FREQUENCY REGIONS (section 2.1.9, page 13)
 // ============================================================================
 
-#define RFID_REGION_FCC     0x01        // 902-928 MHz (USA) - best range
-#define RFID_REGION_ETSI    0x02        // 865-868 MHz (Europe)
-#define RFID_REGION_CHN     0x03        // 920-925 MHz (China)
+#define RFID_REGION_FCC  0x01 // 902-928 MHz (USA) - best range
+#define RFID_REGION_ETSI 0x02 // 865-868 MHz (Europe)
+#define RFID_REGION_CHN  0x03 // 920-925 MHz (China)
 
 // Frequency parameter values (see page 41 for full table)
-#define RFID_FREQ_902MHZ    0x07
-#define RFID_FREQ_915MHZ    0x21
-#define RFID_FREQ_928MHZ    0x3B
+#define RFID_FREQ_902MHZ 0x07
+#define RFID_FREQ_915MHZ 0x21
+#define RFID_FREQ_928MHZ 0x3B
 
 // ============================================================================
 // DATA STRUCTURES
@@ -64,25 +64,27 @@
  * Reader State Machine
  * Tracks reader communication health and readiness
  */
-typedef enum {
-    RFID_STATE_UNINITIALIZED,           // Not initialized yet
-    RFID_STATE_POWERED_OFF,             // Powered off or disconnected
-    RFID_STATE_STARTUP_PENDING,         // Powering up, handshake pending
-    RFID_STATE_RESPONSIVE,              // Communication verified, ready to use
-    RFID_STATE_UNRESPONSIVE             // Communication failed
+typedef enum
+{
+    RFID_STATE_UNINITIALIZED,   // Not initialized yet
+    RFID_STATE_POWERED_OFF,     // Powered off or disconnected
+    RFID_STATE_STARTUP_PENDING, // Powering up, handshake pending
+    RFID_STATE_RESPONSIVE,      // Communication verified, ready to use
+    RFID_STATE_UNRESPONSIVE     // Communication failed
 } rfid_reader_state_t;
 
 /**
  * Reader Health Metrics
  * Used for diagnostics and MQTT health reporting
  */
-typedef struct {
-    uint32_t last_check_ms;             // Timestamp of last health check
-    uint8_t  fw_major;                  // Firmware major version
-    uint8_t  fw_minor;                  // Firmware minor version
-    esp_err_t last_error;               // Last error code from handshake
-    bool     is_responsive;             // True if reader is responsive
-    bool     power_rail_present;        // True if 3.3V power rail is present
+typedef struct
+{
+    uint32_t  last_check_ms;      // Timestamp of last health check
+    uint8_t   fw_major;           // Firmware major version
+    uint8_t   fw_minor;           // Firmware minor version
+    esp_err_t last_error;         // Last error code from handshake
+    bool      is_responsive;      // True if reader is responsive
+    bool      power_rail_present; // True if 3.3V power rail is present
 } rfid_health_t;
 
 /**
@@ -91,33 +93,35 @@ typedef struct {
  * Per section 2.2.8 (Real-Time Inventory Response):
  * [Head][Len][Address][Cmd][Freq_Ant][PC(2)][EPC(N)][RSSI][Check]
  */
-typedef struct {
-    uint8_t  pc[2];                     // Protocol Control (2 bytes)
-    uint8_t  epc[32];                   // EPC tag ID (variable, max 32 bytes)
-    uint8_t  epc_len;                   // Actual EPC length
-    uint8_t  rssi;                      // Signal strength
-    uint8_t  antenna_id;                // Antenna that detected (0-3)
-    uint8_t  frequency;                 // RF frequency parameter
-    uint32_t timestamp_ms;              // When detected (milliseconds)
+typedef struct
+{
+    uint8_t  pc[2];        // Protocol Control (2 bytes)
+    uint8_t  epc[32];      // EPC tag ID (variable, max 32 bytes)
+    uint8_t  epc_len;      // Actual EPC length
+    uint8_t  rssi;         // Signal strength
+    uint8_t  antenna_id;   // Antenna that detected (0-3)
+    uint8_t  frequency;    // RF frequency parameter
+    uint32_t timestamp_ms; // When detected (milliseconds)
 } rfid_tag_event_t;
 
 /**
  * Reader Statistics
  */
-typedef struct {
-    uint32_t tags_detected;             // Unique tags seen
-    uint32_t total_reads;               // Total detection events
-    uint32_t errors;                    // Communication errors
-    bool     inventory_active;          // Currently scanning
+typedef struct
+{
+    uint32_t tags_detected;    // Unique tags seen
+    uint32_t total_reads;      // Total detection events
+    uint32_t errors;           // Communication errors
+    bool     inventory_active; // Currently scanning
 } rfid_stats_t;
 
 /**
  * Tag Detection Callback
- * 
+ *
  * Called from UART task whenever a tag is detected.
  * Keep processing minimal - log tag and return quickly.
  */
-typedef void (*rfid_tag_callback_t)(const rfid_tag_event_t* event);
+typedef void (*rfid_tag_callback_t)(const rfid_tag_event_t *event);
 
 // ============================================================================
 // PUBLIC API
@@ -125,9 +129,9 @@ typedef void (*rfid_tag_callback_t)(const rfid_tag_event_t* event);
 
 /**
  * Initialize RFID reader
- * 
+ *
  * Sets up UART2, configures pins, starts background task.
- * 
+ *
  * @return ESP_OK on success
  */
 esp_err_t rfid_reader_init(void);
@@ -139,12 +143,12 @@ void rfid_reader_deinit(void);
 
 /**
  * Reset the reader module
- * 
+ *
  * Sends 0x70 reset command. Module will beep and restart.
  * Wait ~2 seconds after calling before using other commands.
- * 
+ *
  * Per section 2.1.1, page 7.
- * 
+ *
  * @return ESP_OK if command sent successfully
  */
 esp_err_t rfid_reader_reset(void);
@@ -160,7 +164,7 @@ esp_err_t rfid_reader_reset(void);
  * @param minor Output: firmware minor version (optional, can be NULL)
  * @return ESP_OK if reader is responsive, ESP_ERR_TIMEOUT if unresponsive
  */
-esp_err_t rfid_reader_handshake(uint8_t* major, uint8_t* minor);
+esp_err_t rfid_reader_handshake(uint8_t *major, uint8_t *minor);
 
 /**
  * Get current reader state
@@ -177,7 +181,7 @@ rfid_reader_state_t rfid_reader_get_state(void);
  * @param health Output: health metrics structure
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if health is NULL
  */
-esp_err_t rfid_reader_get_health(rfid_health_t* health);
+esp_err_t rfid_reader_get_health(rfid_health_t *health);
 
 /**
  * Get firmware version
@@ -191,16 +195,16 @@ esp_err_t rfid_reader_get_health(rfid_health_t* health);
  * @param minor Output: minor version number
  * @return ESP_OK on success, ESP_ERR_TIMEOUT if no response
  */
-esp_err_t rfid_reader_get_firmware(uint8_t* major, uint8_t* minor);
+esp_err_t rfid_reader_get_firmware(uint8_t *major, uint8_t *minor);
 
 /**
  * Set RF output power
- * 
+ *
  * Configure transmit power for maximum range.
  * Valid range: 20-33 dBm (will be clamped if out of range)
- * 
+ *
  * Per section 2.1.7, page 12.
- * 
+ *
  * @param power_dbm Power level in dBm (20-33)
  * @return ESP_OK on success
  */
@@ -208,12 +212,12 @@ esp_err_t rfid_reader_set_power(uint8_t power_dbm);
 
 /**
  * Set frequency region
- * 
+ *
  * Configure RF spectrum for your region.
- * 
+ *
  * Per section 2.1.9, page 13.
  * Frequency table on page 41.
- * 
+ *
  * @param region RFID_REGION_FCC, RFID_REGION_ETSI, or RFID_REGION_CHN
  * @param start_freq Starting frequency parameter (see page 41)
  * @param end_freq Ending frequency parameter (see page 41)
@@ -243,25 +247,25 @@ esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t int
 
 /**
  * Stop inventory mode
- * 
+ *
  * @return ESP_OK on success
  */
 esp_err_t rfid_reader_stop_inventory(void);
 
 /**
  * Check if inventory is currently running
- * 
+ *
  * @return true if actively scanning for tags
  */
 bool rfid_reader_is_inventory_active(void);
 
 /**
  * Get current statistics
- * 
+ *
  * @param stats Output: current reader statistics
  * @return ESP_OK on success
  */
-esp_err_t rfid_reader_get_stats(rfid_stats_t* stats);
+esp_err_t rfid_reader_get_stats(rfid_stats_t *stats);
 
 /**
  * Clear statistics counters
