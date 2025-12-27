@@ -18,6 +18,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "offline_event_logger.h"
+#include "uart_reader.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -534,6 +535,48 @@ esp_err_t mqtt_client_publish_health_metrics(void)
                            0,
                            MQTT_QOS_HEALTH_METRICS,
                            0);
+
+    // ========================================================================
+    // Publish RFID Reader Health Status
+    // ========================================================================
+
+    rfid_health_t rfid_health;
+    rfid_reader_state_t rfid_state = rfid_reader_get_state();
+
+    if (rfid_reader_get_health(&rfid_health) == ESP_OK) {
+        // Convert state enum to string for readability
+        const char* state_str;
+        switch (rfid_state) {
+            case RFID_STATE_UNINITIALIZED:   state_str = "UNINITIALIZED"; break;
+            case RFID_STATE_POWERED_OFF:     state_str = "POWERED_OFF"; break;
+            case RFID_STATE_STARTUP_PENDING: state_str = "STARTUP_PENDING"; break;
+            case RFID_STATE_RESPONSIVE:      state_str = "RESPONSIVE"; break;
+            case RFID_STATE_UNRESPONSIVE:    state_str = "UNRESPONSIVE"; break;
+            default:                         state_str = "UNKNOWN"; break;
+        }
+
+        // Build JSON payload with all health metrics
+        char rfid_payload[256];
+        snprintf(rfid_payload, sizeof(rfid_payload),
+                 "{\"state\":\"%s\",\"is_responsive\":%s,\"power_rail_present\":%s,"
+                 "\"fw_version\":\"%u.%u\",\"last_error\":%d,\"last_check_ms\":%lu}",
+                 state_str,
+                 rfid_health.is_responsive ? "true" : "false",
+                 rfid_health.power_rail_present ? "true" : "false",
+                 rfid_health.fw_major,
+                 rfid_health.fw_minor,
+                 rfid_health.last_error,
+                 rfid_health.last_check_ms);
+
+        esp_mqtt_client_publish(s_mqtt_client,
+                               MQTT_TOPIC_HEALTH_BASE "rfid_status",
+                               rfid_payload,
+                               0,
+                               MQTT_QOS_HEALTH_METRICS,
+                               0);
+    } else {
+        ESP_LOGW(TAG, "Failed to get RFID health data");
+    }
 
     ESP_LOGD(TAG, "Published health metrics");
 
