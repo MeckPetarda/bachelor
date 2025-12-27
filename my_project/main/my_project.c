@@ -40,7 +40,6 @@
 #define BUTTON2_PIN     GPIO_NUM_35 // Show statistics
 
 #define DEBOUNCE_TIME_MS 50
-// #define PIR_DEBOUNCE_MS    100
 
 static const char *TAG = "MAIN";
 
@@ -193,24 +192,13 @@ static void rfid_reader_start_inventory_wrapper(void)
 {
     ESP_LOGI(TAG, "Attempting to start RFID scan...");
 
-    // Step 1: Check power rail on GPIO 2 FIRST (proactive check)
-    bool power_present = gpio_get_level(RFID_POWER_STATUS_PIN);
-    if (!power_present)
-    {
-        ESP_LOGE(TAG, "✗ Cannot start scanning - RFID power rail is down (GPIO %d)", RFID_POWER_STATUS_PIN);
-        ESP_LOGE(TAG, "  Check 3.3V power supply to reader");
-        return;
-    }
-
-    ESP_LOGD(TAG, "✓ Power rail present on GPIO %d", RFID_POWER_STATUS_PIN);
-
     // Step 2: Perform handshake to verify reader communication
     ESP_LOGI(TAG, "Performing reader handshake...");
     esp_err_t handshake_result = rfid_reader_handshake(NULL, NULL);
 
     if (handshake_result != ESP_OK)
     {
-        ESP_LOGE(TAG, "✗ Cannot start scanning - reader powered but unresponsive");
+        ESP_LOGE(TAG, "✗ Cannot start scanning");
         ESP_LOGE(TAG, "  Handshake error: %s (0x%X)", esp_err_to_name(handshake_result), handshake_result);
         return;
     }
