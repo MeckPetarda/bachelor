@@ -4,8 +4,11 @@ import {
   testConnection,
   schema
 } from "./database/client";
+import { createLogger } from "./utils/logger";
 
-console.log("[Server] Starting attendance system server...");
+const logger = createLogger("Server")
+
+logger.info("Starting attendance system server...");
 
 // Initialize database
 const db = initDatabase();
@@ -15,20 +18,20 @@ let isShuttingDown = false;
 
 async function gracefulShutdown(signal: string) {
   if (isShuttingDown) {
-    console.log(`[Server] Shutdown already in progress, ignoring ${signal}`);
+    logger.info(`Shutdown already in progress, ignoring ${signal}`);
     return;
   }
 
   isShuttingDown = true;
-  console.log(`\n[Server] Received ${signal}, starting graceful shutdown...`);
+  logger.info(`\nReceived ${signal}, starting graceful shutdown...`);
 
   try {
     // Close database connections
     await closeDatabase();
-    console.log("[Server] Graceful shutdown completed");
+    logger.info("Graceful shutdown completed");
     process.exit(0);
   } catch (error) {
-    console.error("[Server] Error during shutdown:", error);
+    logger.error("Error during shutdown:", error);
     process.exit(1);
   }
 }
@@ -39,12 +42,12 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 // Handle uncaught errors
 process.on("uncaughtException", async (error) => {
-  console.error("[Server] Uncaught exception:", error);
+  logger.error("Uncaught exception:", error);
   await gracefulShutdown("uncaughtException");
 });
 
 process.on("unhandledRejection", async (reason, promise) => {
-  console.error("[Server] Unhandled rejection at:", promise, "reason:", reason);
+  logger.error("Unhandled rejection at:", promise, "reason:", reason);
   await gracefulShutdown("unhandledRejection");
 });
 
@@ -58,20 +61,20 @@ async function startup() {
     }
 
     // Query lighthouses table to verify schema
-    console.log("[Server] Querying lighthouses table...");
+    logger.info("Querying lighthouses table...");
     const lighthouses = await db.select().from(schema.lighthouses);
-    console.log(`[Server] Found ${lighthouses.length} lighthouse(s) in database`);
+    logger.info(`Found ${lighthouses.length} lighthouse(s) in database`);
 
     if (lighthouses.length > 0) {
-      console.log("[Server] Lighthouses:");
+      logger.info("Lighthouses:");
       lighthouses.forEach((lh) => {
-        console.log(`  - ${lh.name} (${lh.deviceId}): ${lh.isActive ? 'active' : 'inactive'}`);
+        logger.info(`  - ${lh.name} (${lh.deviceId}): ${lh.isActive ? 'active' : 'inactive'}`);
       });
     }
 
-    console.log("[Server] Server startup completed successfully");
+    logger.info("Server startup completed successfully");
   } catch (error) {
-    console.error("[Server] Startup failed:", error);
+    logger.error("Startup failed:", error);
     await gracefulShutdown("startup-failure");
   }
 }
