@@ -41,7 +41,7 @@ export function initDatabase(): ReturnType<typeof drizzle<typeof schema>> {
       connect_timeout: 10, // Connection timeout in seconds
       prepare: false, // Disable prepared statements for better compatibility
       onnotice: (notice) => log.debug('PostgreSQL notice:', notice.message),
-      debug: config.nodeEnv === 'development' ? (connection, query, params) => {
+      debug: config.nodeEnv === 'development' ? (_connection, query, _params) => {
         log.debug(`Query: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`);
       } : undefined,
     });
@@ -139,7 +139,7 @@ export async function testConnection(): Promise<boolean> {
   try {
     log.debug('Testing database connection...');
     const result = await getSql()`SELECT 1 as test`;
-    const success = result.length > 0 && result[0].test === 1;
+    const success = result.length > 0 && result[0]?.test === 1;
     if (success) {
       log.info('Database connection test successful');
     }
@@ -194,13 +194,17 @@ export async function executeQuery<T>(queryFn: () => Promise<T>): Promise<T> {
   }
 }
 
+type TransactionCallback<T> = Parameters<ReturnType<typeof drizzle<typeof schema>>['transaction']>[0] extends (tx: infer Tx) => unknown
+  ? (tx: Tx) => Promise<T>
+  : never;
+
 /**
  * Execute a query within a transaction
  * @param txFn - Function that receives the transaction and executes queries
  * @returns The transaction result
  */
 export async function withTransaction<T>(
-  txFn: (tx: ReturnType<typeof drizzle<typeof schema>>) => Promise<T>
+  txFn: TransactionCallback<T>
 ): Promise<T> {
   const database = getDatabase();
   const startTime = performance.now();
