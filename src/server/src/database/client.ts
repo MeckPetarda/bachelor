@@ -2,22 +2,14 @@ import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { getConfig } from '../config/index.ts';
 import * as schema from './schema';
+import { createLogger } from '../utils/logger.ts';
 
 let sql: ReturnType<typeof postgres> | null = null;
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let isShuttingDown = false;
 
 // Logger helper for consistent output
-const log = {
-  info: (message: string, ...args: unknown[]) => console.log(`[Database] ${message}`, ...args),
-  error: (message: string, ...args: unknown[]) => console.error(`[Database] ERROR: ${message}`, ...args),
-  warn: (message: string, ...args: unknown[]) => console.warn(`[Database] WARN: ${message}`, ...args),
-  debug: (message: string, ...args: unknown[]) => {
-    if (getConfig().nodeEnv === 'development') {
-      console.log(`[Database] DEBUG: ${message}`, ...args);
-    }
-  },
-};
+const logger = createLogger("Database")
 
 /**
  * Initialize the PostgreSQL connection pool
@@ -25,34 +17,34 @@ const log = {
  */
 export function initDatabase(): ReturnType<typeof drizzle<typeof schema>> {
   if (db) {
-    log.debug('Database already initialized, returning existing instance');
+    logger.debug('Database already initialized, returning existing instance');
     return db;
   }
 
   const config = getConfig();
 
   try {
-    log.info('Initializing PostgreSQL connection pool...');
-    log.debug(`Connecting to: ${config.database.url.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`);
+    logger.info('Initializing PostgreSQL connection pool...');
+    logger.debug(`Connecting to: ${config.database.url.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`);
 
     sql = postgres(config.database.url, {
       max: 20, // Maximum number of connections in pool
       idle_timeout: 20, // Close idle connections after 20 seconds
       connect_timeout: 10, // Connection timeout in seconds
       prepare: false, // Disable prepared statements for better compatibility
-      onnotice: (notice) => log.debug('PostgreSQL notice:', notice.message),
+      onnotice: (notice) => logger.debug('PostgreSQL notice:', notice.message),
       debug: config.nodeEnv === 'development' ? (_connection, query, _params) => {
-        log.debug(`Query: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`);
+        logger.debug(`Query: ${query.substring(0, 100)}${query.length > 100 ? '...' : ''}`);
       } : undefined,
     });
 
     db = drizzle(sql, { schema, casing: "snake_case" });
 
-    log.info('Connection pool initialized successfully');
+    logger.info('Connection pool initialized successfully');
 
     return db;
   } catch (error) {
-    log.error('Failed to initialize database connection pool:', error);
+    logger.error('Failed to initialize database connection pool:', error);
     throw error;
   }
 }
@@ -93,17 +85,17 @@ export function getSql(): ReturnType<typeof postgres> {
  */
 export async function closeDatabase(timeout = 5000): Promise<void> {
   if (!sql) {
-    log.debug('No database connection to close');
+    logger.debug('No database connection to close');
     return;
   }
 
   if (isShuttingDown) {
-    log.warn('Database shutdown already in progress');
+    logger.warn('Database shutdown already in progress');
     return;
   }
 
   isShuttingDown = true;
-  log.info('Closing database connection pool...');
+  logger.info('Closing database connection pool...');
 
   try {
     // Create a timeout promise
@@ -119,9 +111,9 @@ export async function closeDatabase(timeout = 5000): Promise<void> {
 
     sql = null;
     db = null;
-    log.info('Connection pool closed successfully');
+    logger.info('Connection pool closed successfully');
   } catch (error) {
-    log.error('Error closing database connection pool:', error);
+    logger.error('Error closing database connection pool:', error);
     // Force cleanup even on error
     sql = null;
     db = null;
@@ -137,15 +129,15 @@ export async function closeDatabase(timeout = 5000): Promise<void> {
  */
 export async function testConnection(): Promise<boolean> {
   try {
-    log.debug('Testing database connection...');
+    logger.debug('Testing database connection...');
     const result = await getSql()`SELECT 1 as test`;
     const success = result.length > 0 && result[0]?.test === 1;
     if (success) {
-      log.info('Database connection test successful');
+      logger.info('Database connection test successful');
     }
     return success;
   } catch (error) {
-    log.error('Connection test failed:', error);
+    logger.error('Connection test failed:', error);
     return false;
   }
 }
@@ -185,11 +177,11 @@ export async function executeQuery<T>(queryFn: () => Promise<T>): Promise<T> {
   try {
     const result = await queryFn();
     const duration = performance.now() - startTime;
-    log.debug(`Query executed in ${duration.toFixed(2)}ms`);
+    logger.debug(`Query executed in ${duration.toFixed(2)}ms`);
     return result;
   } catch (error) {
     const duration = performance.now() - startTime;
-    log.error(`Query failed after ${duration.toFixed(2)}ms:`, error);
+    logger.error(`Query failed after ${duration.toFixed(2)}ms:`, error);
     throw error;
   }
 }
@@ -210,14 +202,14 @@ export async function withTransaction<T>(
   const startTime = performance.now();
 
   try {
-    log.debug('Starting transaction...');
+    logger.debug('Starting transaction...');
     const result = await database.transaction(txFn);
     const duration = performance.now() - startTime;
-    log.debug(`Transaction completed in ${duration.toFixed(2)}ms`);
+    logger.debug(`Transaction completed in ${duration.toFixed(2)}ms`);
     return result;
   } catch (error) {
     const duration = performance.now() - startTime;
-    log.error(`Transaction failed after ${duration.toFixed(2)}ms:`, error);
+    logger.error(`Transaction failed after ${duration.toFixed(2)}ms:`, error);
     throw error;
   }
 }
