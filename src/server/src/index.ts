@@ -4,9 +4,10 @@ import {
   testConnection,
   schema
 } from "./database/client";
+import { startMqttBroker, closeMqttBroker, getMqttBrokerStats } from "./mqtt/broker";
 import { createLogger } from "./utils/logger";
 
-const logger = createLogger("Server")
+const logger = createLogger("Server");
 
 logger.info("Starting attendance system server...");
 
@@ -26,8 +27,12 @@ async function gracefulShutdown(signal: string) {
   logger.info(`\nReceived ${signal}, starting graceful shutdown...`);
 
   try {
+    // Close MQTT broker first (stop accepting new messages)
+    await closeMqttBroker();
+
     // Close database connections
     await closeDatabase();
+
     logger.info("Graceful shutdown completed");
     process.exit(0);
   } catch (error) {
@@ -51,7 +56,7 @@ process.on("unhandledRejection", async (reason, promise) => {
   await gracefulShutdown("unhandledRejection");
 });
 
-// Test database connection and query lighthouses table
+// Test database connection and start services
 async function startup() {
   try {
     // Test basic connectivity
@@ -71,6 +76,17 @@ async function startup() {
         logger.info(`  - ${lh.name} (${lh.deviceId}): ${lh.isActive ? 'active' : 'inactive'}`);
       });
     }
+
+    // Start MQTT broker
+    startMqttBroker();
+
+    // Log broker stats after a short delay to ensure it's fully started
+    setTimeout(() => {
+      const stats = getMqttBrokerStats();
+      if (stats.isRunning) {
+        logger.info(`MQTT broker running on port ${stats.port}`);
+      }
+    }, 100);
 
     logger.info("Server startup completed successfully");
   } catch (error) {
