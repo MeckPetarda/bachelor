@@ -1,5 +1,4 @@
 build
 .cache
 
-main/Kconfig.projbuild
 managed_components/**
