@@ -9,7 +9,6 @@ import {
   errorHandler,
   jwtAuth,
   createJWT,
-  type JWTPayload,
 } from "./middleware";
 
 const logger = createLogger("Routes");
@@ -79,6 +78,11 @@ app.post("/api/v1/auth/login", async (c) => {
   }
 
   const user = users[0];
+
+  if (!user) {
+    logger.warn(`Login attempt failed: user '${body.username}' not found`);
+    return c.json({ error: "Invalid credentials", status: 401 }, 401);
+  }
 
   // Check if user is active
   if (!user.isActive) {
