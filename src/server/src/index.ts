@@ -2,7 +2,6 @@ import {
   initDatabase,
   closeDatabase,
   testConnection,
-  getDatabase,
   schema
 } from "./database/client";
 
