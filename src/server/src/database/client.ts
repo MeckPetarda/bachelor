@@ -46,7 +46,7 @@ export function initDatabase(): ReturnType<typeof drizzle<typeof schema>> {
       } : undefined,
     });
 
-    db = drizzle(sql, { schema });
+    db = drizzle(sql, { schema, casing: "snake_case" });
 
     log.info('Connection pool initialized successfully');
 
