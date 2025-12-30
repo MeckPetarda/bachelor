@@ -5,6 +5,8 @@ import {
   schema
 } from "./database/client";
 import { startMqttBroker, closeMqttBroker, getMqttBrokerStats } from "./mqtt/broker";
+import { app } from "./api/routes";
+import { getConfig } from "./config";
 import { createLogger } from "./utils/logger";
 
 const logger = createLogger("Server");
@@ -13,6 +15,9 @@ logger.info("Starting attendance system server...");
 
 // Initialize database
 const db = initDatabase();
+
+// HTTP server reference for graceful shutdown
+let httpServer: ReturnType<typeof Bun.serve> | null = null;
 
 // Set up graceful shutdown handlers
 let isShuttingDown = false;
@@ -27,7 +32,14 @@ async function gracefulShutdown(signal: string) {
   logger.info(`\nReceived ${signal}, starting graceful shutdown...`);
 
   try {
-    // Close MQTT broker first (stop accepting new messages)
+    // Stop HTTP server first (stop accepting new requests)
+    if (httpServer) {
+      logger.info("Stopping HTTP server...");
+      httpServer.stop();
+      httpServer = null;
+    }
+
+    // Close MQTT broker (stop accepting new messages)
     await closeMqttBroker();
 
     // Close database connections
@@ -88,6 +100,14 @@ async function startup() {
       }
     }, 100);
 
+    // Start HTTP server
+    const config = getConfig();
+    httpServer = Bun.serve({
+      port: config.http.port,
+      fetch: app.fetch,
+    });
+
+    logger.info(`HTTP server running on port ${config.http.port}`);
     logger.info("Server startup completed successfully");
   } catch (error) {
     logger.error("Startup failed:", error);
