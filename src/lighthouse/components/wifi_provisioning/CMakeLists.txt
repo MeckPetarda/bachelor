@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "wifi_settings_storage.c"
+        "wifi_provisioning.c"
     INCLUDE_DIRS
         "."
     REQUIRES
@@ -8,4 +9,6 @@ idf_component_register(
         "mbedtls"
         "esp_common"
         "freertos"
+        "esp_timer"
+        "driver"
 )
