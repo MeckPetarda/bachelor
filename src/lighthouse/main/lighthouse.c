@@ -27,6 +27,7 @@
 #include "offline_event_logger.h"
 #include "uart_reader.h"
 #include "wifi_manager.h"
+#include "wifi_provisioning.h"
 
 // ============================================================================
 // GPIO CONFIGURATION
@@ -259,17 +260,50 @@ static void process_buttons(void)
         state->last_stable_state = level;
     }
 
-    // BUTTON2: Show statistics
+    // BUTTON2: Show statistics or enter setup mode (5s hold)
     {
         uint32_t        level = gpio_get_level(BUTTON2_PIN);
         button_state_t *state = &button_states[1];
 
+        // Detect button press start (transition from released to pressed)
         if (level == 0 && state->last_stable_state == 1)
         {
             if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS)
             {
-                state->press_count++;
+                // Record press start time
                 state->last_press_time = current_time;
+                // Clear setup triggered flag (high bit of press_count)
+                state->press_count &= 0x7F;
+            }
+        }
+
+        // Track press duration while button held (level == 0 continuously)
+        if (level == 0 && state->last_stable_state == 0)
+        {
+            uint32_t press_duration = current_time - state->last_press_time;
+
+            // Check for 5-second hold (only trigger once using high bit flag)
+            if (press_duration >= 5000 && !(state->press_count & 0x80))
+            {
+                // 5s threshold crossed - enter setup mode
+                ESP_LOGI(TAG, "BUTTON2 held for 5+ seconds - entering WiFi setup mode");
+                state->press_count |= 0x80;  // Mark that we've triggered setup
+
+                // This function reboots the device - code below won't execute
+                wifi_provisioning_setup_button_pressed();
+            }
+        }
+
+        // Handle button release (transition from pressed to released)
+        if (level == 1 && state->last_stable_state == 0)
+        {
+            uint32_t press_duration = current_time - state->last_press_time;
+
+            // Only handle short press if we didn't trigger setup and debounce passed
+            if (press_duration < 5000 && !(state->press_count & 0x80) &&
+                press_duration >= DEBOUNCE_TIME_MS)
+            {
+                state->press_count++;
 
                 // Get and display statistics
                 rfid_stats_t stats;
@@ -294,6 +328,9 @@ static void process_buttons(void)
                     ESP_LOGW(TAG, "MQTT not connected - skipping health metrics publish");
                 }
             }
+
+            // Reset press count for next press cycle (keep low bits for potential debug)
+            state->press_count = 0;
         }
 
         state->last_stable_state = level;
@@ -313,6 +350,10 @@ static void main_task(void *arg)
 
     while (1)
     {
+        // Process WiFi provisioning state machine
+        // Handles LED blinking, state transitions, connection monitoring
+        wifi_provisioning_process();
+
         process_buttons();
         // process_pir();  // Disabled - GPIO 2 used for RFID power monitoring
 
@@ -365,6 +406,47 @@ void app_main(void)
 
     // Initialize GPIO
     gpio_init();
+
+    // ============================================================================
+    // INITIALIZE WIFI PROVISIONING SYSTEM
+    // ============================================================================
+
+    ESP_LOGI(TAG, "Initializing WiFi provisioning system...");
+    ret = wifi_provisioning_init(WIFI_STATUS_LED, 10000);  // 10s connection timeout
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "WiFi provisioning initialization failed: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Continuing without provisioning support...\n");
+    }
+    else
+    {
+        // Wait for WiFi to be ready before proceeding
+        // If not configured, user must press BUTTON2 for 5 seconds to enter setup mode
+        if (!wifi_provisioning_is_ready())
+        {
+            ESP_LOGI(TAG, "════════════════════════════════════");
+            ESP_LOGI(TAG, "  WiFi Not Configured");
+            ESP_LOGI(TAG, "════════════════════════════════════");
+            ESP_LOGI(TAG, "  Press BUTTON2 for 5 seconds to enter setup mode");
+            ESP_LOGI(TAG, "  Current state: %s",
+                     wifi_provisioning_state_to_string(wifi_provisioning_get_state()));
+            ESP_LOGI(TAG, "════════════════════════════════════\n");
+
+            // Block here until configured or ready (AP mode, etc.)
+            while (!wifi_provisioning_is_ready())
+            {
+                wifi_provisioning_process();
+
+                // Also process buttons so user can trigger setup mode
+                process_buttons();
+
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+
+            ESP_LOGI(TAG, "WiFi provisioning ready, state: %s",
+                     wifi_provisioning_state_to_string(wifi_provisioning_get_state()));
+        }
+    }
 
     // ============================================================================
     // INITIALIZE WIFI (PoC)
