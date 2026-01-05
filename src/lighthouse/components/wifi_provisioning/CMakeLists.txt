@@ -7,4 +7,5 @@ idf_component_register(
         "nvs_flash"
         "mbedtls"
         "esp_common"
+        "freertos"
 )
