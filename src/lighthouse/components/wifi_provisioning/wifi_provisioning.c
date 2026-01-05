@@ -12,33 +12,34 @@
  * - ESP-IDF GPIO and Timer documentation
  */
 
-#include <string.h>
 #include "wifi_provisioning.h"
-#include "wifi_settings_storage.h"
+#include "driver/gpio.h"
 #include "esp_log.h"
-#include "esp_timer.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/gpio.h"
-#include "nvs_flash.h"
 #include "nvs.h"
+#include "nvs_flash.h"
+#include "wifi_settings_storage.h"
+#include <string.h>
 
-static const char* TAG = "WIFI_PROV";
+static const char *TAG = "WIFI_PROV";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-#define LED_BLINK_INTERVAL_MS   1000    // LED toggle interval during AP mode
-#define SETUP_FLAG_NVS_KEY      "setup_req"  // NVS key for setup request flag
-#define NVS_NAMESPACE           "wifi_prov"  // NVS namespace for provisioning flags
+#define LED_BLINK_INTERVAL_MS 1000        // LED toggle interval during AP mode
+#define SETUP_FLAG_NVS_KEY    "setup_req" // NVS key for setup request flag
+#define NVS_NAMESPACE         "wifi_prov" // NVS namespace for provisioning flags
 
 // ============================================================================
 // STATE MACHINE DATA
 // ============================================================================
 
-typedef struct {
+typedef struct
+{
     // Core state
     wifi_state_t current_state;
     wifi_event_t pending_event;
@@ -49,9 +50,9 @@ typedef struct {
 
     // LED control
     gpio_num_t led_pin;
-    uint32_t led_blink_interval_ms;
-    uint32_t last_led_toggle_ms;
-    uint8_t led_state;
+    uint32_t   led_blink_interval_ms;
+    uint32_t   last_led_toggle_ms;
+    uint8_t    led_state;
 
     // Pending credentials during setup (from HTTP form)
     char pending_ssid[32];
@@ -87,20 +88,20 @@ static uint32_t get_time_ms(void)
  */
 static void transition_to(wifi_state_t new_state)
 {
-    if (prov_state.current_state == new_state) {
-        return;  // No transition needed
+    if (prov_state.current_state == new_state)
+    {
+        return; // No transition needed
     }
 
-    ESP_LOGI(TAG, "State transition: %s -> %s",
-             wifi_provisioning_state_to_string(prov_state.current_state),
+    ESP_LOGI(TAG, "State transition: %s -> %s", wifi_provisioning_state_to_string(prov_state.current_state),
              wifi_provisioning_state_to_string(new_state));
 
-    prov_state.current_state = new_state;
+    prov_state.current_state       = new_state;
     prov_state.state_enter_time_ms = get_time_ms();
 
     // Reset LED state on transition
     prov_state.last_led_toggle_ms = get_time_ms();
-    prov_state.led_state = 0;
+    prov_state.led_state          = 0;
     gpio_set_level(prov_state.led_pin, 0);
 }
 
@@ -111,23 +112,29 @@ static void transition_to(wifi_state_t new_state)
 static bool check_setup_requested(void)
 {
     nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
+    esp_err_t    ret = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
 
-    if (ret == ESP_ERR_NVS_NOT_FOUND) {
+    if (ret == ESP_ERR_NVS_NOT_FOUND)
+    {
         // Namespace doesn't exist yet - no setup requested
         return false;
-    } else if (ret != ESP_OK) {
+    }
+    else if (ret != ESP_OK)
+    {
         ESP_LOGW(TAG, "Failed to open NVS for setup flag: %s", esp_err_to_name(ret));
         return false;
     }
 
     uint8_t setup_flag = 0;
-    ret = nvs_get_u8(nvs_handle, SETUP_FLAG_NVS_KEY, &setup_flag);
+    ret                = nvs_get_u8(nvs_handle, SETUP_FLAG_NVS_KEY, &setup_flag);
     nvs_close(nvs_handle);
 
-    if (ret == ESP_ERR_NVS_NOT_FOUND) {
+    if (ret == ESP_ERR_NVS_NOT_FOUND)
+    {
         return false;
-    } else if (ret != ESP_OK) {
+    }
+    else if (ret != ESP_OK)
+    {
         ESP_LOGW(TAG, "Failed to read setup flag: %s", esp_err_to_name(ret));
         return false;
     }
@@ -141,15 +148,17 @@ static bool check_setup_requested(void)
 static esp_err_t set_setup_requested(bool requested)
 {
     nvs_handle_t nvs_handle;
-    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    esp_err_t    ret = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to open NVS for setup flag: %s", esp_err_to_name(ret));
         return ret;
     }
 
     ret = nvs_set_u8(nvs_handle, SETUP_FLAG_NVS_KEY, requested ? 1 : 0);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to write setup flag: %s", esp_err_to_name(ret));
         nvs_close(nvs_handle);
         return ret;
@@ -175,15 +184,17 @@ static void clear_setup_requested(void)
  */
 static void process_led(void)
 {
-    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE) {
+    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE)
+    {
         // LED off in non-AP states (or controlled by other logic)
         return;
     }
 
-    uint32_t now = get_time_ms();
+    uint32_t now     = get_time_ms();
     uint32_t elapsed = now - prov_state.last_led_toggle_ms;
 
-    if (elapsed >= prov_state.led_blink_interval_ms) {
+    if (elapsed >= prov_state.led_blink_interval_ms)
+    {
         // Toggle LED
         prov_state.led_state = !prov_state.led_state;
         gpio_set_level(prov_state.led_pin, prov_state.led_state);
@@ -210,7 +221,8 @@ static void process_ap_active(void)
     // LED blinking is handled in process_led()
 
     // Check if credentials were submitted
-    if (prov_state.credentials_pending) {
+    if (prov_state.credentials_pending)
+    {
         ESP_LOGI(TAG, "Credentials received, transitioning to CONNECTING");
         prov_state.credentials_pending = false;
         transition_to(WIFI_STATE_CONNECTING);
@@ -224,13 +236,17 @@ static void process_ap_active(void)
 static void process_connecting(void)
 {
     // Check if connection result is ready
-    if (prov_state.connection_result_ready) {
+    if (prov_state.connection_result_ready)
+    {
         prov_state.connection_result_ready = false;
 
-        if (prov_state.connection_success) {
+        if (prov_state.connection_success)
+        {
             ESP_LOGI(TAG, "Connection successful!");
             transition_to(WIFI_STATE_CONNECTED);
-        } else {
+        }
+        else
+        {
             ESP_LOGW(TAG, "Connection failed: %s", prov_state.error_message);
             // Return to AP mode for retry
             transition_to(WIFI_STATE_AP_ACTIVE);
@@ -239,7 +255,8 @@ static void process_connecting(void)
 
     // Check for timeout
     uint32_t elapsed = get_time_ms() - prov_state.state_enter_time_ms;
-    if (elapsed >= prov_state.connection_timeout_ms) {
+    if (elapsed >= prov_state.connection_timeout_ms)
+    {
         ESP_LOGW(TAG, "Connection timeout after %lu ms", (unsigned long)elapsed);
         strncpy(prov_state.error_message, "Connection timeout", sizeof(prov_state.error_message) - 1);
         prov_state.error_message[sizeof(prov_state.error_message) - 1] = '\0';
@@ -277,7 +294,8 @@ static void process_offline(void)
 
 esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout_ms)
 {
-    if (prov_state.initialized) {
+    if (prov_state.initialized)
+    {
         ESP_LOGW(TAG, "Already initialized");
         return ESP_OK;
     }
@@ -285,62 +303,67 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
     ESP_LOGI(TAG, "Initializing WiFi provisioning system");
 
     // Validate parameters
-    if (led_pin < 0 || led_pin >= GPIO_NUM_MAX) {
+    if (led_pin < 0 || led_pin >= GPIO_NUM_MAX)
+    {
         ESP_LOGE(TAG, "Invalid LED pin: %d", led_pin);
         return ESP_ERR_INVALID_ARG;
     }
 
     // Store configuration
-    prov_state.led_pin = led_pin;
+    prov_state.led_pin               = led_pin;
     prov_state.connection_timeout_ms = connection_timeout_ms;
     prov_state.led_blink_interval_ms = LED_BLINK_INTERVAL_MS;
 
     // Configure LED GPIO (if not already configured by main app)
     gpio_config_t led_config = {
         .pin_bit_mask = (1ULL << led_pin),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     gpio_config(&led_config);
     gpio_set_level(led_pin, 0);
 
     // Initialize default NVS partition (for provisioning flags)
     esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
         // NVS partition needs erase
         ESP_LOGW(TAG, "NVS needs erase, reinitializing");
         nvs_flash_erase();
         ret = nvs_flash_init();
     }
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to initialize default NVS: %s", esp_err_to_name(ret));
         return ret;
     }
 
     // Initialize WiFi settings storage
     wifi_storage_error_t storage_ret = wifi_settings_init();
-    if (storage_ret != WIFI_STORAGE_OK) {
-        ESP_LOGW(TAG, "WiFi settings storage init failed: %s",
-                 wifi_settings_error_to_string(storage_ret));
+    if (storage_ret != WIFI_STORAGE_OK)
+    {
+        ESP_LOGW(TAG, "WiFi settings storage init failed: %s", wifi_settings_error_to_string(storage_ret));
         // Continue anyway - device can still work in setup mode
     }
 
     // Determine initial state
     bool setup_requested = check_setup_requested();
-    bool is_configured = wifi_settings_is_configured();
+    bool is_configured   = wifi_settings_is_configured();
 
-    ESP_LOGI(TAG, "Boot state: setup_requested=%d, is_configured=%d",
-             setup_requested, is_configured);
+    ESP_LOGI(TAG, "Boot state: setup_requested=%d, is_configured=%d", setup_requested, is_configured);
 
-    if (setup_requested) {
+    if (setup_requested)
+    {
         // User requested setup mode before reboot
         clear_setup_requested();
         prov_state.current_state = WIFI_STATE_AP_ACTIVE;
         ESP_LOGI(TAG, "Entering AP mode (setup requested)");
         // AP and HTTP server will be started in Phase 3
-    } else if (is_configured) {
+    }
+    else if (is_configured)
+    {
         // Device has stored credentials - try to connect
         prov_state.current_state = WIFI_STATE_CONNECTING;
         ESP_LOGI(TAG, "Credentials found, will attempt connection");
@@ -350,7 +373,9 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
         // This will be replaced with actual WiFi connection in Phase 3
         prov_state.current_state = WIFI_STATE_CONNECTED;
         ESP_LOGI(TAG, "NOTE: WiFi connection not implemented yet - assuming connected");
-    } else {
+    }
+    else
+    {
         // Device not configured - wait for user
         prov_state.current_state = WIFI_STATE_UNCONFIGURED;
         ESP_LOGI(TAG, "Device not configured, waiting for setup");
@@ -358,7 +383,7 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
     }
 
     prov_state.state_enter_time_ms = get_time_ms();
-    prov_state.initialized = true;
+    prov_state.initialized         = true;
 
     ESP_LOGI(TAG, "WiFi provisioning initialized, state: %s",
              wifi_provisioning_state_to_string(prov_state.current_state));
@@ -372,7 +397,8 @@ void wifi_provisioning_setup_button_pressed(void)
 
     // Set flag so we enter AP mode after reboot
     esp_err_t ret = set_setup_requested(true);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to set setup flag, aborting");
         return;
     }
@@ -390,7 +416,8 @@ void wifi_provisioning_setup_button_pressed(void)
 
 void wifi_provisioning_process(void)
 {
-    if (!prov_state.initialized) {
+    if (!prov_state.initialized)
+    {
         return;
     }
 
@@ -398,34 +425,35 @@ void wifi_provisioning_process(void)
     process_led();
 
     // Process state-specific logic
-    switch (prov_state.current_state) {
-        case WIFI_STATE_UNCONFIGURED:
-            process_unconfigured();
-            break;
+    switch (prov_state.current_state)
+    {
+    case WIFI_STATE_UNCONFIGURED:
+        process_unconfigured();
+        break;
 
-        case WIFI_STATE_SETUP_REQUESTED:
-            // This state is transient (handled by reboot)
-            break;
+    case WIFI_STATE_SETUP_REQUESTED:
+        // This state is transient (handled by reboot)
+        break;
 
-        case WIFI_STATE_AP_ACTIVE:
-            process_ap_active();
-            break;
+    case WIFI_STATE_AP_ACTIVE:
+        process_ap_active();
+        break;
 
-        case WIFI_STATE_CONNECTING:
-            process_connecting();
-            break;
+    case WIFI_STATE_CONNECTING:
+        process_connecting();
+        break;
 
-        case WIFI_STATE_CONNECTED:
-            process_connected();
-            break;
+    case WIFI_STATE_CONNECTED:
+        process_connected();
+        break;
 
-        case WIFI_STATE_OFFLINE:
-            process_offline();
-            break;
+    case WIFI_STATE_OFFLINE:
+        process_offline();
+        break;
 
-        default:
-            ESP_LOGE(TAG, "Unknown state: %d", prov_state.current_state);
-            break;
+    default:
+        ESP_LOGE(TAG, "Unknown state: %d", prov_state.current_state);
+        break;
     }
 }
 
@@ -436,64 +464,71 @@ wifi_state_t wifi_provisioning_get_state(void)
 
 bool wifi_provisioning_is_ready(void)
 {
-    return (prov_state.current_state == WIFI_STATE_CONNECTED ||
-            prov_state.current_state == WIFI_STATE_OFFLINE);
+    return (prov_state.current_state == WIFI_STATE_CONNECTED || prov_state.current_state == WIFI_STATE_OFFLINE);
 }
 
-const char* wifi_provisioning_state_to_string(wifi_state_t state)
+const char *wifi_provisioning_state_to_string(wifi_state_t state)
 {
-    switch (state) {
-        case WIFI_STATE_UNCONFIGURED:
-            return "UNCONFIGURED";
-        case WIFI_STATE_SETUP_REQUESTED:
-            return "SETUP_REQUESTED";
-        case WIFI_STATE_AP_ACTIVE:
-            return "AP_ACTIVE";
-        case WIFI_STATE_CONNECTING:
-            return "CONNECTING";
-        case WIFI_STATE_CONNECTED:
-            return "CONNECTED";
-        case WIFI_STATE_OFFLINE:
-            return "OFFLINE";
-        default:
-            return "UNKNOWN";
+    switch (state)
+    {
+    case WIFI_STATE_UNCONFIGURED:
+        return "UNCONFIGURED";
+    case WIFI_STATE_SETUP_REQUESTED:
+        return "SETUP_REQUESTED";
+    case WIFI_STATE_AP_ACTIVE:
+        return "AP_ACTIVE";
+    case WIFI_STATE_CONNECTING:
+        return "CONNECTING";
+    case WIFI_STATE_CONNECTED:
+        return "CONNECTED";
+    case WIFI_STATE_OFFLINE:
+        return "OFFLINE";
+    default:
+        return "UNKNOWN";
     }
 }
 
-void wifi_provisioning_set_connection_result(bool success, const char* error_message)
+void wifi_provisioning_set_connection_result(bool success, const char *error_message)
 {
-    prov_state.connection_success = success;
+    prov_state.connection_success      = success;
     prov_state.connection_result_ready = true;
 
-    if (!success && error_message) {
+    if (!success && error_message)
+    {
         strncpy(prov_state.error_message, error_message, sizeof(prov_state.error_message) - 1);
         prov_state.error_message[sizeof(prov_state.error_message) - 1] = '\0';
-    } else {
+    }
+    else
+    {
         prov_state.error_message[0] = '\0';
     }
 }
 
-esp_err_t wifi_provisioning_submit_credentials(const char* ssid, const char* password)
+esp_err_t wifi_provisioning_submit_credentials(const char *ssid, const char *password)
 {
-    if (!ssid || !password) {
+    if (!ssid || !password)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE) {
+    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE)
+    {
         ESP_LOGW(TAG, "Cannot submit credentials - not in AP_ACTIVE state");
         return ESP_ERR_INVALID_STATE;
     }
 
     // Validate SSID
     size_t ssid_len = strlen(ssid);
-    if (ssid_len == 0 || ssid_len > 31) {
+    if (ssid_len == 0 || ssid_len > 31)
+    {
         ESP_LOGE(TAG, "Invalid SSID length: %zu", ssid_len);
         return ESP_ERR_INVALID_ARG;
     }
 
     // Validate password
     size_t password_len = strlen(password);
-    if (password_len < 8 || password_len > 63) {
+    if (password_len < 8 || password_len > 63)
+    {
         ESP_LOGE(TAG, "Invalid password length: %zu (must be 8-63)", password_len);
         return ESP_ERR_INVALID_ARG;
     }
@@ -512,9 +547,10 @@ esp_err_t wifi_provisioning_submit_credentials(const char* ssid, const char* pas
     return ESP_OK;
 }
 
-const char* wifi_provisioning_get_error_message(void)
+const char *wifi_provisioning_get_error_message(void)
 {
-    if (prov_state.error_message[0] == '\0') {
+    if (prov_state.error_message[0] == '\0')
+    {
         return NULL;
     }
     return prov_state.error_message;

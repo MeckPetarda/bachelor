@@ -13,10 +13,10 @@
 #ifndef WIFI_PROVISIONING_H
 #define WIFI_PROVISIONING_H
 
-#include <stdint.h>
-#include <stdbool.h>
-#include "esp_err.h"
 #include "driver/gpio.h"
+#include "esp_err.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 // ============================================================================
 // STATE DEFINITIONS
@@ -32,13 +32,14 @@
  *   CONNECTING -> (failure) -> AP_ACTIVE (retry)
  *   UNCONFIGURED -> (boot with config) -> CONNECTING -> CONNECTED/OFFLINE
  */
-typedef enum {
-    WIFI_STATE_UNCONFIGURED = 0,      // No config saved; waiting for user action
-    WIFI_STATE_SETUP_REQUESTED = 1,   // User triggered setup; reboot flag set
-    WIFI_STATE_AP_ACTIVE = 2,         // Broadcasting AP, serving provisioning page
-    WIFI_STATE_CONNECTING = 3,        // Attempting STA connection with credentials
-    WIFI_STATE_CONNECTED = 4,         // Successfully connected to WiFi network
-    WIFI_STATE_OFFLINE = 5,           // Connection failed; running in offline mode
+typedef enum
+{
+    WIFI_STATE_UNCONFIGURED    = 0, // No config saved; waiting for user action
+    WIFI_STATE_SETUP_REQUESTED = 1, // User triggered setup; reboot flag set
+    WIFI_STATE_AP_ACTIVE       = 2, // Broadcasting AP, serving provisioning page
+    WIFI_STATE_CONNECTING      = 3, // Attempting STA connection with credentials
+    WIFI_STATE_CONNECTED       = 4, // Successfully connected to WiFi network
+    WIFI_STATE_OFFLINE         = 5, // Connection failed; running in offline mode
 } wifi_state_t;
 
 /**
@@ -46,14 +47,15 @@ typedef enum {
  *
  * Events drive state transitions in the provisioning state machine.
  */
-typedef enum {
-    WIFI_EVENT_NONE = 0,               // No event pending
-    WIFI_EVENT_CONFIG_LOADED = 1,      // Credentials loaded from NVS partition
+typedef enum
+{
+    WIFI_EVENT_NONE                 = 0, // No event pending
+    WIFI_EVENT_CONFIG_LOADED        = 1, // Credentials loaded from NVS partition
     WIFI_EVENT_SETUP_BUTTON_PRESSED = 2, // User held BUTTON2 for 5 seconds
-    WIFI_EVENT_CREDS_SUBMITTED = 3,    // Provisioning form submitted via HTTP
-    WIFI_EVENT_CONNECTION_SUCCESS = 4, // WiFi STA connection succeeded
-    WIFI_EVENT_CONNECTION_FAILED = 5,  // WiFi STA connection timed out
-    WIFI_EVENT_REBOOT_REQUESTED = 6,   // User clicked restart button on webpage
+    WIFI_EVENT_CREDS_SUBMITTED      = 3, // Provisioning form submitted via HTTP
+    WIFI_EVENT_CONNECTION_SUCCESS   = 4, // WiFi STA connection succeeded
+    WIFI_EVENT_CONNECTION_FAILED    = 5, // WiFi STA connection timed out
+    WIFI_EVENT_REBOOT_REQUESTED     = 6, // User clicked restart button on webpage
 } wifi_event_t;
 
 // ============================================================================
@@ -141,7 +143,7 @@ bool wifi_provisioning_is_ready(void);
  * @return String like "CONNECTED", "OFFLINE", "AP_ACTIVE", etc.
  *         Never returns NULL.
  */
-const char* wifi_provisioning_state_to_string(wifi_state_t state);
+const char *wifi_provisioning_state_to_string(wifi_state_t state);
 
 /**
  * Set connection test result (called from HTTP server)
@@ -155,7 +157,7 @@ const char* wifi_provisioning_state_to_string(wifi_state_t state);
  *                      Pass NULL on success
  *                      String is copied internally
  */
-void wifi_provisioning_set_connection_result(bool success, const char* error_message);
+void wifi_provisioning_set_connection_result(bool success, const char *error_message);
 
 /**
  * Submit credentials for connection test (called from HTTP server)
@@ -170,7 +172,7 @@ void wifi_provisioning_set_connection_result(bool success, const char* error_mes
  *         ESP_ERR_INVALID_ARG if validation fails
  *         ESP_ERR_INVALID_STATE if not in AP_ACTIVE state
  */
-esp_err_t wifi_provisioning_submit_credentials(const char* ssid, const char* password);
+esp_err_t wifi_provisioning_submit_credentials(const char *ssid, const char *password);
 
 /**
  * Get pending error message from connection test
@@ -180,7 +182,7 @@ esp_err_t wifi_provisioning_submit_credentials(const char* ssid, const char* pas
  *
  * @return Error message string, or NULL if no error
  */
-const char* wifi_provisioning_get_error_message(void);
+const char *wifi_provisioning_get_error_message(void);
 
 /**
  * Trigger device restart
