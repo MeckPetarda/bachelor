@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "wifi_settings_storage.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        "nvs_flash"
+        "mbedtls"
+        "esp_common"
+)
