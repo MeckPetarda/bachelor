@@ -15,6 +15,7 @@
  */
 
 #include "driver/gpio.h"
+#include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -287,7 +288,7 @@ static void process_buttons(void)
             {
                 // 5s threshold crossed - enter setup mode
                 ESP_LOGI(TAG, "BUTTON2 held for 5+ seconds - entering WiFi setup mode");
-                state->press_count |= 0x80;  // Mark that we've triggered setup
+                state->press_count |= 0x80; // Mark that we've triggered setup
 
                 // This function reboots the device - code below won't execute
                 wifi_provisioning_setup_button_pressed();
@@ -300,8 +301,7 @@ static void process_buttons(void)
             uint32_t press_duration = current_time - state->last_press_time;
 
             // Only handle short press if we didn't trigger setup and debounce passed
-            if (press_duration < 5000 && !(state->press_count & 0x80) &&
-                press_duration >= DEBOUNCE_TIME_MS)
+            if (press_duration < 5000 && !(state->press_count & 0x80) && press_duration >= DEBOUNCE_TIME_MS)
             {
                 state->press_count++;
 
@@ -381,218 +381,198 @@ static void main_task(void *arg)
     }
 }
 
-// ============================================================================
-// APPLICATION ENTRY POINT
-// ============================================================================
-
-void app_main(void)
+esp_err_t init_wifi_provisioning()
 {
+    ESP_LOGI(TAG, "Initializing WiFi provisioning system...");
+    esp_err_t ret = wifi_provisioning_init(WIFI_STATUS_LED, 10000); // 10s connection timeout
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "WiFi provisioning initialization failed: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Continuing without provisioning support...\n");
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    // Wait for WiFi to be ready before proceeding
+    // If not configured, user must press BUTTON2 for 5 seconds to enter setup mode
+    if (wifi_provisioning_is_ready())
+    {
+        return ESP_OK;
+    }
+
     ESP_LOGI(TAG, "════════════════════════════════════");
-    ESP_LOGI(TAG, "  ESP32 Attendance System");
-    ESP_LOGI(TAG, "  with UHF RFID Reader + WiFi");
+    ESP_LOGI(TAG, "  WiFi Not Configured");
+    ESP_LOGI(TAG, "════════════════════════════════════");
+    ESP_LOGI(TAG, "  Press BUTTON2 for 5 seconds to enter setup mode");
+    ESP_LOGI(TAG, "  Current state: %s", wifi_provisioning_state_to_string(wifi_provisioning_get_state()));
     ESP_LOGI(TAG, "════════════════════════════════════\n");
 
-    // ============================================================================
-    // INITIALIZE OFFLINE EVENT LOGGER
-    // ============================================================================
+    // Block here until configured or ready (AP mode, etc.)
+    while (!wifi_provisioning_is_ready())
+    {
+        wifi_provisioning_process();
 
+        // Also process buttons so user can trigger setup mode
+        process_buttons();
+
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+
+    ESP_LOGI(TAG, "WiFi provisioning ready, state: %s",
+             wifi_provisioning_state_to_string(wifi_provisioning_get_state()));
+
+    return ESP_OK;
+}
+
+esp_err_t init_mqtt()
+{
+
+    ESP_LOGI(TAG, "Initializing MQTT client...");
+    esp_err_t ret = mqtt_client_init();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to initialize MQTT: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Continuing without MQTT...\n");
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    // Mark MQTT as initialized (automatic reconnection is now active)
+    mqtt_initialized = true;
+
+    // Wait for MQTT connection (10 second timeout)
+    ret = mqtt_client_wait_for_connection(10000);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "MQTT connection timeout");
+        ESP_LOGW(TAG, "Broker will auto-reconnect when available");
+        ESP_LOGW(TAG, "Continuing without MQTT...\n");
+        return ESP_OK;
+    }
+
+    // Turn on MQTT status LED
+    gpio_set_level(MQTT_STATUS_LED, 1);
+
+    ESP_LOGI(TAG, "════════════════════════════════════");
+    ESP_LOGI(TAG, "  MQTT Connected Successfully!");
+    ESP_LOGI(TAG, "════════════════════════════════════\n");
+
+    // Subscribe to configuration topics
+    ret = mqtt_client_subscribe_config(on_mqtt_config_message);
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Subscribed to configuration topics");
+    }
+
+    // Publish initial health metrics
+    mqtt_client_publish_health_metrics();
+
+    return ESP_OK;
+}
+
+esp_err_t init_wifi()
+{
+
+    ESP_LOGI(TAG, "Initializing WiFi...");
+    esp_err_t ret = wifi_manager_init();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to initialize WiFi: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Continuing without WiFi...");
+        return ret;
+    }
+
+    // Wait for connection (30 second timeout)
+    ret = wifi_manager_wait_for_connection(30000);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Failed to connect to WiFi");
+        ESP_LOGW(TAG, "Either it is currently unreachable or the provided credentials are incorrect. Check "
+                      "SSID/password in wifi_manager.h");
+        ESP_LOGW(TAG, "If the network appears later, the device will reconnect automatically");
+        ESP_LOGW(TAG, "Continuing without WiFi...\n");
+        return ESP_OK; // OK to continue, wifi isn't currently reachable but lighthouse can still operate until it is
+                       // able to reconnect
+    }
+
+    // Turn on WiFi status LED
+    gpio_set_level(WIFI_STATUS_LED, 1);
+
+    ESP_LOGI(TAG, "════════════════════════════════════");
+    ESP_LOGI(TAG, "  WiFi Connected Successfully!");
+
+    // Display connection information
+    esp_netif_ip_info_t ip_info;
+    if (wifi_manager_get_ip_info(&ip_info) == ESP_OK)
+    {
+        ESP_LOGI(TAG, "  IP Address: " IPSTR, IP2STR(&ip_info.ip));
+        ESP_LOGI(TAG, "  Gateway: " IPSTR, IP2STR(&ip_info.gw));
+        ESP_LOGI(TAG, "  Netmask: " IPSTR, IP2STR(&ip_info.netmask));
+    }
+
+    // Display signal strength
+    int8_t rssi;
+    if (wifi_manager_get_rssi(&rssi) == ESP_OK)
+    {
+        ESP_LOGI(TAG, "  Signal Strength: %d dBm", rssi);
+        if (rssi >= -50)
+        {
+            ESP_LOGI(TAG, "  Signal Quality: Excellent");
+        }
+        else if (rssi >= -60)
+        {
+            ESP_LOGI(TAG, "  Signal Quality: Good");
+        }
+        else if (rssi >= -70)
+        {
+            ESP_LOGI(TAG, "  Signal Quality: Fair");
+        }
+        else
+        {
+            ESP_LOGI(TAG, "  Signal Quality: Poor");
+        }
+    }
+
+    ESP_LOGI(TAG, "════════════════════════════════════\n");
+
+    ret = init_mqtt();
+    if (ret != ESP_OK)
+        return ret;
+
+    return ESP_OK;
+}
+
+esp_err_t init_offline_event_logger()
+{
     ESP_LOGI(TAG, "Initializing offline event logger...");
     esp_err_t ret = offline_logger_init();
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "Failed to initialize offline logger: %s", esp_err_to_name(ret));
         ESP_LOGW(TAG, "Continuing without offline logging...\n");
+        return ret;
     }
 
-    // Initialize GPIO
-    gpio_init();
+    return ESP_OK;
+}
 
-    // ============================================================================
-    // INITIALIZE WIFI PROVISIONING SYSTEM
-    // ============================================================================
-
-    ESP_LOGI(TAG, "Initializing WiFi provisioning system...");
-    ret = wifi_provisioning_init(WIFI_STATUS_LED, 10000);  // 10s connection timeout
-    if (ret != ESP_OK)
-    {
-        ESP_LOGW(TAG, "WiFi provisioning initialization failed: %s", esp_err_to_name(ret));
-        ESP_LOGW(TAG, "Continuing without provisioning support...\n");
-    }
-    else
-    {
-        // Wait for WiFi to be ready before proceeding
-        // If not configured, user must press BUTTON2 for 5 seconds to enter setup mode
-        if (!wifi_provisioning_is_ready())
-        {
-            ESP_LOGI(TAG, "════════════════════════════════════");
-            ESP_LOGI(TAG, "  WiFi Not Configured");
-            ESP_LOGI(TAG, "════════════════════════════════════");
-            ESP_LOGI(TAG, "  Press BUTTON2 for 5 seconds to enter setup mode");
-            ESP_LOGI(TAG, "  Current state: %s",
-                     wifi_provisioning_state_to_string(wifi_provisioning_get_state()));
-            ESP_LOGI(TAG, "════════════════════════════════════\n");
-
-            // Block here until configured or ready (AP mode, etc.)
-            while (!wifi_provisioning_is_ready())
-            {
-                wifi_provisioning_process();
-
-                // Also process buttons so user can trigger setup mode
-                process_buttons();
-
-                vTaskDelay(pdMS_TO_TICKS(50));
-            }
-
-            ESP_LOGI(TAG, "WiFi provisioning ready, state: %s",
-                     wifi_provisioning_state_to_string(wifi_provisioning_get_state()));
-        }
-    }
-
-    // ============================================================================
-    // INITIALIZE WIFI (PoC)
-    // ============================================================================
-
-    ESP_LOGI(TAG, "Initializing WiFi...");
-    ret = wifi_manager_init();
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Failed to initialize WiFi: %s", esp_err_to_name(ret));
-        ESP_LOGW(TAG, "Continuing without WiFi...");
-    }
-    else
-    {
-        // Wait for connection (30 second timeout)
-        ret = wifi_manager_wait_for_connection(30000);
-        if (ret == ESP_OK)
-        {
-            // Turn on WiFi status LED
-            gpio_set_level(WIFI_STATUS_LED, 1);
-
-            ESP_LOGI(TAG, "════════════════════════════════════");
-            ESP_LOGI(TAG, "  WiFi Connected Successfully!");
-
-            // Display connection information
-            esp_netif_ip_info_t ip_info;
-            if (wifi_manager_get_ip_info(&ip_info) == ESP_OK)
-            {
-                ESP_LOGI(TAG, "  IP Address: " IPSTR, IP2STR(&ip_info.ip));
-                ESP_LOGI(TAG, "  Gateway: " IPSTR, IP2STR(&ip_info.gw));
-                ESP_LOGI(TAG, "  Netmask: " IPSTR, IP2STR(&ip_info.netmask));
-            }
-
-            // Display signal strength
-            int8_t rssi;
-            if (wifi_manager_get_rssi(&rssi) == ESP_OK)
-            {
-                ESP_LOGI(TAG, "  Signal Strength: %d dBm", rssi);
-                if (rssi >= -50)
-                {
-                    ESP_LOGI(TAG, "  Signal Quality: Excellent");
-                }
-                else if (rssi >= -60)
-                {
-                    ESP_LOGI(TAG, "  Signal Quality: Good");
-                }
-                else if (rssi >= -70)
-                {
-                    ESP_LOGI(TAG, "  Signal Quality: Fair");
-                }
-                else
-                {
-                    ESP_LOGI(TAG, "  Signal Quality: Poor");
-                }
-            }
-
-            ESP_LOGI(TAG, "════════════════════════════════════\n");
-
-            // ================================================================
-            // INITIALIZE MQTT (PoC)
-            // ================================================================
-
-            ESP_LOGI(TAG, "Initializing MQTT client...");
-            ret = mqtt_client_init();
-            if (ret != ESP_OK)
-            {
-                ESP_LOGE(TAG, "Failed to initialize MQTT: %s", esp_err_to_name(ret));
-                ESP_LOGW(TAG, "Continuing without MQTT...\n");
-            }
-            else
-            {
-                // Mark MQTT as initialized (automatic reconnection is now active)
-                mqtt_initialized = true;
-
-                // Wait for MQTT connection (10 second timeout)
-                ret = mqtt_client_wait_for_connection(10000);
-                if (ret == ESP_OK)
-                {
-                    // Turn on MQTT status LED
-                    gpio_set_level(MQTT_STATUS_LED, 1);
-
-                    ESP_LOGI(TAG, "════════════════════════════════════");
-                    ESP_LOGI(TAG, "  MQTT Connected Successfully!");
-                    ESP_LOGI(TAG, "════════════════════════════════════\n");
-
-                    // Subscribe to configuration topics
-                    ret = mqtt_client_subscribe_config(on_mqtt_config_message);
-                    if (ret == ESP_OK)
-                    {
-                        ESP_LOGI(TAG, "Subscribed to configuration topics");
-                    }
-
-                    // Publish initial health metrics
-                    mqtt_client_publish_health_metrics();
-                }
-                else
-                {
-                    ESP_LOGW(TAG, "MQTT connection timeout");
-                    ESP_LOGW(TAG, "Broker will auto-reconnect when available");
-                    ESP_LOGW(TAG, "Continuing without MQTT...\n");
-                }
-            }
-        }
-        else
-        {
-            ESP_LOGW(TAG, "Failed to connect to WiFi");
-            ESP_LOGW(TAG, "Check SSID/password in wifi_manager.h");
-            ESP_LOGW(TAG, "Continuing without WiFi...\n");
-        }
-    }
-
-    // ============================================================================
-
-    // Initialize RFID reader
-    ret = rfid_reader_init();
+esp_err_t init_rfid_reader()
+{
+    esp_err_t ret = rfid_reader_init();
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "Failed to initialize RFID reader: %s", esp_err_to_name(ret));
-        return;
+        return ret;
     }
 
     // Small delay for module to stabilize
     vTaskDelay(pdMS_TO_TICKS(500));
 
-    // Optional: Reset reader on startup
     ESP_LOGI(TAG, "Resetting RFID reader...");
     rfid_reader_reset();
     vTaskDelay(pdMS_TO_TICKS(2000)); // Wait for restart
-
-    // Optional: Get firmware version
-    uint8_t major, minor;
-    if (rfid_reader_get_firmware(&major, &minor) == ESP_OK)
-    {
-        ESP_LOGI(TAG, "RFID Reader Firmware: %d.%d\n", major, minor);
-    }
-
-    // ============================================================================
-    // CONFIGURE READER FOR MAXIMUM RANGE
-    // ============================================================================
 
     ESP_LOGI(TAG, "Configuring reader for maximum range...");
 
     // Set maximum RF output power (33 dBm)
     // Per R300 protocol section 2.1.7, page 12
     // Valid range: 20-33 dBm
-
     uint8_t power_level = 33;
 
     ret = rfid_reader_set_power(power_level);
@@ -603,6 +583,7 @@ void app_main(void)
     else
     {
         ESP_LOGW(TAG, "  ✗ Failed to set power");
+        return ret;
     }
     vTaskDelay(pdMS_TO_TICKS(200));
 
@@ -620,18 +601,40 @@ void app_main(void)
     else
     {
         ESP_LOGW(TAG, "  ✗ Failed to set frequency");
+        return ret;
     }
     vTaskDelay(pdMS_TO_TICKS(200));
 
-    ESP_LOGI(TAG, "Configuration complete!\n");
+    return ESP_OK;
+}
 
-    // ============================================================================
+// ============================================================================
+// APPLICATION ENTRY POINT
+// ============================================================================
+
+void app_main(void)
+{
+    ESP_LOGI(TAG, "════════════════════════════════════");
+    ESP_LOGI(TAG, "  ESP32 Attendance System");
+    ESP_LOGI(TAG, "  with UHF RFID Reader + WiFi");
+    ESP_LOGI(TAG, "════════════════════════════════════\n");
+
+    gpio_init();
+    if (init_wifi_provisioning() != ESP_OK)
+        return;
+    if (init_wifi() != ESP_OK)
+        return;
+    if (init_offline_event_logger() != ESP_OK)
+        return;
+    if (init_rfid_reader() != ESP_OK)
+        return;
+
+    ESP_LOGI(TAG, "Configuration complete!\n");
 
     ESP_LOGI(TAG, "System ready!");
     ESP_LOGI(TAG, "  Press BUTTON1 to start/stop scanning");
     ESP_LOGI(TAG, "  Press BUTTON2 to show statistics");
     ESP_LOGI(TAG, "  RFID power monitoring active on GPIO 2\n");
 
-    // Start main task
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
 }
