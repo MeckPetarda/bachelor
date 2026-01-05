@@ -10,21 +10,22 @@
 #ifndef WIFI_SETTINGS_STORAGE_H
 #define WIFI_SETTINGS_STORAGE_H
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "esp_err.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 // ============================================================================
 // ERROR CODES
 // ============================================================================
 
-typedef enum {
-    WIFI_STORAGE_OK = 0,
-    WIFI_STORAGE_NOT_FOUND = 1,
-    WIFI_STORAGE_CORRUPT = 2,
+typedef enum
+{
+    WIFI_STORAGE_OK               = 0,
+    WIFI_STORAGE_NOT_FOUND        = 1,
+    WIFI_STORAGE_CORRUPT          = 2,
     WIFI_STORAGE_ENCRYPTION_ERROR = 3,
-    WIFI_STORAGE_WRITE_ERROR = 4,
-    WIFI_STORAGE_INVALID_PARAM = 5,
+    WIFI_STORAGE_WRITE_ERROR      = 4,
+    WIFI_STORAGE_INVALID_PARAM    = 5,
 } wifi_storage_error_t;
 
 // ============================================================================
@@ -34,10 +35,11 @@ typedef enum {
 /**
  * WiFi Credentials (RAM only, never persisted in plaintext)
  */
-typedef struct {
-    char ssid[32];              // Network name (null-terminated)
-    char password[64];          // Network password (null-terminated)
-    uint8_t configured;         // Flag from partition (0=no, 1=yes)
+typedef struct
+{
+    char    ssid[32];     // Network name (null-terminated)
+    char    password[64]; // Network password (null-terminated)
+    uint8_t configured;   // Flag from partition (0=no, 1=yes)
 } wifi_credentials_t;
 
 // ============================================================================
@@ -79,7 +81,7 @@ bool wifi_settings_is_configured(void);
  *         WIFI_STORAGE_NOT_FOUND if not yet configured
  *         WIFI_STORAGE_ENCRYPTION_ERROR if decryption fails
  */
-wifi_storage_error_t wifi_settings_load(wifi_credentials_t* creds);
+wifi_storage_error_t wifi_settings_load(wifi_credentials_t *creds);
 
 /**
  * Save WiFi credentials to partition
@@ -102,7 +104,7 @@ wifi_storage_error_t wifi_settings_load(wifi_credentials_t* creds);
  *         WIFI_STORAGE_INVALID_PARAM if validation fails
  *         WIFI_STORAGE_WRITE_ERROR if write to NVS fails
  */
-wifi_storage_error_t wifi_settings_save(const char* ssid, const char* password);
+wifi_storage_error_t wifi_settings_save(const char *ssid, const char *password);
 
 /**
  * Factory reset - clear all WiFi configuration
@@ -124,6 +126,6 @@ wifi_storage_error_t wifi_settings_factory_reset(void);
  * @param err Error code from previous operation
  * @return String description (never NULL, always valid C string)
  */
-const char* wifi_settings_error_to_string(wifi_storage_error_t err);
+const char *wifi_settings_error_to_string(wifi_storage_error_t err);
 
 #endif // WIFI_SETTINGS_STORAGE_H
