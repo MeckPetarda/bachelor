@@ -41,7 +41,7 @@ static const uint8_t ENCRYPTION_KEY[16] = {
 };
 
 // NVS partition handle (opened during init)
-static nvs_handle_t nvs_handle = 0;
+static nvs_handle_t wifi_nvs_handle = 0;
 static bool nvs_initialized = false;
 
 // ============================================================================
@@ -164,7 +164,7 @@ wifi_storage_error_t wifi_settings_init(void)
     }
 
     // Open namespace for read/write access
-    ret = nvs_open_from_partition(NVS_PARTITION_NAME, NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    ret = nvs_open_from_partition(NVS_PARTITION_NAME, NVS_NAMESPACE, NVS_READWRITE, &wifi_nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS namespace: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_WRITE_ERROR;
@@ -184,7 +184,7 @@ bool wifi_settings_is_configured(void)
     }
 
     uint8_t configured = 0;
-    esp_err_t ret = nvs_get_u8(nvs_handle, NVS_CONFIGURED_KEY, &configured);
+    esp_err_t ret = nvs_get_u8(wifi_nvs_handle, NVS_CONFIGURED_KEY, &configured);
 
     if (ret == ESP_ERR_NVS_NOT_FOUND) {
         // Key doesn't exist yet (first boot or after factory reset)
@@ -210,7 +210,7 @@ wifi_storage_error_t wifi_settings_load(wifi_credentials_t* creds)
 
     // Read configured flag first
     uint8_t configured = 0;
-    esp_err_t ret = nvs_get_u8(nvs_handle, NVS_CONFIGURED_KEY, &configured);
+    esp_err_t ret = nvs_get_u8(wifi_nvs_handle, NVS_CONFIGURED_KEY, &configured);
     if (ret != ESP_OK || configured != 1) {
         ESP_LOGW(TAG, "Device not configured");
         return WIFI_STORAGE_NOT_FOUND;
@@ -219,7 +219,7 @@ wifi_storage_error_t wifi_settings_load(wifi_credentials_t* creds)
     // Read encrypted SSID (32 bytes, padded)
     uint8_t encrypted_ssid[32] = {0};
     size_t encrypted_ssid_len = sizeof(encrypted_ssid);
-    ret = nvs_get_blob(nvs_handle, NVS_SSID_KEY, encrypted_ssid, &encrypted_ssid_len);
+    ret = nvs_get_blob(wifi_nvs_handle, NVS_SSID_KEY, encrypted_ssid, &encrypted_ssid_len);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read encrypted SSID: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_CORRUPT;
@@ -228,7 +228,7 @@ wifi_storage_error_t wifi_settings_load(wifi_credentials_t* creds)
     // Read encrypted password (64 bytes, padded)
     uint8_t encrypted_password[64] = {0};
     size_t encrypted_password_len = sizeof(encrypted_password);
-    ret = nvs_get_blob(nvs_handle, NVS_PASSWORD_KEY, encrypted_password, &encrypted_password_len);
+    ret = nvs_get_blob(wifi_nvs_handle, NVS_PASSWORD_KEY, encrypted_password, &encrypted_password_len);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read encrypted password: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_CORRUPT;
@@ -315,28 +315,28 @@ wifi_storage_error_t wifi_settings_save(const char* ssid, const char* password)
     }
 
     // Write encrypted SSID
-    esp_err_t ret = nvs_set_blob(nvs_handle, NVS_SSID_KEY, encrypted_ssid, 32);
+    esp_err_t ret = nvs_set_blob(wifi_nvs_handle, NVS_SSID_KEY, encrypted_ssid, 32);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write encrypted SSID: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_WRITE_ERROR;
     }
 
     // Write encrypted password
-    ret = nvs_set_blob(nvs_handle, NVS_PASSWORD_KEY, encrypted_password, 64);
+    ret = nvs_set_blob(wifi_nvs_handle, NVS_PASSWORD_KEY, encrypted_password, 64);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write encrypted password: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_WRITE_ERROR;
     }
 
     // Write configured flag
-    ret = nvs_set_u8(nvs_handle, NVS_CONFIGURED_KEY, 1);
+    ret = nvs_set_u8(wifi_nvs_handle, NVS_CONFIGURED_KEY, 1);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write configured flag: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_WRITE_ERROR;
     }
 
     // Commit changes to flash
-    ret = nvs_commit(nvs_handle);
+    ret = nvs_commit(wifi_nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to commit NVS changes: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_WRITE_ERROR;
@@ -357,14 +357,14 @@ wifi_storage_error_t wifi_settings_factory_reset(void)
     ESP_LOGI(TAG, "Performing factory reset of WiFi settings");
 
     // Erase all keys in the namespace
-    esp_err_t ret = nvs_erase_all(nvs_handle);
+    esp_err_t ret = nvs_erase_all(wifi_nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to erase NVS namespace: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_WRITE_ERROR;
     }
 
     // Commit the erase operation
-    ret = nvs_commit(nvs_handle);
+    ret = nvs_commit(wifi_nvs_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to commit factory reset: %s", esp_err_to_name(ret));
         return WIFI_STORAGE_WRITE_ERROR;
