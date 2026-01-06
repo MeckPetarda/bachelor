@@ -15,8 +15,8 @@
  */
 
 #include "wifi_provisioning.h"
-#include "wifi_provisioning_config.h"
 #include "wifi_http_server.h"
+#include "wifi_provisioning_config.h"
 #include "wifi_settings_storage.h"
 
 #include "driver/gpio.h"
@@ -245,21 +245,20 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             esp_wifi_connect();
             break;
 
-        case WIFI_EVENT_STA_DISCONNECTED:
-            {
-                wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
-                ESP_LOGW(TAG, "WiFi disconnected (reason: %d)", event->reason);
+        case WIFI_EVENT_STA_DISCONNECTED: {
+            wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
+            ESP_LOGW(TAG, "WiFi disconnected (reason: %d)", event->reason);
 
-                if (prov_state.connection_test_in_progress)
+            if (prov_state.connection_test_in_progress)
+            {
+                // Connection test failed
+                if (s_wifi_event_group)
                 {
-                    // Connection test failed
-                    if (s_wifi_event_group)
-                    {
-                        xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-                    }
+                    xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
                 }
             }
-            break;
+        }
+        break;
 
         case WIFI_EVENT_STA_CONNECTED:
             ESP_LOGI(TAG, "WiFi STA connected to AP");
@@ -273,19 +272,17 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             ESP_LOGI(TAG, "WiFi AP stopped");
             break;
 
-        case WIFI_EVENT_AP_STACONNECTED:
-            {
-                wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
-                ESP_LOGI(TAG, "Station connected to AP, MAC: " MACSTR ", AID: %d", MAC2STR(event->mac), event->aid);
-            }
-            break;
+        case WIFI_EVENT_AP_STACONNECTED: {
+            wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+            ESP_LOGI(TAG, "Station connected to AP, MAC: " MACSTR ", AID: %d", MAC2STR(event->mac), event->aid);
+        }
+        break;
 
-        case WIFI_EVENT_AP_STADISCONNECTED:
-            {
-                wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
-                ESP_LOGI(TAG, "Station disconnected from AP, MAC: " MACSTR ", AID: %d", MAC2STR(event->mac), event->aid);
-            }
-            break;
+        case WIFI_EVENT_AP_STADISCONNECTED: {
+            wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+            ESP_LOGI(TAG, "Station disconnected from AP, MAC: " MACSTR ", AID: %d", MAC2STR(event->mac), event->aid);
+        }
+        break;
 
         default:
             break;
@@ -295,17 +292,16 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     {
         switch (event_id)
         {
-        case IP_EVENT_STA_GOT_IP:
-            {
-                ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-                ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+        case IP_EVENT_STA_GOT_IP: {
+            ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+            ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
 
-                if (prov_state.connection_test_in_progress && s_wifi_event_group)
-                {
-                    xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-                }
+            if (prov_state.connection_test_in_progress && s_wifi_event_group)
+            {
+                xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
             }
-            break;
+        }
+        break;
 
         default:
             break;
@@ -428,11 +424,11 @@ static esp_err_t wifi_start_ap(void)
     wifi_config_t wifi_config = {
         .ap =
             {
-                .ssid_len        = strlen(WIFI_SETUP_AP_SSID),
-                .channel         = WIFI_SETUP_AP_CHANNEL,
-                .max_connection  = WIFI_SETUP_AP_MAX_CONN,
-                .authmode        = WIFI_AUTH_WPA2_PSK,
-                .pmf_cfg         = {.required = false},
+                .ssid_len       = strlen(WIFI_SETUP_AP_SSID),
+                .channel        = WIFI_SETUP_AP_CHANNEL,
+                .max_connection = WIFI_SETUP_AP_MAX_CONN,
+                .authmode       = WIFI_AUTH_WPA2_PSK,
+                .pmf_cfg        = {.required = false},
             },
     };
 
@@ -555,7 +551,7 @@ static esp_err_t stop_http_server(void)
 
     ESP_LOGI(TAG, "Stopping HTTP server...");
 
-    esp_err_t ret               = wifi_http_server_stop();
+    esp_err_t ret                  = wifi_http_server_stop();
     prov_state.http_server_started = false;
 
     return ret;
@@ -742,8 +738,7 @@ static void process_connecting(void)
             // Connection successful - save credentials
             ESP_LOGI(TAG, "Connection successful! Saving credentials...");
 
-            wifi_storage_error_t storage_ret =
-                wifi_settings_save(prov_state.pending_ssid, prov_state.pending_password);
+            wifi_storage_error_t storage_ret = wifi_settings_save(prov_state.pending_ssid, prov_state.pending_password);
             if (storage_ret != WIFI_STORAGE_OK)
             {
                 ESP_LOGE(TAG, "Failed to save credentials: %s", wifi_settings_error_to_string(storage_ret));
@@ -779,7 +774,7 @@ static void process_connecting(void)
             strncpy(prov_state.error_message, "Connection failed - check SSID and password",
                     sizeof(prov_state.error_message) - 1);
             prov_state.error_message[sizeof(prov_state.error_message) - 1] = '\0';
-            prov_state.connection_success                                   = false;
+            prov_state.connection_success                                  = false;
 
             // Notify HTTP server of failure
             wifi_http_server_set_connection_result(false, prov_state.error_message);

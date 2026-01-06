@@ -55,9 +55,7 @@
  * Future: Generate per device during firmware build process
  */
 #define WIFI_ENCRYPTION_KEY                                                                                            \
-    {                                                                                                                  \
-        0x4C, 0x69, 0x67, 0x68, 0x74, 0x68, 0x6F, 0x75, 0x73, 0x65, 0x4B, 0x65, 0x79, 0x31, 0x32, 0x33                  \
-    }
+    {0x4C, 0x69, 0x67, 0x68, 0x74, 0x68, 0x6F, 0x75, 0x73, 0x65, 0x4B, 0x65, 0x79, 0x31, 0x32, 0x33}
 
 // ============================================================================
 // OPERATIONAL PARAMETERS
