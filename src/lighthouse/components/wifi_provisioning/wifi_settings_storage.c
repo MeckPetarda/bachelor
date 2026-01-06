@@ -10,6 +10,7 @@
  */
 
 #include "wifi_settings_storage.h"
+#include "wifi_provisioning_config.h"
 #include "esp_log.h"
 #include "mbedtls/aes.h"
 #include "nvs_flash.h"
@@ -32,11 +33,10 @@ static const char *TAG = "WIFI_STORAGE";
 #define PASSWORD_MIN_LEN 8  // WPA2 requirement
 #define PASSWORD_MAX_LEN 63
 
-// Device-specific AES key (must match compile-time constant)
+// Device-specific AES key from configuration header
 // SECURITY NOTE: In production, generate unique per device during firmware build
-// For now, using a placeholder - replace with device-specific key
-static const uint8_t ENCRYPTION_KEY[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                                           0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+// Key is defined in wifi_provisioning_config.h for easy customization per device
+static const uint8_t ENCRYPTION_KEY[16] = WIFI_ENCRYPTION_KEY;
 
 // NVS partition handle (opened during init)
 static nvs_handle_t wifi_nvs_handle = 0;
