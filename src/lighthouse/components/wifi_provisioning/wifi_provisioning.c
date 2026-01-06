@@ -54,8 +54,8 @@ static const char *TAG = "WIFI_PROV";
 typedef struct
 {
     // Core state
-    wifi_state_t current_state;
-    wifi_event_t pending_event;
+    wifi_state_t      current_state;
+    wifi_prov_event_t pending_event;
 
     // Timing
     uint32_t state_enter_time_ms;
