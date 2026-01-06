@@ -46,17 +46,18 @@ typedef enum
  * WiFi Provisioning Events
  *
  * Events drive state transitions in the provisioning state machine.
+ * Note: Named wifi_prov_event_t to avoid conflict with ESP-IDF's wifi_event_t
  */
 typedef enum
 {
-    WIFI_EVENT_NONE                 = 0, // No event pending
-    WIFI_EVENT_CONFIG_LOADED        = 1, // Credentials loaded from NVS partition
-    WIFI_EVENT_SETUP_BUTTON_PRESSED = 2, // User held BUTTON2 for 5 seconds
-    WIFI_EVENT_CREDS_SUBMITTED      = 3, // Provisioning form submitted via HTTP
-    WIFI_EVENT_CONNECTION_SUCCESS   = 4, // WiFi STA connection succeeded
-    WIFI_EVENT_CONNECTION_FAILED    = 5, // WiFi STA connection timed out
-    WIFI_EVENT_REBOOT_REQUESTED     = 6, // User clicked restart button on webpage
-} wifi_event_t;
+    WIFI_PROV_EVENT_NONE                 = 0, // No event pending
+    WIFI_PROV_EVENT_CONFIG_LOADED        = 1, // Credentials loaded from NVS partition
+    WIFI_PROV_EVENT_SETUP_BUTTON_PRESSED = 2, // User held BUTTON2 for 5 seconds
+    WIFI_PROV_EVENT_CREDS_SUBMITTED      = 3, // Provisioning form submitted via HTTP
+    WIFI_PROV_EVENT_CONNECTION_SUCCESS   = 4, // WiFi STA connection succeeded
+    WIFI_PROV_EVENT_CONNECTION_FAILED    = 5, // WiFi STA connection timed out
+    WIFI_PROV_EVENT_REBOOT_REQUESTED     = 6, // User clicked restart button on webpage
+} wifi_prov_event_t;
 
 // ============================================================================
 // PUBLIC API
