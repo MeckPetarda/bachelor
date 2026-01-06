@@ -269,6 +269,9 @@ esp_err_t wifi_manager_init(void)
             },
     };
 
+    ESP_LOGD(TAG, WIFI_SSID);
+    ESP_LOGD(TAG, WIFI_PASSWORD);
+
     ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     if (ret != ESP_OK)
     {

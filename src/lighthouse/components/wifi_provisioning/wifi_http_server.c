@@ -26,21 +26,21 @@ static const char *TAG = "WIFI_HTTP";
 // CONFIGURATION
 // ============================================================================
 
-#define MAX_ERROR_MSG_LEN   128
-#define RESULT_WAIT_TIMEOUT_MS 15000  // Max time to wait for connection result
+#define MAX_ERROR_MSG_LEN       128
+#define RESULT_WAIT_TIMEOUT_MS  15000 // Max time to wait for connection result
 #define RESULT_POLL_INTERVAL_MS 200   // How often to check for result
 
 // ============================================================================
 // MODULE STATE
 // ============================================================================
 
-static httpd_handle_t server_handle = NULL;
+static httpd_handle_t              server_handle        = NULL;
 static wifi_credentials_callback_t credentials_callback = NULL;
-static bool server_running = false;
+static bool                        server_running       = false;
 
 // Connection result state
-static bool result_ready = false;
-static bool result_success = false;
+static bool result_ready                    = false;
+static bool result_success                  = false;
 static char result_error[MAX_ERROR_MSG_LEN] = {0};
 
 // AP info for display
@@ -139,9 +139,9 @@ static const char *PROVISIONING_PAGE_HTML =
  */
 static void url_decode(char *str)
 {
-    char *src = str;
-    char *dst = str;
-    char hex[3] = {0};
+    char *src    = str;
+    char *dst    = str;
+    char  hex[3] = {0};
 
     while (*src)
     {
@@ -165,6 +165,50 @@ static void url_decode(char *str)
     *dst = '\0';
 }
 
+static char *extract_multipart_value(const char *content, const char *key)
+{
+    // Build the pattern we're looking for: name="<key>"
+    char name_pattern[128];
+    snprintf(name_pattern, sizeof(name_pattern), "name=\"%s\"", key);
+
+    // Find the field in the multipart data
+    const char *field_start = strstr(content, name_pattern);
+    if (!field_start)
+    {
+        return NULL;
+    }
+
+    // Move past the name="key" line to find the value
+    // The value starts after the next \r\n\r\n (empty line separating headers from content)
+    const char *value_start = strstr(field_start, "\r\n\r\n");
+    if (!value_start)
+    {
+        return NULL;
+    }
+
+    value_start += 4; // Skip the \r\n\r\n
+
+    // Find the end of the value (next boundary marker which starts with \r\n---)
+    const char *value_end = strstr(value_start, "\r\n");
+    if (!value_end)
+    {
+        return NULL;
+    }
+
+    size_t len = (size_t)(value_end - value_start);
+
+    char *value = malloc(len + 1);
+    if (!value)
+    {
+        return NULL;
+    }
+
+    strncpy(value, value_start, len);
+    value[len] = '\0';
+
+    return value;
+}
+
 /**
  * Extract value for a key from URL-encoded form data
  * Returns pointer to value (must be freed by caller) or NULL if not found
@@ -182,7 +226,7 @@ static char *extract_form_value(const char *content, const char *key)
 
     start += strlen(search_key);
     const char *end = strchr(start, '&');
-    size_t len = end ? (size_t)(end - start) : strlen(start);
+    size_t      len = end ? (size_t)(end - start) : strlen(start);
 
     char *value = malloc(len + 1);
     if (!value)
@@ -223,8 +267,8 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
     ESP_LOGI(TAG, "Received configuration request");
 
     // Read request body
-    char content[256] = {0};
-    int content_len = req->content_len;
+    char content[512] = {0};
+    int  content_len  = req->content_len;
 
     if (content_len <= 0 || content_len >= (int)sizeof(content))
     {
@@ -244,11 +288,11 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
     }
     content[content_len] = '\0';
 
-    ESP_LOGD(TAG, "Form data: %s", content);
+    ESP_LOGI(TAG, "Form data: %s", content);
 
     // Extract SSID and password
-    char *ssid = extract_form_value(content, "ssid");
-    char *password = extract_form_value(content, "password");
+    char *ssid     = extract_multipart_value(content, "ssid");
+    char *password = extract_multipart_value(content, "password");
 
     if (!ssid || !password)
     {
@@ -328,13 +372,13 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
     if (result_success)
     {
         ESP_LOGI(TAG, "Connection successful, sending success response");
-        httpd_resp_sendstr(req, "{\"status\":\"success\",\"message\":\"Connected successfully! Click the button below to restart the device.\"}");
+        httpd_resp_sendstr(req, "{\"status\":\"success\",\"message\":\"Connected successfully! Click the button below "
+                                "to restart the device.\"}");
     }
     else
     {
         char response[256];
-        snprintf(response, sizeof(response),
-                 "{\"status\":\"error\",\"message\":\"%s\"}",
+        snprintf(response, sizeof(response), "{\"status\":\"error\",\"message\":\"%s\"}",
                  result_error[0] ? result_error : "Connection failed");
         ESP_LOGI(TAG, "Connection failed, sending error response");
         httpd_resp_sendstr(req, response);
@@ -352,15 +396,14 @@ static esp_err_t get_restart_handler(httpd_req_t *req)
 
     // Send response before restarting
     httpd_resp_set_type(req, "text/html");
-    httpd_resp_sendstr(req,
-                       "<!DOCTYPE html><html><head>"
-                       "<meta charset=\"UTF-8\">"
-                       "<title>Restarting...</title>"
-                       "<style>body{font-family:Arial,sans-serif;text-align:center;padding:50px;}</style>"
-                       "</head><body>"
-                       "<h1>Restarting device...</h1>"
-                       "<p>Please wait. The device will reconnect to the configured network.</p>"
-                       "</body></html>");
+    httpd_resp_sendstr(req, "<!DOCTYPE html><html><head>"
+                            "<meta charset=\"UTF-8\">"
+                            "<title>Restarting...</title>"
+                            "<style>body{font-family:Arial,sans-serif;text-align:center;padding:50px;}</style>"
+                            "</head><body>"
+                            "<h1>Restarting device...</h1>"
+                            "<p>Please wait. The device will reconnect to the configured network.</p>"
+                            "</body></html>");
 
     // Brief delay to ensure response is sent
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -395,8 +438,8 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
     }
 
     // Configure HTTP server
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.stack_size = 8192;
+    httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
+    config.stack_size       = 8192;
     config.max_uri_handlers = 4;
     config.lru_purge_enable = true;
 
@@ -410,23 +453,23 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
 
     // Register URI handlers
     httpd_uri_t uri_get_root = {
-        .uri = "/",
-        .method = HTTP_GET,
-        .handler = get_provisioning_page_handler,
+        .uri      = "/",
+        .method   = HTTP_GET,
+        .handler  = get_provisioning_page_handler,
         .user_ctx = NULL,
     };
 
     httpd_uri_t uri_post_configure = {
-        .uri = "/configure",
-        .method = HTTP_POST,
-        .handler = post_configure_handler,
+        .uri      = "/configure",
+        .method   = HTTP_POST,
+        .handler  = post_configure_handler,
         .user_ctx = NULL,
     };
 
     httpd_uri_t uri_get_restart = {
-        .uri = "/restart",
-        .method = HTTP_GET,
-        .handler = get_restart_handler,
+        .uri      = "/restart",
+        .method   = HTTP_GET,
+        .handler  = get_restart_handler,
         .user_ctx = NULL,
     };
 
@@ -450,8 +493,8 @@ esp_err_t wifi_http_server_stop(void)
 
     ESP_LOGI(TAG, "Stopping HTTP server");
 
-    esp_err_t ret = httpd_stop(server_handle);
-    server_handle = NULL;
+    esp_err_t ret  = httpd_stop(server_handle);
+    server_handle  = NULL;
     server_running = false;
 
     // Clear result state
@@ -482,8 +525,7 @@ void wifi_http_server_set_connection_result(bool success, const char *error_mess
 
     result_ready = true;
 
-    ESP_LOGI(TAG, "Connection result set: success=%d, error=%s",
-             success, result_error[0] ? result_error : "(none)");
+    ESP_LOGI(TAG, "Connection result set: success=%d, error=%s", success, result_error[0] ? result_error : "(none)");
 }
 
 bool wifi_http_server_is_result_ready(void)
@@ -507,8 +549,8 @@ const char *wifi_http_server_get_result_error(void)
 
 void wifi_http_server_clear_result(void)
 {
-    result_ready = false;
-    result_success = false;
+    result_ready    = false;
+    result_success  = false;
     result_error[0] = '\0';
 }
 
