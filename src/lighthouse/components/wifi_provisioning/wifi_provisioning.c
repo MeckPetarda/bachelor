@@ -4,24 +4,33 @@
  * Implements the provisioning state machine with:
  * - Boot state detection and initialization
  * - Setup mode entry via 5-second button press
+ * - WiFi AP mode for web-based configuration
+ * - HTTP server integration for credential submission
+ * - WiFi STA connection testing
  * - LED blinking control during AP mode
- * - State transitions and event handling
  *
  * Reference:
  * - WIFI_PROVISIONING_IMPLEMENTATION_PLAN.md Section 2.2
- * - ESP-IDF GPIO and Timer documentation
+ * - ESP-IDF WiFi and HTTP Server documentation
  */
 
 #include "wifi_provisioning.h"
+#include "wifi_provisioning_config.h"
+#include "wifi_http_server.h"
+#include "wifi_settings_storage.h"
+
 #include "driver/gpio.h"
+#include "esp_event.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "nvs.h"
 #include "nvs_flash.h"
-#include "wifi_settings_storage.h"
 #include <string.h>
 
 static const char *TAG = "WIFI_PROV";
@@ -30,9 +39,13 @@ static const char *TAG = "WIFI_PROV";
 // CONFIGURATION
 // ============================================================================
 
-#define LED_BLINK_INTERVAL_MS 1000        // LED toggle interval during AP mode
+#define LED_BLINK_INTERVAL_MS 500         // LED toggle interval during AP mode (500ms on/off = 1s cycle)
 #define SETUP_FLAG_NVS_KEY    "setup_req" // NVS key for setup request flag
 #define NVS_NAMESPACE         "wifi_prov" // NVS namespace for provisioning flags
+
+// WiFi event bits for connection testing
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
 
 // ============================================================================
 // STATE MACHINE DATA
@@ -67,9 +80,20 @@ typedef struct
     // Flags
     bool initialized;
     bool setup_requested;
+    bool ap_started;
+    bool http_server_started;
+    bool wifi_initialized;
+    bool connection_test_in_progress;
 } wifi_provisioning_state_t;
 
 static wifi_provisioning_state_t prov_state = {0};
+
+// Event group for WiFi connection status
+static EventGroupHandle_t s_wifi_event_group = NULL;
+
+// Network interface handles
+static esp_netif_t *s_ap_netif  = NULL;
+static esp_netif_t *s_sta_netif = NULL;
 
 // ============================================================================
 // INTERNAL HELPER FUNCTIONS
@@ -180,13 +204,13 @@ static void clear_setup_requested(void)
 
 /**
  * Process LED blinking for current state
- * Only blinks during AP_ACTIVE state
+ * Only blinks during AP_ACTIVE and CONNECTING states
  */
 static void process_led(void)
 {
-    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE)
+    // Only blink during AP_ACTIVE and CONNECTING states
+    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE && prov_state.current_state != WIFI_STATE_CONNECTING)
     {
-        // LED off in non-AP states (or controlled by other logic)
         return;
     }
 
@@ -202,6 +226,442 @@ static void process_led(void)
     }
 }
 
+// ============================================================================
+// WIFI EVENT HANDLER
+// ============================================================================
+
+/**
+ * WiFi event handler for connection testing
+ */
+static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    if (event_base == WIFI_EVENT)
+    {
+        switch (event_id)
+        {
+        case WIFI_EVENT_STA_START:
+            ESP_LOGI(TAG, "WiFi STA started, connecting...");
+            esp_wifi_connect();
+            break;
+
+        case WIFI_EVENT_STA_DISCONNECTED:
+            {
+                wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
+                ESP_LOGW(TAG, "WiFi disconnected (reason: %d)", event->reason);
+
+                if (prov_state.connection_test_in_progress)
+                {
+                    // Connection test failed
+                    if (s_wifi_event_group)
+                    {
+                        xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+                    }
+                }
+            }
+            break;
+
+        case WIFI_EVENT_STA_CONNECTED:
+            ESP_LOGI(TAG, "WiFi STA connected to AP");
+            break;
+
+        case WIFI_EVENT_AP_START:
+            ESP_LOGI(TAG, "WiFi AP started");
+            break;
+
+        case WIFI_EVENT_AP_STOP:
+            ESP_LOGI(TAG, "WiFi AP stopped");
+            break;
+
+        case WIFI_EVENT_AP_STACONNECTED:
+            {
+                wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
+                ESP_LOGI(TAG, "Station connected to AP, MAC: " MACSTR ", AID: %d", MAC2STR(event->mac), event->aid);
+            }
+            break;
+
+        case WIFI_EVENT_AP_STADISCONNECTED:
+            {
+                wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
+                ESP_LOGI(TAG, "Station disconnected from AP, MAC: " MACSTR ", AID: %d", MAC2STR(event->mac), event->aid);
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+    else if (event_base == IP_EVENT)
+    {
+        switch (event_id)
+        {
+        case IP_EVENT_STA_GOT_IP:
+            {
+                ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+                ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+
+                if (prov_state.connection_test_in_progress && s_wifi_event_group)
+                {
+                    xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+                }
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+}
+
+// ============================================================================
+// WIFI AP MODE
+// ============================================================================
+
+/**
+ * Initialize WiFi subsystem (needed before AP or STA mode)
+ */
+static esp_err_t wifi_init_common(void)
+{
+    if (prov_state.wifi_initialized)
+    {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Initializing WiFi subsystem...");
+
+    // Initialize TCP/IP stack
+    esp_err_t ret = esp_netif_init();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        ESP_LOGE(TAG, "Failed to init netif: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Create default event loop
+    ret = esp_event_loop_create_default();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        ESP_LOGE(TAG, "Failed to create event loop: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Create event group for WiFi status
+    if (s_wifi_event_group == NULL)
+    {
+        s_wifi_event_group = xEventGroupCreate();
+        if (s_wifi_event_group == NULL)
+        {
+            ESP_LOGE(TAG, "Failed to create event group");
+            return ESP_FAIL;
+        }
+    }
+
+    // Register event handlers
+    ret = esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        ESP_LOGE(TAG, "Failed to register WIFI event handler: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        ESP_LOGE(TAG, "Failed to register IP event handler: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Initialize WiFi with default config
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ret                    = esp_wifi_init(&cfg);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to init WiFi: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    prov_state.wifi_initialized = true;
+    ESP_LOGI(TAG, "WiFi subsystem initialized");
+
+    return ESP_OK;
+}
+
+/**
+ * Start WiFi Access Point for provisioning
+ */
+static esp_err_t wifi_start_ap(void)
+{
+    if (prov_state.ap_started)
+    {
+        ESP_LOGW(TAG, "AP already started");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Starting WiFi Access Point...");
+
+    esp_err_t ret = wifi_init_common();
+    if (ret != ESP_OK)
+    {
+        return ret;
+    }
+
+    // Create AP network interface if not exists
+    if (s_ap_netif == NULL)
+    {
+        s_ap_netif = esp_netif_create_default_wifi_ap();
+        if (s_ap_netif == NULL)
+        {
+            ESP_LOGE(TAG, "Failed to create AP netif");
+            return ESP_FAIL;
+        }
+    }
+
+    // Set WiFi mode to AP
+    ret = esp_wifi_set_mode(WIFI_MODE_AP);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to set AP mode: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Configure AP
+    wifi_config_t wifi_config = {
+        .ap =
+            {
+                .ssid_len        = strlen(WIFI_SETUP_AP_SSID),
+                .channel         = WIFI_SETUP_AP_CHANNEL,
+                .max_connection  = WIFI_SETUP_AP_MAX_CONN,
+                .authmode        = WIFI_AUTH_WPA2_PSK,
+                .pmf_cfg         = {.required = false},
+            },
+    };
+
+    // Copy SSID and password
+    strncpy((char *)wifi_config.ap.ssid, WIFI_SETUP_AP_SSID, sizeof(wifi_config.ap.ssid) - 1);
+    strncpy((char *)wifi_config.ap.password, WIFI_SETUP_AP_PASSWORD, sizeof(wifi_config.ap.password) - 1);
+
+    // If password is less than 8 characters, use open auth
+    if (strlen(WIFI_SETUP_AP_PASSWORD) < 8)
+    {
+        wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+        ESP_LOGW(TAG, "AP password too short, using open authentication");
+    }
+
+    ret = esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to set AP config: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Start WiFi
+    ret = esp_wifi_start();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    prov_state.ap_started = true;
+
+    ESP_LOGI(TAG, "WiFi AP started successfully");
+    ESP_LOGI(TAG, "  SSID: %s", WIFI_SETUP_AP_SSID);
+    ESP_LOGI(TAG, "  Password: %s", WIFI_SETUP_AP_PASSWORD);
+    ESP_LOGI(TAG, "  IP: %s", WIFI_AP_IP_ADDR);
+
+    return ESP_OK;
+}
+
+/**
+ * Stop WiFi Access Point
+ */
+static esp_err_t wifi_stop_ap(void)
+{
+    if (!prov_state.ap_started)
+    {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Stopping WiFi AP...");
+
+    esp_err_t ret = esp_wifi_stop();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Failed to stop WiFi: %s", esp_err_to_name(ret));
+    }
+
+    prov_state.ap_started = false;
+
+    return ESP_OK;
+}
+
+// ============================================================================
+// HTTP SERVER INTEGRATION
+// ============================================================================
+
+/**
+ * Callback when credentials are submitted from HTTP form
+ */
+static void on_credentials_received(const char *ssid, const char *password)
+{
+    ESP_LOGI(TAG, "Credentials received from HTTP form for SSID: %s", ssid);
+
+    // Store credentials for testing
+    esp_err_t ret = wifi_provisioning_submit_credentials(ssid, password);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to submit credentials: %s", esp_err_to_name(ret));
+        wifi_http_server_set_connection_result(false, "Invalid credentials format");
+    }
+}
+
+/**
+ * Start HTTP server for provisioning
+ */
+static esp_err_t start_http_server(void)
+{
+    if (prov_state.http_server_started)
+    {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Starting HTTP server...");
+
+    // Set credentials callback before starting
+    wifi_http_server_set_credentials_callback(on_credentials_received);
+
+    esp_err_t ret = wifi_http_server_start(WIFI_SETUP_AP_SSID, WIFI_SETUP_AP_PASSWORD);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start HTTP server: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    prov_state.http_server_started = true;
+    ESP_LOGI(TAG, "HTTP server started on http://%s/", WIFI_AP_IP_ADDR);
+
+    return ESP_OK;
+}
+
+/**
+ * Stop HTTP server
+ */
+static esp_err_t stop_http_server(void)
+{
+    if (!prov_state.http_server_started)
+    {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Stopping HTTP server...");
+
+    esp_err_t ret               = wifi_http_server_stop();
+    prov_state.http_server_started = false;
+
+    return ret;
+}
+
+// ============================================================================
+// WIFI STA CONNECTION TESTING
+// ============================================================================
+
+/**
+ * Test WiFi connection with provided credentials
+ * Returns true if connection successful
+ */
+static bool test_wifi_connection(const char *ssid, const char *password)
+{
+    ESP_LOGI(TAG, "Testing WiFi connection to: %s", ssid);
+
+    prov_state.connection_test_in_progress = true;
+
+    // Stop AP mode first
+    stop_http_server();
+    wifi_stop_ap();
+
+    // Clear event bits
+    if (s_wifi_event_group)
+    {
+        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    }
+
+    // Create STA network interface if not exists
+    if (s_sta_netif == NULL)
+    {
+        s_sta_netif = esp_netif_create_default_wifi_sta();
+        if (s_sta_netif == NULL)
+        {
+            ESP_LOGE(TAG, "Failed to create STA netif");
+            prov_state.connection_test_in_progress = false;
+            return false;
+        }
+    }
+
+    // Set WiFi mode to STA
+    esp_err_t ret = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to set STA mode: %s", esp_err_to_name(ret));
+        prov_state.connection_test_in_progress = false;
+        return false;
+    }
+
+    // Configure STA with provided credentials
+    wifi_config_t wifi_config = {
+        .sta =
+            {
+                .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+                .pmf_cfg            = {.capable = true, .required = false},
+            },
+    };
+
+    strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
+    strncpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password) - 1);
+
+    ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to set STA config: %s", esp_err_to_name(ret));
+        prov_state.connection_test_in_progress = false;
+        return false;
+    }
+
+    // Start WiFi
+    ret = esp_wifi_start();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
+        prov_state.connection_test_in_progress = false;
+        return false;
+    }
+
+    // Wait for connection result
+    ESP_LOGI(TAG, "Waiting for connection (timeout: %lu ms)...", (unsigned long)prov_state.connection_timeout_ms);
+
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE,
+                                           pdMS_TO_TICKS(prov_state.connection_timeout_ms));
+
+    prov_state.connection_test_in_progress = false;
+
+    if (bits & WIFI_CONNECTED_BIT)
+    {
+        ESP_LOGI(TAG, "WiFi connection test SUCCESSFUL!");
+        return true;
+    }
+    else
+    {
+        ESP_LOGW(TAG, "WiFi connection test FAILED (timeout or auth error)");
+
+        // Stop WiFi before returning to AP mode
+        esp_wifi_stop();
+
+        return false;
+    }
+}
+
+// ============================================================================
+// STATE PROCESSING FUNCTIONS
+// ============================================================================
+
 /**
  * Process UNCONFIGURED state
  * Waiting for user to press setup button
@@ -210,6 +670,35 @@ static void process_unconfigured(void)
 {
     // Nothing to do - just waiting for button press
     // Button handler will trigger setup mode entry
+}
+
+/**
+ * Enter AP_ACTIVE state - start AP and HTTP server
+ */
+static void enter_ap_active_state(void)
+{
+    ESP_LOGI(TAG, "Entering AP_ACTIVE state...");
+
+    // Start WiFi AP
+    esp_err_t ret = wifi_start_ap();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start WiFi AP");
+        return;
+    }
+
+    // Start HTTP server
+    ret = start_http_server();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start HTTP server");
+        wifi_stop_ap();
+        return;
+    }
+
+    ESP_LOGI(TAG, "AP mode active - waiting for credentials");
+    ESP_LOGI(TAG, "Connect to WiFi: %s (password: %s)", WIFI_SETUP_AP_SSID, WIFI_SETUP_AP_PASSWORD);
+    ESP_LOGI(TAG, "Then open http://%s/ in browser", WIFI_AP_IP_ADDR);
 }
 
 /**
@@ -235,45 +724,85 @@ static void process_ap_active(void)
  */
 static void process_connecting(void)
 {
-    // Check if connection result is ready
-    if (prov_state.connection_result_ready)
-    {
-        prov_state.connection_result_ready = false;
+    // Only run connection test once per state entry
+    static bool test_started = false;
 
-        if (prov_state.connection_success)
+    if (!test_started)
+    {
+        test_started = true;
+
+        ESP_LOGI(TAG, "Testing WiFi connection...");
+
+        // Test the connection
+        bool success = test_wifi_connection(prov_state.pending_ssid, prov_state.pending_password);
+
+        if (success)
         {
-            ESP_LOGI(TAG, "Connection successful!");
-            transition_to(WIFI_STATE_CONNECTED);
+            // Connection successful - save credentials
+            ESP_LOGI(TAG, "Connection successful! Saving credentials...");
+
+            wifi_storage_error_t storage_ret =
+                wifi_settings_save(prov_state.pending_ssid, prov_state.pending_password);
+            if (storage_ret != WIFI_STORAGE_OK)
+            {
+                ESP_LOGE(TAG, "Failed to save credentials: %s", wifi_settings_error_to_string(storage_ret));
+                strncpy(prov_state.error_message, "Failed to save credentials", sizeof(prov_state.error_message) - 1);
+                prov_state.connection_success = false;
+            }
+            else
+            {
+                ESP_LOGI(TAG, "Credentials saved successfully");
+                prov_state.connection_success = true;
+            }
+
+            // Notify HTTP server of result
+            wifi_http_server_set_connection_result(prov_state.connection_success, prov_state.error_message);
+
+            if (prov_state.connection_success)
+            {
+                transition_to(WIFI_STATE_CONNECTED);
+            }
+            else
+            {
+                // Return to AP mode for retry
+                test_started = false;
+                wifi_start_ap();
+                start_http_server();
+                transition_to(WIFI_STATE_AP_ACTIVE);
+            }
         }
         else
         {
-            ESP_LOGW(TAG, "Connection failed: %s", prov_state.error_message);
+            // Connection failed
+            ESP_LOGW(TAG, "Connection failed");
+            strncpy(prov_state.error_message, "Connection failed - check SSID and password",
+                    sizeof(prov_state.error_message) - 1);
+            prov_state.error_message[sizeof(prov_state.error_message) - 1] = '\0';
+            prov_state.connection_success                                   = false;
+
+            // Notify HTTP server of failure
+            wifi_http_server_set_connection_result(false, prov_state.error_message);
+
             // Return to AP mode for retry
+            test_started = false;
+            wifi_start_ap();
+            start_http_server();
             transition_to(WIFI_STATE_AP_ACTIVE);
         }
-    }
-
-    // Check for timeout
-    uint32_t elapsed = get_time_ms() - prov_state.state_enter_time_ms;
-    if (elapsed >= prov_state.connection_timeout_ms)
-    {
-        ESP_LOGW(TAG, "Connection timeout after %lu ms", (unsigned long)elapsed);
-        strncpy(prov_state.error_message, "Connection timeout", sizeof(prov_state.error_message) - 1);
-        prov_state.error_message[sizeof(prov_state.error_message) - 1] = '\0';
-        transition_to(WIFI_STATE_AP_ACTIVE);
     }
 }
 
 /**
  * Process CONNECTED state
- * Normal operation, monitoring connection
+ * Successfully connected, waiting for restart
  */
 static void process_connected(void)
 {
     // LED solid on to indicate connected
     gpio_set_level(prov_state.led_pin, 1);
 
-    // Connection monitoring will be added in Phase 3
+    // Device is ready - waiting for user to click restart
+    // HTTP server will call wifi_provisioning_restart_device() when user clicks restart
 }
 
 /**
@@ -360,19 +889,16 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
         clear_setup_requested();
         prov_state.current_state = WIFI_STATE_AP_ACTIVE;
         ESP_LOGI(TAG, "Entering AP mode (setup requested)");
-        // AP and HTTP server will be started in Phase 3
+
+        // Start AP and HTTP server
+        enter_ap_active_state();
     }
     else if (is_configured)
     {
-        // Device has stored credentials - try to connect
-        prov_state.current_state = WIFI_STATE_CONNECTING;
-        ESP_LOGI(TAG, "Credentials found, will attempt connection");
-        // Actual connection attempt will be in Phase 3
-
-        // For now, transition to CONNECTED to allow normal operation
-        // This will be replaced with actual WiFi connection in Phase 3
+        // Device has stored credentials - mark as ready
+        // Actual WiFi connection will be handled by wifi_manager
         prov_state.current_state = WIFI_STATE_CONNECTED;
-        ESP_LOGI(TAG, "NOTE: WiFi connection not implemented yet - assuming connected");
+        ESP_LOGI(TAG, "Device configured - credentials available");
     }
     else
     {
@@ -559,6 +1085,9 @@ const char *wifi_provisioning_get_error_message(void)
 void wifi_provisioning_restart_device(void)
 {
     ESP_LOGI(TAG, "Restart requested - rebooting device...");
+
+    // Stop HTTP server if running
+    stop_http_server();
 
     // Brief delay to ensure log message is printed
     vTaskDelay(pdMS_TO_TICKS(100));
