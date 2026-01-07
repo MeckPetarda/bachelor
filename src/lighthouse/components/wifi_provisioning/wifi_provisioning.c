@@ -564,6 +564,10 @@ static esp_err_t stop_http_server(void)
 /**
  * Test WiFi connection with provided credentials
  * Returns true if connection successful
+ *
+ * IMPORTANT: Uses APSTA mode to keep AP active during test.
+ * This allows the HTTP handler to receive the result and send
+ * the response back to the browser.
  */
 static bool test_wifi_connection(const char *ssid, const char *password)
 {
@@ -571,15 +575,14 @@ static bool test_wifi_connection(const char *ssid, const char *password)
 
     prov_state.connection_test_in_progress = true;
 
-    // Stop AP mode first
-    stop_http_server();
-    wifi_stop_ap();
-
     // Clear event bits
     if (s_wifi_event_group)
     {
         xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     }
+
+    // Stop WiFi to reconfigure (but don't stop HTTP server!)
+    esp_wifi_stop();
 
     // Create STA network interface if not exists
     if (s_sta_netif == NULL)
@@ -589,21 +592,52 @@ static bool test_wifi_connection(const char *ssid, const char *password)
         {
             ESP_LOGE(TAG, "Failed to create STA netif");
             prov_state.connection_test_in_progress = false;
+            // Restart AP mode
+            wifi_start_ap();
             return false;
         }
     }
 
-    // Set WiFi mode to STA
-    esp_err_t ret = esp_wifi_set_mode(WIFI_MODE_STA);
+    // Set WiFi mode to APSTA (both AP and STA simultaneously)
+    // This keeps AP active so browser stays connected and can receive response
+    esp_err_t ret = esp_wifi_set_mode(WIFI_MODE_APSTA);
     if (ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "Failed to set STA mode: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to set APSTA mode: %s", esp_err_to_name(ret));
         prov_state.connection_test_in_progress = false;
+        // Restart AP mode
+        esp_wifi_set_mode(WIFI_MODE_AP);
+        wifi_start_ap();
         return false;
     }
 
+    // Re-configure AP (needed after mode change)
+    wifi_config_t ap_config = {
+        .ap =
+            {
+                .ssid_len       = strlen(WIFI_SETUP_AP_SSID),
+                .channel        = WIFI_SETUP_AP_CHANNEL,
+                .max_connection = WIFI_SETUP_AP_MAX_CONN,
+                .authmode       = WIFI_AUTH_WPA2_PSK,
+                .pmf_cfg        = {.required = false},
+            },
+    };
+    strncpy((char *)ap_config.ap.ssid, WIFI_SETUP_AP_SSID, sizeof(ap_config.ap.ssid) - 1);
+    strncpy((char *)ap_config.ap.password, WIFI_SETUP_AP_PASSWORD, sizeof(ap_config.ap.password) - 1);
+
+    if (strlen(WIFI_SETUP_AP_PASSWORD) < 8)
+    {
+        ap_config.ap.authmode = WIFI_AUTH_OPEN;
+    }
+
+    ret = esp_wifi_set_config(WIFI_IF_AP, &ap_config);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Failed to reconfigure AP: %s", esp_err_to_name(ret));
+    }
+
     // Configure STA with provided credentials
-    wifi_config_t wifi_config = {
+    wifi_config_t sta_config = {
         .sta =
             {
                 .threshold.authmode = WIFI_AUTH_WPA2_PSK,
@@ -611,18 +645,21 @@ static bool test_wifi_connection(const char *ssid, const char *password)
             },
     };
 
-    strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
-    strncpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password) - 1);
+    strncpy((char *)sta_config.sta.ssid, ssid, sizeof(sta_config.sta.ssid) - 1);
+    strncpy((char *)sta_config.sta.password, password, sizeof(sta_config.sta.password) - 1);
 
-    ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    ret = esp_wifi_set_config(WIFI_IF_STA, &sta_config);
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "Failed to set STA config: %s", esp_err_to_name(ret));
         prov_state.connection_test_in_progress = false;
+        // Restart AP-only mode
+        esp_wifi_set_mode(WIFI_MODE_AP);
+        wifi_start_ap();
         return false;
     }
 
-    // Start WiFi
+    // Start WiFi (in APSTA mode)
     ret = esp_wifi_start();
     if (ret != ESP_OK)
     {
@@ -630,6 +667,8 @@ static bool test_wifi_connection(const char *ssid, const char *password)
         prov_state.connection_test_in_progress = false;
         return false;
     }
+
+    ESP_LOGI(TAG, "AP still active during connection test (APSTA mode)");
 
     // Wait for connection result
     ESP_LOGI(TAG, "Waiting for connection (timeout: %lu ms)...", (unsigned long)prov_state.connection_timeout_ms);
@@ -642,15 +681,21 @@ static bool test_wifi_connection(const char *ssid, const char *password)
     if (bits & WIFI_CONNECTED_BIT)
     {
         ESP_LOGI(TAG, "WiFi connection test SUCCESSFUL!");
+        // Keep APSTA mode - AP stays active for browser to get response
+        // AP will be disabled when device restarts
         return true;
     }
     else
     {
         ESP_LOGW(TAG, "WiFi connection test FAILED (timeout or auth error)");
 
-        // Stop WiFi before returning to AP mode
-        esp_wifi_stop();
+        // Disconnect STA but keep AP running
+        esp_wifi_disconnect();
 
+        // Switch back to AP-only mode for retry
+        esp_wifi_stop();
+        esp_wifi_set_mode(WIFI_MODE_AP);
+        wifi_start_ap();
         return false;
     }
 }
@@ -718,6 +763,9 @@ static void process_ap_active(void)
 /**
  * Process CONNECTING state
  * Attempting WiFi connection with provided credentials
+ *
+ * NOTE: AP and HTTP server remain active during the connection test
+ * (using APSTA mode) so the browser can receive the response.
  */
 static void process_connecting(void)
 {
@@ -730,7 +778,7 @@ static void process_connecting(void)
 
         ESP_LOGI(TAG, "Testing WiFi connection...");
 
-        // Test the connection
+        // Test the connection (AP stays active via APSTA mode)
         bool success = test_wifi_connection(prov_state.pending_ssid, prov_state.pending_password);
 
         if (success)
@@ -751,19 +799,20 @@ static void process_connecting(void)
                 prov_state.connection_success = true;
             }
 
-            // Notify HTTP server of result
+            // Notify HTTP server of result (browser will receive this response)
             wifi_http_server_set_connection_result(prov_state.connection_success, prov_state.error_message);
 
             if (prov_state.connection_success)
             {
+                // Transition to CONNECTED - AP stays active for browser to show restart button
+                // Device will restart when user clicks restart button
                 transition_to(WIFI_STATE_CONNECTED);
             }
             else
             {
-                // Return to AP mode for retry
+                // Failed to save - return to AP_ACTIVE for retry
+                // AP is already running in APSTA mode, just transition state
                 test_started = false;
-                wifi_start_ap();
-                start_http_server();
                 transition_to(WIFI_STATE_AP_ACTIVE);
             }
         }
@@ -779,10 +828,8 @@ static void process_connecting(void)
             // Notify HTTP server of failure
             wifi_http_server_set_connection_result(false, prov_state.error_message);
 
-            // Return to AP mode for retry
+            // Return to AP mode for retry (test_wifi_connection already restarted AP)
             test_started = false;
-            wifi_start_ap();
-            start_http_server();
             transition_to(WIFI_STATE_AP_ACTIVE);
         }
     }
@@ -891,10 +938,36 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
     }
     else if (is_configured)
     {
-        // Device has stored credentials - mark as ready
-        // Actual WiFi connection will be handled by wifi_manager
-        prov_state.current_state = WIFI_STATE_CONNECTED;
-        ESP_LOGI(TAG, "Device configured - credentials available");
+        // Device has stored credentials - load them and auto-connect
+        wifi_credentials_t   creds    = {0};
+        wifi_storage_error_t load_err = wifi_settings_load(&creds);
+
+        if (load_err == WIFI_STORAGE_OK)
+        {
+            // Store credentials in state machine for auto-connection
+            strncpy(prov_state.pending_ssid, creds.ssid, sizeof(prov_state.pending_ssid) - 1);
+            prov_state.pending_ssid[sizeof(prov_state.pending_ssid) - 1] = '\0';
+
+            strncpy(prov_state.pending_password, creds.password, sizeof(prov_state.pending_password) - 1);
+            prov_state.pending_password[sizeof(prov_state.pending_password) - 1] = '\0';
+
+            // Clear credentials from RAM after copying
+            memset(&creds, 0, sizeof(creds));
+
+            ESP_LOGI(TAG, "Loaded saved credentials for SSID: %s", prov_state.pending_ssid);
+
+            // Mark as ready - wifi_manager will use these credentials
+            prov_state.current_state = WIFI_STATE_CONNECTED;
+            ESP_LOGI(TAG, "Device configured - ready to connect");
+        }
+        else
+        {
+            // Load failed despite being configured - fall back to unconfigured
+            ESP_LOGW(TAG, "Failed to load credentials: %s", wifi_settings_error_to_string(load_err));
+            prov_state.current_state = WIFI_STATE_UNCONFIGURED;
+            ESP_LOGI(TAG, "Falling back to unconfigured state");
+            ESP_LOGI(TAG, "Press BUTTON2 for 5 seconds to enter setup mode");
+        }
     }
     else
     {
