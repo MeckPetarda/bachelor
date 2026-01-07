@@ -17,6 +17,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "nvs_flash.h"
+#include "wifi_settings_storage.h"
 #include <string.h>
 
 // ============================================================================
@@ -259,6 +260,17 @@ esp_err_t wifi_manager_init(void)
     // STEP 7: Configure WiFi Credentials
     // ========================================================================
 
+    // Device has stored credentials - load them and auto-connect
+    wifi_credentials_t   creds    = {0};
+    wifi_storage_error_t load_err = wifi_settings_load(&creds);
+
+    if (load_err != WIFI_STORAGE_OK)
+    {
+        ESP_LOGW(TAG, "Failed to load credentials: %s", wifi_settings_error_to_string(load_err));
+        ESP_LOGI(TAG, "Falling back to unconfigured state");
+        ESP_LOGI(TAG, "Press BUTTON2 for 5 seconds to enter setup mode");
+    }
+
     wifi_config_t wifi_config = {
         .sta =
             {
@@ -269,8 +281,11 @@ esp_err_t wifi_manager_init(void)
             },
     };
 
-    ESP_LOGD(TAG, WIFI_SSID);
-    ESP_LOGD(TAG, WIFI_PASSWORD);
+    strncpy((char *)wifi_config.sta.ssid, creds.ssid, sizeof(wifi_config.sta.ssid) - 1);
+    wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
+
+    strncpy((char *)wifi_config.sta.password, creds.password, sizeof(wifi_config.sta.password) - 1);
+    wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
 
     ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     if (ret != ESP_OK)
