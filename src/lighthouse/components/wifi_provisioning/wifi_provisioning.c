@@ -617,6 +617,12 @@ static bool test_wifi_connection(const char *ssid, const char *password)
         return false;
     }
 
+    // Disconnect any existing STA connection before configuring new one
+    // This is needed because switching to APSTA mode may trigger auto-connect
+    // if there's an existing STA config, and we can't set config while connecting
+    esp_wifi_disconnect();
+    vTaskDelay(pdMS_TO_TICKS(100)); // Brief delay to ensure disconnect completes
+
     // Configure STA with provided credentials
     wifi_config_t sta_config = {
         .sta =
