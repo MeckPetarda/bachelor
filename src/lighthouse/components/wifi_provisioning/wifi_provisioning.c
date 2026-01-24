@@ -15,6 +15,7 @@
  */
 
 #include "wifi_provisioning.h"
+#include "dns_server.h"
 #include "wifi_http_server.h"
 #include "wifi_provisioning_config.h"
 #include "wifi_settings_storage.h"
@@ -492,6 +493,13 @@ static esp_err_t wifi_stop_ap(void)
 
     ESP_LOGI(TAG, "Stopping WiFi AP...");
 
+    // Stop DNS server if running (captive portal)
+    if (dns_server_is_running())
+    {
+        dns_server_stop();
+        ESP_LOGI(TAG, "Captive portal disabled");
+    }
+
     esp_err_t ret = esp_wifi_stop();
     if (ret != ESP_OK)
     {
@@ -721,6 +729,18 @@ static void enter_ap_active_state(void)
         ESP_LOGE(TAG, "Failed to start HTTP server");
         wifi_stop_ap();
         return;
+    }
+
+    // Start DNS server for captive portal
+    ret = dns_server_start();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Failed to start DNS server: %s (captive portal may not work)", esp_err_to_name(ret));
+        // Continue anyway - manual browser access still works
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Captive portal enabled - setup page will open automatically on connected devices");
     }
 
     ESP_LOGI(TAG, "AP mode active - waiting for credentials");
@@ -1139,6 +1159,12 @@ const char *wifi_provisioning_get_error_message(void)
 void wifi_provisioning_restart_device(void)
 {
     ESP_LOGI(TAG, "Restart requested - rebooting device...");
+
+    // Stop DNS server if running (captive portal)
+    if (dns_server_is_running())
+    {
+        dns_server_stop();
+    }
 
     // Stop HTTP server if running
     stop_http_server();

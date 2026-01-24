@@ -387,6 +387,34 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
 }
 
 /**
+ * Captive portal redirect handler (wildcard route)
+ *
+ * This handler catches all GET requests that don't match specific routes
+ * (/, /configure, /restart) and redirects them to the provisioning page.
+ * This enables captive portal detection on mobile devices and computers.
+ *
+ * When a device connects to the AP, it performs connectivity checks by
+ * requesting URLs like captive.apple.com or connectivitycheck.gstatic.com.
+ * By redirecting these requests to our setup page, the OS detects a
+ * "captive portal" and automatically opens a browser.
+ */
+static esp_err_t captive_portal_handler(httpd_req_t *req)
+{
+    ESP_LOGD(TAG, "Captive portal redirect for: %s", req->uri);
+
+    /* Set HTTP 302 Found status for redirect */
+    httpd_resp_set_status(req, "302 Found");
+
+    /* Set Location header to redirect to setup page */
+    httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
+
+    /* Send empty response body (standard for redirects) */
+    httpd_resp_send(req, NULL, 0);
+
+    return ESP_OK;
+}
+
+/**
  * GET "/restart" - Restart device
  */
 static esp_err_t get_restart_handler(httpd_req_t *req)
@@ -439,8 +467,9 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
     // Configure HTTP server
     httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
     config.stack_size       = 8192;
-    config.max_uri_handlers = 4;
+    config.max_uri_handlers = 8;  // Increased to accommodate wildcard handler
     config.lru_purge_enable = true;
+    config.uri_match_fn     = httpd_uri_match_wildcard;  // Enable wildcard matching
 
     // Start HTTP server
     esp_err_t ret = httpd_start(&server_handle, &config);
@@ -476,8 +505,18 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
     httpd_register_uri_handler(server_handle, &uri_post_configure);
     httpd_register_uri_handler(server_handle, &uri_get_restart);
 
+    // Register wildcard handler LAST - catches all other GET requests for captive portal
+    // This must be registered after specific handlers so they take priority
+    httpd_uri_t uri_captive_portal = {
+        .uri      = "/*",
+        .method   = HTTP_GET,
+        .handler  = captive_portal_handler,
+        .user_ctx = NULL,
+    };
+    httpd_register_uri_handler(server_handle, &uri_captive_portal);
+
     server_running = true;
-    ESP_LOGI(TAG, "HTTP server started on port 80");
+    ESP_LOGI(TAG, "HTTP server started on port 80 with captive portal support");
 
     return ESP_OK;
 }
