@@ -328,29 +328,23 @@ esp_err_t wifi_manager_init(void)
     ESP_LOGI(TAG, "  ✓ WiFi credentials configured");
 
     // ========================================================================
-    // STEP 8: Start WiFi Driver
+    // STEP 8: Start WiFi Driver and Connect
     // ========================================================================
     // This activates the WiFi driver
     // WIFI_EVENT_STA_START will be triggered, which initiates connection
-    // Skip if already started (e.g., by provisioning system)
+    //
+    // Note: We always call esp_wifi_start() because:
+    // - esp_wifi_get_mode() returns the MODE we SET, not whether WiFi is STARTED
+    // - If WiFi was started by provisioning but mode changed to STA, we need to
+    //   ensure connection is re-initiated
 
-    wifi_mode_t current_mode;
-    ret = esp_wifi_get_mode(&current_mode);
-    if (ret == ESP_OK && current_mode != WIFI_MODE_NULL)
+    ret = esp_wifi_start();
+    if (ret != ESP_OK)
     {
-        // WiFi is already started (by provisioning system)
-        ESP_LOGI(TAG, "  ✓ WiFi already running (started by provisioning)");
+        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
+        return ret;
     }
-    else
-    {
-        ret = esp_wifi_start();
-        if (ret != ESP_OK)
-        {
-            ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
-            return ret;
-        }
-        ESP_LOGI(TAG, "  ✓ WiFi driver started");
-    }
+    ESP_LOGI(TAG, "  ✓ WiFi driver started");
 
     // Enable debug logging for troubleshooting
     esp_log_level_set("wifi", ESP_LOG_INFO);
