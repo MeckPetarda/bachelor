@@ -259,33 +259,56 @@ esp_err_t wifi_manager_init(void)
     // ========================================================================
     // STEP 7: Configure WiFi Credentials
     // ========================================================================
-
-    // Device has stored credentials - load them and auto-connect
-    wifi_credentials_t   creds    = {0};
-    wifi_storage_error_t load_err = wifi_settings_load(&creds);
-
-    if (load_err != WIFI_STORAGE_OK)
-    {
-        ESP_LOGW(TAG, "Failed to load credentials: %s", wifi_settings_error_to_string(load_err));
-        ESP_LOGI(TAG, "Falling back to unconfigured state");
-        ESP_LOGI(TAG, "Press BUTTON2 for 5 seconds to enter setup mode");
-    }
+    // Priority order:
+    // 1. First choice: Credentials from NVS (user-provisioned)
+    // 2. Second choice: Hardcoded SDK config (factory defaults)
 
     wifi_config_t wifi_config = {
         .sta =
             {
-                .ssid               = WIFI_SSID,
-                .password           = WIFI_PASSWORD,
                 .threshold.authmode = WIFI_AUTH_WPA2_PSK, // Minimum security
                 .pmf_cfg            = {.capable = true, .required = false},
             },
     };
 
-    strncpy((char *)wifi_config.sta.ssid, creds.ssid, sizeof(wifi_config.sta.ssid) - 1);
-    wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
+    // Try to load saved credentials from NVS
+    wifi_credentials_t   creds    = {0};
+    wifi_storage_error_t load_err = wifi_settings_load(&creds);
 
-    strncpy((char *)wifi_config.sta.password, creds.password, sizeof(wifi_config.sta.password) - 1);
-    wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
+    if (load_err == WIFI_STORAGE_OK && creds.ssid[0] != '\0')
+    {
+        // Use saved credentials from NVS (user-provisioned)
+        strncpy((char *)wifi_config.sta.ssid, creds.ssid, sizeof(wifi_config.sta.ssid) - 1);
+        wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
+
+        strncpy((char *)wifi_config.sta.password, creds.password, sizeof(wifi_config.sta.password) - 1);
+        wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
+
+        // Clear credentials from RAM after copying for security
+        memset(&creds, 0, sizeof(creds));
+
+        ESP_LOGI(TAG, "  ✓ Using saved WiFi credentials: %s", wifi_config.sta.ssid);
+    }
+    else
+    {
+        // Fall back to SDK config (factory defaults)
+        if (load_err != WIFI_STORAGE_OK)
+        {
+            ESP_LOGW(TAG, "Failed to load saved credentials: %s", wifi_settings_error_to_string(load_err));
+        }
+        else
+        {
+            ESP_LOGW(TAG, "Saved credentials are empty");
+        }
+
+        strncpy((char *)wifi_config.sta.ssid, WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
+        wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
+
+        strncpy((char *)wifi_config.sta.password, WIFI_PASSWORD, sizeof(wifi_config.sta.password) - 1);
+        wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
+
+        ESP_LOGI(TAG, "  ✓ Using SDK config credentials (factory defaults): %s", wifi_config.sta.ssid);
+    }
 
     ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     if (ret != ESP_OK)
