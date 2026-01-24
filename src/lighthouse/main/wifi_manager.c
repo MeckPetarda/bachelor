@@ -163,28 +163,37 @@ esp_err_t wifi_manager_init(void)
     // Creates the TCP/IP stack (lwIP) and event handling infrastructure
 
     ret = esp_netif_init();
-    if (ret != ESP_OK)
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
         ESP_LOGE(TAG, "Failed to initialize network interface: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "  ✓ Network interface (lwIP) initialized");
+    ESP_LOGI(TAG, "  ✓ Network interface (lwIP) %s", ret == ESP_ERR_INVALID_STATE ? "already initialized" : "initialized");
 
     ret = esp_event_loop_create_default();
-    if (ret != ESP_OK)
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
         ESP_LOGE(TAG, "Failed to create event loop: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "  ✓ Event loop created");
+    ESP_LOGI(TAG, "  ✓ Event loop %s", ret == ESP_ERR_INVALID_STATE ? "already exists" : "created");
 
-    s_sta_netif = esp_netif_create_default_wifi_sta();
+    // Check if STA netif already exists (created by provisioning system)
+    s_sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (s_sta_netif == NULL)
     {
-        ESP_LOGE(TAG, "Failed to create default WiFi STA interface");
-        return ESP_FAIL;
+        s_sta_netif = esp_netif_create_default_wifi_sta();
+        if (s_sta_netif == NULL)
+        {
+            ESP_LOGE(TAG, "Failed to create default WiFi STA interface");
+            return ESP_FAIL;
+        }
+        ESP_LOGI(TAG, "  ✓ WiFi STA interface created");
     }
-    ESP_LOGI(TAG, "  ✓ WiFi STA interface created");
+    else
+    {
+        ESP_LOGI(TAG, "  ✓ WiFi STA interface already exists");
+    }
 
     // ========================================================================
     // STEP 3: Initialize WiFi Driver
@@ -194,12 +203,12 @@ esp_err_t wifi_manager_init(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ret                    = esp_wifi_init(&cfg);
-    if (ret != ESP_OK)
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
         ESP_LOGE(TAG, "Failed to initialize WiFi driver: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "  ✓ WiFi driver initialized");
+    ESP_LOGI(TAG, "  ✓ WiFi driver %s", ret == ESP_ERR_INVALID_STATE ? "already initialized" : "initialized");
 
     // ========================================================================
     // STEP 4: Create Event Group
@@ -323,14 +332,25 @@ esp_err_t wifi_manager_init(void)
     // ========================================================================
     // This activates the WiFi driver
     // WIFI_EVENT_STA_START will be triggered, which initiates connection
+    // Skip if already started (e.g., by provisioning system)
 
-    ret = esp_wifi_start();
-    if (ret != ESP_OK)
+    wifi_mode_t current_mode;
+    ret = esp_wifi_get_mode(&current_mode);
+    if (ret == ESP_OK && current_mode != WIFI_MODE_NULL)
     {
-        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
-        return ret;
+        // WiFi is already started (by provisioning system)
+        ESP_LOGI(TAG, "  ✓ WiFi already running (started by provisioning)");
     }
-    ESP_LOGI(TAG, "  ✓ WiFi driver started");
+    else
+    {
+        ret = esp_wifi_start();
+        if (ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
+            return ret;
+        }
+        ESP_LOGI(TAG, "  ✓ WiFi driver started");
+    }
 
     // Enable debug logging for troubleshooting
     esp_log_level_set("wifi", ESP_LOG_INFO);
