@@ -346,6 +346,19 @@ esp_err_t wifi_manager_init(void)
     }
     ESP_LOGI(TAG, "  ✓ WiFi driver started");
 
+    // Explicitly initiate connection
+    // This is needed because if WiFi was already started by provisioning,
+    // esp_wifi_start() won't trigger WIFI_EVENT_STA_START again, so the
+    // event handler's esp_wifi_connect() call won't happen
+    s_retry_count = 0;
+    xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    ret = esp_wifi_connect();
+    if (ret != ESP_OK && ret != ESP_ERR_WIFI_CONN)
+    {
+        // ESP_ERR_WIFI_CONN means already connecting, which is fine
+        ESP_LOGW(TAG, "esp_wifi_connect returned: %s", esp_err_to_name(ret));
+    }
+
     // Enable debug logging for troubleshooting
     esp_log_level_set("wifi", ESP_LOG_INFO);
 
