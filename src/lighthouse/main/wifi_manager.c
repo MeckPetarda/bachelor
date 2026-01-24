@@ -163,28 +163,37 @@ esp_err_t wifi_manager_init(void)
     // Creates the TCP/IP stack (lwIP) and event handling infrastructure
 
     ret = esp_netif_init();
-    if (ret != ESP_OK)
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
         ESP_LOGE(TAG, "Failed to initialize network interface: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "  ✓ Network interface (lwIP) initialized");
+    ESP_LOGI(TAG, "  ✓ Network interface (lwIP) %s", ret == ESP_ERR_INVALID_STATE ? "already initialized" : "initialized");
 
     ret = esp_event_loop_create_default();
-    if (ret != ESP_OK)
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
         ESP_LOGE(TAG, "Failed to create event loop: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "  ✓ Event loop created");
+    ESP_LOGI(TAG, "  ✓ Event loop %s", ret == ESP_ERR_INVALID_STATE ? "already exists" : "created");
 
-    s_sta_netif = esp_netif_create_default_wifi_sta();
+    // Check if STA netif already exists (created by provisioning system)
+    s_sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     if (s_sta_netif == NULL)
     {
-        ESP_LOGE(TAG, "Failed to create default WiFi STA interface");
-        return ESP_FAIL;
+        s_sta_netif = esp_netif_create_default_wifi_sta();
+        if (s_sta_netif == NULL)
+        {
+            ESP_LOGE(TAG, "Failed to create default WiFi STA interface");
+            return ESP_FAIL;
+        }
+        ESP_LOGI(TAG, "  ✓ WiFi STA interface created");
     }
-    ESP_LOGI(TAG, "  ✓ WiFi STA interface created");
+    else
+    {
+        ESP_LOGI(TAG, "  ✓ WiFi STA interface already exists");
+    }
 
     // ========================================================================
     // STEP 3: Initialize WiFi Driver
@@ -194,12 +203,12 @@ esp_err_t wifi_manager_init(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ret                    = esp_wifi_init(&cfg);
-    if (ret != ESP_OK)
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
     {
         ESP_LOGE(TAG, "Failed to initialize WiFi driver: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "  ✓ WiFi driver initialized");
+    ESP_LOGI(TAG, "  ✓ WiFi driver %s", ret == ESP_ERR_INVALID_STATE ? "already initialized" : "initialized");
 
     // ========================================================================
     // STEP 4: Create Event Group
@@ -259,33 +268,56 @@ esp_err_t wifi_manager_init(void)
     // ========================================================================
     // STEP 7: Configure WiFi Credentials
     // ========================================================================
-
-    // Device has stored credentials - load them and auto-connect
-    wifi_credentials_t   creds    = {0};
-    wifi_storage_error_t load_err = wifi_settings_load(&creds);
-
-    if (load_err != WIFI_STORAGE_OK)
-    {
-        ESP_LOGW(TAG, "Failed to load credentials: %s", wifi_settings_error_to_string(load_err));
-        ESP_LOGI(TAG, "Falling back to unconfigured state");
-        ESP_LOGI(TAG, "Press BUTTON2 for 5 seconds to enter setup mode");
-    }
+    // Priority order:
+    // 1. First choice: Credentials from NVS (user-provisioned)
+    // 2. Second choice: Hardcoded SDK config (factory defaults)
 
     wifi_config_t wifi_config = {
         .sta =
             {
-                .ssid               = WIFI_SSID,
-                .password           = WIFI_PASSWORD,
                 .threshold.authmode = WIFI_AUTH_WPA2_PSK, // Minimum security
                 .pmf_cfg            = {.capable = true, .required = false},
             },
     };
 
-    strncpy((char *)wifi_config.sta.ssid, creds.ssid, sizeof(wifi_config.sta.ssid) - 1);
-    wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
+    // Try to load saved credentials from NVS
+    wifi_credentials_t   creds    = {0};
+    wifi_storage_error_t load_err = wifi_settings_load(&creds);
 
-    strncpy((char *)wifi_config.sta.password, creds.password, sizeof(wifi_config.sta.password) - 1);
-    wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
+    if (load_err == WIFI_STORAGE_OK && creds.ssid[0] != '\0')
+    {
+        // Use saved credentials from NVS (user-provisioned)
+        strncpy((char *)wifi_config.sta.ssid, creds.ssid, sizeof(wifi_config.sta.ssid) - 1);
+        wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
+
+        strncpy((char *)wifi_config.sta.password, creds.password, sizeof(wifi_config.sta.password) - 1);
+        wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
+
+        // Clear credentials from RAM after copying for security
+        memset(&creds, 0, sizeof(creds));
+
+        ESP_LOGI(TAG, "  ✓ Using saved WiFi credentials: %s", wifi_config.sta.ssid);
+    }
+    else
+    {
+        // Fall back to SDK config (factory defaults)
+        if (load_err != WIFI_STORAGE_OK)
+        {
+            ESP_LOGW(TAG, "Failed to load saved credentials: %s", wifi_settings_error_to_string(load_err));
+        }
+        else
+        {
+            ESP_LOGW(TAG, "Saved credentials are empty");
+        }
+
+        strncpy((char *)wifi_config.sta.ssid, WIFI_SSID, sizeof(wifi_config.sta.ssid) - 1);
+        wifi_config.sta.ssid[sizeof(wifi_config.sta.ssid) - 1] = '\0';
+
+        strncpy((char *)wifi_config.sta.password, WIFI_PASSWORD, sizeof(wifi_config.sta.password) - 1);
+        wifi_config.sta.password[sizeof(wifi_config.sta.password) - 1] = '\0';
+
+        ESP_LOGI(TAG, "  ✓ Using SDK config credentials (factory defaults): %s", wifi_config.sta.ssid);
+    }
 
     ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     if (ret != ESP_OK)
@@ -296,10 +328,15 @@ esp_err_t wifi_manager_init(void)
     ESP_LOGI(TAG, "  ✓ WiFi credentials configured");
 
     // ========================================================================
-    // STEP 8: Start WiFi Driver
+    // STEP 8: Start WiFi Driver and Connect
     // ========================================================================
     // This activates the WiFi driver
     // WIFI_EVENT_STA_START will be triggered, which initiates connection
+    //
+    // Note: We always call esp_wifi_start() because:
+    // - esp_wifi_get_mode() returns the MODE we SET, not whether WiFi is STARTED
+    // - If WiFi was started by provisioning but mode changed to STA, we need to
+    //   ensure connection is re-initiated
 
     ret = esp_wifi_start();
     if (ret != ESP_OK)
@@ -308,6 +345,30 @@ esp_err_t wifi_manager_init(void)
         return ret;
     }
     ESP_LOGI(TAG, "  ✓ WiFi driver started");
+
+    // Check if we're already connected (e.g., from provisioning)
+    // If so, just set the connected bit - no need to reconnect
+    wifi_ap_record_t ap_info;
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK)
+    {
+        ESP_LOGI(TAG, "  ✓ Already connected to: %s", ap_info.ssid);
+        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+    }
+    else
+    {
+        // Not connected - initiate connection
+        // This is needed because if WiFi was already started by provisioning,
+        // esp_wifi_start() won't trigger WIFI_EVENT_STA_START again, so the
+        // event handler's esp_wifi_connect() call won't happen
+        s_retry_count = 0;
+        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+        ret = esp_wifi_connect();
+        if (ret != ESP_OK && ret != ESP_ERR_WIFI_CONN)
+        {
+            // ESP_ERR_WIFI_CONN means already connecting, which is fine
+            ESP_LOGW(TAG, "esp_wifi_connect returned: %s", esp_err_to_name(ret));
+        }
+    }
 
     // Enable debug logging for troubleshooting
     esp_log_level_set("wifi", ESP_LOG_INFO);

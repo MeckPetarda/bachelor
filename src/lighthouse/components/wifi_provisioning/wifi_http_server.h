@@ -129,4 +129,18 @@ void wifi_http_server_clear_result(void);
  */
 bool wifi_http_server_is_running(void);
 
+/**
+ * Wait for WiFi connection test result
+ *
+ * Called by POST handler after invoking callback.
+ * Blocks until result available or timeout.
+ * Uses semaphore for efficient synchronization.
+ *
+ * @param timeout_ms Maximum time to wait (milliseconds)
+ * @param out_success Output: true if connection succeeded
+ * @param out_error Output: error message pointer (if failed, may be NULL)
+ * @return ESP_OK if result ready, ESP_ERR_TIMEOUT if timeout
+ */
+esp_err_t wifi_http_server_wait_connection_result(uint32_t timeout_ms, bool *out_success, const char **out_error);
+
 #endif // WIFI_HTTP_SERVER_H

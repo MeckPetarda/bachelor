@@ -17,6 +17,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include <string.h>
 
@@ -42,6 +43,9 @@ static bool                        server_running       = false;
 static bool result_ready                    = false;
 static bool result_success                  = false;
 static char result_error[MAX_ERROR_MSG_LEN] = {0};
+
+// Semaphore for synchronization between HTTP handler and state machine
+static SemaphoreHandle_t result_semaphore = NULL;
 
 // AP info for display
 static char ap_ssid_display[33] = {0};
@@ -351,25 +355,20 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
     free(ssid);
     free(password);
 
-    // Wait for connection result with timeout
-    uint32_t wait_start = xTaskGetTickCount() * portTICK_PERIOD_MS;
-    while (!result_ready)
-    {
-        uint32_t elapsed = (xTaskGetTickCount() * portTICK_PERIOD_MS) - wait_start;
-        if (elapsed >= RESULT_WAIT_TIMEOUT_MS)
-        {
-            ESP_LOGW(TAG, "Timeout waiting for connection result");
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Connection test timeout\"}");
-            return ESP_OK;
-        }
-        vTaskDelay(pdMS_TO_TICKS(RESULT_POLL_INTERVAL_MS));
-    }
+    // Wait for connection result using semaphore (with timeout)
+    bool        success   = false;
+    const char *error_msg = NULL;
+    esp_err_t   wait_ret  = wifi_http_server_wait_connection_result(RESULT_WAIT_TIMEOUT_MS, &success, &error_msg);
 
     // Send result to client
     httpd_resp_set_type(req, "application/json");
 
-    if (result_success)
+    if (wait_ret == ESP_ERR_TIMEOUT)
+    {
+        ESP_LOGW(TAG, "Timeout waiting for connection result");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Connection test timeout\"}");
+    }
+    else if (wait_ret == ESP_OK && success)
     {
         ESP_LOGI(TAG, "Connection successful, sending success response");
         httpd_resp_sendstr(req, "{\"status\":\"success\",\"message\":\"Connected successfully! Click the button below "
@@ -379,7 +378,7 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
     {
         char response[256];
         snprintf(response, sizeof(response), "{\"status\":\"error\",\"message\":\"%s\"}",
-                 result_error[0] ? result_error : "Connection failed");
+                 error_msg ? error_msg : "Connection failed");
         ESP_LOGI(TAG, "Connection failed, sending error response");
         httpd_resp_sendstr(req, response);
     }
@@ -525,6 +524,12 @@ void wifi_http_server_set_connection_result(bool success, const char *error_mess
 
     result_ready = true;
 
+    // Signal waiting HTTP handler via semaphore
+    if (result_semaphore != NULL)
+    {
+        xSemaphoreGive(result_semaphore);
+    }
+
     ESP_LOGI(TAG, "Connection result set: success=%d, error=%s", success, result_error[0] ? result_error : "(none)");
 }
 
@@ -552,6 +557,63 @@ void wifi_http_server_clear_result(void)
     result_ready    = false;
     result_success  = false;
     result_error[0] = '\0';
+
+    // Ensure semaphore is in taken state (not signaled)
+    if (result_semaphore != NULL)
+    {
+        // Try to take without blocking - this clears any pending signal
+        xSemaphoreTake(result_semaphore, 0);
+    }
+}
+
+esp_err_t wifi_http_server_wait_connection_result(uint32_t timeout_ms, bool *out_success, const char **out_error)
+{
+    if (out_success == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Create semaphore on first use
+    if (result_semaphore == NULL)
+    {
+        result_semaphore = xSemaphoreCreateBinary();
+        if (result_semaphore == NULL)
+        {
+            ESP_LOGE(TAG, "Failed to create result semaphore");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    // If result is already ready, return immediately
+    if (result_ready)
+    {
+        *out_success = result_success;
+        if (out_error != NULL)
+        {
+            *out_error = result_error[0] ? result_error : NULL;
+        }
+        return ESP_OK;
+    }
+
+    // Wait for semaphore signal (with timeout)
+    BaseType_t ret = xSemaphoreTake(result_semaphore, pdMS_TO_TICKS(timeout_ms));
+
+    if (ret == pdTRUE)
+    {
+        // Result is now ready
+        *out_success = result_success;
+        if (out_error != NULL)
+        {
+            *out_error = result_error[0] ? result_error : NULL;
+        }
+        return ESP_OK;
+    }
+    else
+    {
+        // Timeout
+        ESP_LOGW(TAG, "Timeout waiting for connection result");
+        return ESP_ERR_TIMEOUT;
+    }
 }
 
 bool wifi_http_server_is_running(void)

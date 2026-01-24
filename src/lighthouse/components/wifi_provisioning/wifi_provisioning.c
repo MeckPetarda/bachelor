@@ -412,6 +412,18 @@ static esp_err_t wifi_start_ap(void)
         }
     }
 
+    // Also create STA network interface now so we can switch to APSTA mode
+    // later without stopping WiFi (preserves client connections)
+    if (s_sta_netif == NULL)
+    {
+        s_sta_netif = esp_netif_create_default_wifi_sta();
+        if (s_sta_netif == NULL)
+        {
+            ESP_LOGW(TAG, "Failed to create STA netif (will retry during connection test)");
+            // Not fatal - we can try again later
+        }
+    }
+
     // Set WiFi mode to AP
     ret = esp_wifi_set_mode(WIFI_MODE_AP);
     if (ret != ESP_OK)
@@ -581,60 +593,35 @@ static bool test_wifi_connection(const char *ssid, const char *password)
         xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
     }
 
-    // Stop WiFi to reconfigure (but don't stop HTTP server!)
-    esp_wifi_stop();
-
-    // Create STA network interface if not exists
+    // Check if STA netif exists (should be created in wifi_start_ap)
     if (s_sta_netif == NULL)
     {
+        // Try to create it now
         s_sta_netif = esp_netif_create_default_wifi_sta();
         if (s_sta_netif == NULL)
         {
             ESP_LOGE(TAG, "Failed to create STA netif");
             prov_state.connection_test_in_progress = false;
-            // Restart AP mode
-            wifi_start_ap();
             return false;
         }
     }
 
-    // Set WiFi mode to APSTA (both AP and STA simultaneously)
-    // This keeps AP active so browser stays connected and can receive response
+    // Switch to APSTA mode WITHOUT stopping WiFi
+    // This preserves client connections to the AP
+    ESP_LOGI(TAG, "Switching to APSTA mode (preserving AP connections)...");
     esp_err_t ret = esp_wifi_set_mode(WIFI_MODE_APSTA);
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "Failed to set APSTA mode: %s", esp_err_to_name(ret));
         prov_state.connection_test_in_progress = false;
-        // Restart AP mode
-        esp_wifi_set_mode(WIFI_MODE_AP);
-        wifi_start_ap();
         return false;
     }
 
-    // Re-configure AP (needed after mode change)
-    wifi_config_t ap_config = {
-        .ap =
-            {
-                .ssid_len       = strlen(WIFI_SETUP_AP_SSID),
-                .channel        = WIFI_SETUP_AP_CHANNEL,
-                .max_connection = WIFI_SETUP_AP_MAX_CONN,
-                .authmode       = WIFI_AUTH_WPA2_PSK,
-                .pmf_cfg        = {.required = false},
-            },
-    };
-    strncpy((char *)ap_config.ap.ssid, WIFI_SETUP_AP_SSID, sizeof(ap_config.ap.ssid) - 1);
-    strncpy((char *)ap_config.ap.password, WIFI_SETUP_AP_PASSWORD, sizeof(ap_config.ap.password) - 1);
-
-    if (strlen(WIFI_SETUP_AP_PASSWORD) < 8)
-    {
-        ap_config.ap.authmode = WIFI_AUTH_OPEN;
-    }
-
-    ret = esp_wifi_set_config(WIFI_IF_AP, &ap_config);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGW(TAG, "Failed to reconfigure AP: %s", esp_err_to_name(ret));
-    }
+    // Disconnect any existing STA connection before configuring new one
+    // This is needed because switching to APSTA mode may trigger auto-connect
+    // if there's an existing STA config, and we can't set config while connecting
+    esp_wifi_disconnect();
+    vTaskDelay(pdMS_TO_TICKS(100)); // Brief delay to ensure disconnect completes
 
     // Configure STA with provided credentials
     wifi_config_t sta_config = {
@@ -653,18 +640,18 @@ static bool test_wifi_connection(const char *ssid, const char *password)
     {
         ESP_LOGE(TAG, "Failed to set STA config: %s", esp_err_to_name(ret));
         prov_state.connection_test_in_progress = false;
-        // Restart AP-only mode
+        // Switch back to AP-only mode
         esp_wifi_set_mode(WIFI_MODE_AP);
-        wifi_start_ap();
         return false;
     }
 
-    // Start WiFi (in APSTA mode)
-    ret = esp_wifi_start();
+    // Connect to the target network (AP stays running)
+    ret = esp_wifi_connect();
     if (ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to initiate WiFi connection: %s", esp_err_to_name(ret));
         prov_state.connection_test_in_progress = false;
+        esp_wifi_set_mode(WIFI_MODE_AP);
         return false;
     }
 
@@ -692,10 +679,8 @@ static bool test_wifi_connection(const char *ssid, const char *password)
         // Disconnect STA but keep AP running
         esp_wifi_disconnect();
 
-        // Switch back to AP-only mode for retry
-        esp_wifi_stop();
+        // Switch back to AP-only mode for retry (no stop needed, preserves client connections)
         esp_wifi_set_mode(WIFI_MODE_AP);
-        wifi_start_ap();
         return false;
     }
 }
