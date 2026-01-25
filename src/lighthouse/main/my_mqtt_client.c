@@ -12,6 +12,7 @@
  */
 
 #include "my_mqtt_client.h"
+#include "mqtt_settings_storage.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -285,12 +286,39 @@ esp_err_t mqtt_client_init(void)
     ESP_LOGI(TAG, "  ✓ Event group created");
 
     // ========================================================================
-    // STEP 2: Configure MQTT Client
+    // STEP 2: Load MQTT Configuration from NVS
+    // ========================================================================
+
+    // Initialize MQTT settings storage
+    mqtt_storage_error_t storage_err = mqtt_settings_init();
+    if (storage_err != MQTT_STORAGE_OK)
+    {
+        ESP_LOGW(TAG, "Failed to init MQTT settings storage: %s", mqtt_settings_error_to_string(storage_err));
+        ESP_LOGW(TAG, "Using default broker configuration");
+    }
+
+    // Load broker configuration
+    mqtt_broker_config_t broker_config;
+    storage_err = mqtt_settings_load(&broker_config);
+    if (storage_err != MQTT_STORAGE_OK)
+    {
+        ESP_LOGW(TAG, "Failed to load MQTT settings: %s", mqtt_settings_error_to_string(storage_err));
+        // Defaults are already populated by mqtt_settings_load
+    }
+
+    // Build broker URI
+    static char broker_uri[MQTT_BROKER_URI_MAX_LEN];
+    snprintf(broker_uri, sizeof(broker_uri), "mqtt://%s:%u", broker_config.broker_ip, broker_config.broker_port);
+
+    ESP_LOGI(TAG, "  ✓ Loaded broker config: %s", broker_uri);
+
+    // ========================================================================
+    // STEP 3: Configure MQTT Client
     // ========================================================================
 
     esp_mqtt_client_config_t mqtt_cfg = {
-        // Broker configuration
-        .broker.address.uri = MQTT_BROKER_URI,
+        // Broker configuration (from NVS)
+        .broker.address.uri = broker_uri,
 
         // Client credentials
         .credentials.client_id               = MQTT_CLIENT_ID,
@@ -317,7 +345,7 @@ esp_err_t mqtt_client_init(void)
     };
 
     ESP_LOGI(TAG, "  ✓ MQTT configuration created");
-    ESP_LOGI(TAG, "    Broker: %s", MQTT_BROKER_URI);
+    ESP_LOGI(TAG, "    Broker: %s", broker_uri);
     ESP_LOGI(TAG, "    Client ID: %s", MQTT_CLIENT_ID);
 
     // ========================================================================

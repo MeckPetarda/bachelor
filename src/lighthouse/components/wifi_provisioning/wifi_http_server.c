@@ -13,6 +13,7 @@
  */
 
 #include "wifi_http_server.h"
+#include "mqtt_settings_storage.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -20,8 +21,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "lwip/sockets.h"
+#include "mqtt_client.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static const char *TAG = "WIFI_HTTP";
 
@@ -32,6 +37,8 @@ static const char *TAG = "WIFI_HTTP";
 #define MAX_ERROR_MSG_LEN       128
 #define RESULT_WAIT_TIMEOUT_MS  15000 // Max time to wait for connection result
 #define RESULT_POLL_INTERVAL_MS 200   // How often to check for result
+#define MQTT_TEST_TIMEOUT_MS    5000  // Timeout for MQTT connection test
+#define MQTT_CONNECTED_BIT      BIT0  // Event bit for MQTT connection
 
 // ============================================================================
 // MODULE STATE
@@ -54,6 +61,10 @@ static char ap_ssid_display[33] = {0};
 
 // SPIFFS state
 static bool spiffs_initialized = false;
+
+// MQTT test state
+static EventGroupHandle_t     mqtt_test_event_group = NULL;
+static esp_mqtt_client_handle_t mqtt_test_client    = NULL;
 
 // Acknowledgment state for browser confirmation
 typedef struct
@@ -334,6 +345,49 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
+    // Extract MQTT settings
+    char *mqtt_ip   = extract_multipart_value(content, "mqtt_ip");
+    char *mqtt_port_str = extract_multipart_value(content, "mqtt_port");
+
+    if (!mqtt_ip || !mqtt_port_str)
+    {
+        ESP_LOGE(TAG, "Missing MQTT IP or port in form data");
+        free(ssid);
+        free(password);
+        free(mqtt_ip);
+        free(mqtt_port_str);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"MQTT broker IP and port are required\"}");
+        return ESP_OK;
+    }
+
+    // Validate MQTT IP
+    if (!mqtt_settings_validate_ip(mqtt_ip))
+    {
+        ESP_LOGE(TAG, "Invalid MQTT broker IP: %s", mqtt_ip);
+        free(ssid);
+        free(password);
+        free(mqtt_ip);
+        free(mqtt_port_str);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Invalid MQTT broker IP address format\"}");
+        return ESP_OK;
+    }
+
+    // Parse and validate MQTT port
+    uint16_t mqtt_port = (uint16_t)atoi(mqtt_port_str);
+    if (!mqtt_settings_validate_port(mqtt_port))
+    {
+        ESP_LOGE(TAG, "Invalid MQTT port: %s", mqtt_port_str);
+        free(ssid);
+        free(password);
+        free(mqtt_ip);
+        free(mqtt_port_str);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"MQTT port must be between 1 and 65535\"}");
+        return ESP_OK;
+    }
+
     // Validate SSID
     size_t ssid_len = strlen(ssid);
     if (ssid_len == 0 || ssid_len > 31)
@@ -359,6 +413,22 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
     }
 
     ESP_LOGI(TAG, "Testing connection to SSID: %s", ssid);
+    ESP_LOGI(TAG, "MQTT broker: %s:%u", mqtt_ip, mqtt_port);
+
+    // Save MQTT settings before connection test
+    mqtt_storage_error_t mqtt_err = mqtt_settings_save(mqtt_ip, mqtt_port);
+    if (mqtt_err != MQTT_STORAGE_OK)
+    {
+        ESP_LOGW(TAG, "Failed to save MQTT settings: %s", mqtt_settings_error_to_string(mqtt_err));
+        // Continue anyway - WiFi connection is more important
+    }
+    else
+    {
+        ESP_LOGI(TAG, "MQTT settings saved successfully");
+    }
+
+    free(mqtt_ip);
+    free(mqtt_port_str);
 
     // Clear previous result
     wifi_http_server_clear_result();
@@ -550,6 +620,272 @@ static esp_err_t post_ack_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * POST "/test/wifi" - Test WiFi connectivity
+ *
+ * Tests WiFi connection without saving credentials.
+ * Returns JSON: {"status": "ok|fail", "message": "..."}
+ */
+static esp_err_t post_test_wifi_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "Received WiFi test request");
+
+    // Read request body
+    char content[256] = {0};
+    int  content_len  = req->content_len;
+
+    if (content_len <= 0 || content_len >= (int)sizeof(content))
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Invalid request\"}");
+        return ESP_OK;
+    }
+
+    int received = httpd_req_recv(req, content, content_len);
+    if (received != content_len)
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Failed to read request\"}");
+        return ESP_OK;
+    }
+    content[content_len] = '\0';
+
+    // Extract SSID and password from URL-encoded form
+    char *ssid     = extract_form_value(content, "ssid");
+    char *password = extract_form_value(content, "password");
+
+    if (!ssid || !password)
+    {
+        free(ssid);
+        free(password);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"SSID and password required\"}");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Testing WiFi connection to: %s", ssid);
+
+    // Clear previous result
+    wifi_http_server_clear_result();
+
+    // Call callback to initiate connection test
+    if (credentials_callback)
+    {
+        credentials_callback(ssid, password);
+    }
+    else
+    {
+        free(ssid);
+        free(password);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Server not ready\"}");
+        return ESP_OK;
+    }
+
+    free(ssid);
+    free(password);
+
+    // Wait for connection result
+    bool        success   = false;
+    const char *error_msg = NULL;
+    esp_err_t   wait_ret  = wifi_http_server_wait_connection_result(RESULT_WAIT_TIMEOUT_MS, &success, &error_msg);
+
+    httpd_resp_set_type(req, "application/json");
+    char response[256];
+
+    if (wait_ret == ESP_ERR_TIMEOUT)
+    {
+        snprintf(response, sizeof(response), "{\"status\":\"fail\",\"message\":\"Connection test timeout\"}");
+    }
+    else if (success)
+    {
+        snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"WiFi connection successful\"}");
+    }
+    else
+    {
+        snprintf(response, sizeof(response), "{\"status\":\"fail\",\"message\":\"%s\"}",
+                 error_msg ? error_msg : "Connection failed");
+    }
+
+    httpd_resp_sendstr(req, response);
+    return ESP_OK;
+}
+
+/**
+ * MQTT test event handler
+ *
+ * Used for testing MQTT broker connectivity.
+ */
+static void mqtt_test_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    switch ((esp_mqtt_event_id_t)event_id)
+    {
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG, "MQTT test: Connected to broker");
+        if (mqtt_test_event_group)
+        {
+            xEventGroupSetBits(mqtt_test_event_group, MQTT_CONNECTED_BIT);
+        }
+        break;
+
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG, "MQTT test: Disconnected");
+        break;
+
+    case MQTT_EVENT_ERROR:
+        ESP_LOGE(TAG, "MQTT test: Connection error");
+        break;
+
+    default:
+        break;
+    }
+}
+
+/**
+ * POST "/test/mqtt" - Test MQTT broker connectivity
+ *
+ * Tests connection to MQTT broker without persisting.
+ * Returns JSON: {"status": "ok|fail", "message": "..."}
+ */
+static esp_err_t post_test_mqtt_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "Received MQTT test request");
+
+    // Read request body
+    char content[128] = {0};
+    int  content_len  = req->content_len;
+
+    if (content_len <= 0 || content_len >= (int)sizeof(content))
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Invalid request\"}");
+        return ESP_OK;
+    }
+
+    int received = httpd_req_recv(req, content, content_len);
+    if (received != content_len)
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Failed to read request\"}");
+        return ESP_OK;
+    }
+    content[content_len] = '\0';
+
+    // Extract MQTT IP and port from URL-encoded form
+    char *mqtt_ip       = extract_form_value(content, "mqtt_ip");
+    char *mqtt_port_str = extract_form_value(content, "mqtt_port");
+
+    if (!mqtt_ip || !mqtt_port_str)
+    {
+        free(mqtt_ip);
+        free(mqtt_port_str);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"MQTT IP and port required\"}");
+        return ESP_OK;
+    }
+
+    // Validate IP
+    if (!mqtt_settings_validate_ip(mqtt_ip))
+    {
+        free(mqtt_ip);
+        free(mqtt_port_str);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Invalid IP address format\"}");
+        return ESP_OK;
+    }
+
+    // Parse and validate port
+    uint16_t mqtt_port = (uint16_t)atoi(mqtt_port_str);
+    if (!mqtt_settings_validate_port(mqtt_port))
+    {
+        free(mqtt_ip);
+        free(mqtt_port_str);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Invalid port number\"}");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Testing MQTT connection to: %s:%u", mqtt_ip, mqtt_port);
+
+    // Create event group for test
+    if (mqtt_test_event_group == NULL)
+    {
+        mqtt_test_event_group = xEventGroupCreate();
+    }
+    else
+    {
+        xEventGroupClearBits(mqtt_test_event_group, MQTT_CONNECTED_BIT);
+    }
+
+    // Build broker URI
+    char broker_uri[64];
+    snprintf(broker_uri, sizeof(broker_uri), "mqtt://%s:%u", mqtt_ip, mqtt_port);
+
+    free(mqtt_ip);
+    free(mqtt_port_str);
+
+    // Configure MQTT client for test
+    esp_mqtt_client_config_t mqtt_cfg = {
+        .broker.address.uri              = broker_uri,
+        .session.protocol_ver            = MQTT_PROTOCOL_V_3_1_1,
+        .session.keepalive               = 10,
+        .network.reconnect_timeout_ms    = 1000,
+        .network.timeout_ms              = MQTT_TEST_TIMEOUT_MS,
+    };
+
+    // Create test client
+    mqtt_test_client = esp_mqtt_client_init(&mqtt_cfg);
+    if (mqtt_test_client == NULL)
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Failed to create MQTT client\"}");
+        return ESP_OK;
+    }
+
+    // Register event handler
+    esp_mqtt_client_register_event(mqtt_test_client, ESP_EVENT_ANY_ID, mqtt_test_event_handler, NULL);
+
+    // Start client
+    esp_err_t start_ret = esp_mqtt_client_start(mqtt_test_client);
+    if (start_ret != ESP_OK)
+    {
+        esp_mqtt_client_destroy(mqtt_test_client);
+        mqtt_test_client = NULL;
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Failed to start MQTT client\"}");
+        return ESP_OK;
+    }
+
+    // Wait for connection result
+    EventBits_t bits = xEventGroupWaitBits(
+        mqtt_test_event_group,
+        MQTT_CONNECTED_BIT,
+        pdTRUE,  // Clear on exit
+        pdFALSE, // Wait for any bit
+        pdMS_TO_TICKS(MQTT_TEST_TIMEOUT_MS));
+
+    // Cleanup test client
+    esp_mqtt_client_stop(mqtt_test_client);
+    esp_mqtt_client_destroy(mqtt_test_client);
+    mqtt_test_client = NULL;
+
+    // Send response
+    httpd_resp_set_type(req, "application/json");
+
+    if (bits & MQTT_CONNECTED_BIT)
+    {
+        ESP_LOGI(TAG, "MQTT test successful");
+        httpd_resp_sendstr(req, "{\"status\":\"ok\",\"message\":\"MQTT broker connection successful\"}");
+    }
+    else
+    {
+        ESP_LOGW(TAG, "MQTT test failed - connection timeout");
+        httpd_resp_sendstr(req, "{\"status\":\"fail\",\"message\":\"Could not connect to MQTT broker\"}");
+    }
+
+    return ESP_OK;
+}
+
 // ============================================================================
 // PUBLIC API IMPLEMENTATION
 // ============================================================================
@@ -582,7 +918,7 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
     // Configure HTTP server
     httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
     config.stack_size       = 8192;
-    config.max_uri_handlers = 8;  // Increased to accommodate wildcard handler
+    config.max_uri_handlers = 10;  // Increased to accommodate test endpoints
     config.lru_purge_enable = true;
     config.uri_match_fn     = httpd_uri_match_wildcard;  // Enable wildcard matching
 
@@ -627,6 +963,23 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
     httpd_register_uri_handler(server_handle, &uri_post_configure);
     httpd_register_uri_handler(server_handle, &uri_get_restart);
     httpd_register_uri_handler(server_handle, &uri_post_ack);
+
+    // Register test endpoints
+    httpd_uri_t uri_test_wifi = {
+        .uri      = "/test/wifi",
+        .method   = HTTP_POST,
+        .handler  = post_test_wifi_handler,
+        .user_ctx = NULL,
+    };
+    httpd_register_uri_handler(server_handle, &uri_test_wifi);
+
+    httpd_uri_t uri_test_mqtt = {
+        .uri      = "/test/mqtt",
+        .method   = HTTP_POST,
+        .handler  = post_test_mqtt_handler,
+        .user_ctx = NULL,
+    };
+    httpd_register_uri_handler(server_handle, &uri_test_mqtt);
 
     // Register wildcard handler LAST - catches all other GET requests for captive portal
     // This must be registered after specific handlers so they take priority

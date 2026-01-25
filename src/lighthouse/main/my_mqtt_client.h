@@ -32,14 +32,18 @@
 /**
  * MQTT Broker Configuration
  *
+ * Broker IP and port are now loaded from NVS (configured via setup page).
+ * Defaults are defined in mqtt_settings_storage.h:
+ *   - Default IP: 192.168.1.1
+ *   - Default Port: 1883
+ *
  * For testing, use local Mosquitto broker:
  *   mosquitto -p 1883
- *
- * For production, configure via menuconfig or change these defaults:
  */
-#define MQTT_BROKER_URI  "mqtt://10.0.0.222:1883"
-#define MQTT_BROKER_PORT 1883
 #define MQTT_CLIENT_ID   "ESP32_ATTENDANCE_01"
+
+// Maximum length for broker URI (mqtt://255.255.255.255:65535)
+#define MQTT_BROKER_URI_MAX_LEN 32
 
 /**
  * MQTT Topic Structure
