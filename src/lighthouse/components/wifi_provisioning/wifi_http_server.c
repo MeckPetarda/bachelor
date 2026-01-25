@@ -55,6 +55,18 @@ static char ap_ssid_display[33] = {0};
 // SPIFFS state
 static bool spiffs_initialized = false;
 
+// Acknowledgment state for browser confirmation
+typedef struct
+{
+    bool             ack_received;
+    SemaphoreHandle_t ack_semaphore;
+} ack_state_t;
+
+static ack_state_t ack_state = {
+    .ack_received  = false,
+    .ack_semaphore = NULL,
+};
+
 // ============================================================================
 // SPIFFS INITIALIZATION
 // ============================================================================
@@ -393,6 +405,18 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
         httpd_resp_sendstr(req, response);
     }
 
+    // Wait for browser acknowledgment (max 10 seconds)
+    // Browser must display result and send /ack before we continue
+    esp_err_t ack_ret = wifi_http_server_wait_for_ack(10000);
+    if (ack_ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Browser acknowledged result");
+    }
+    else
+    {
+        ESP_LOGW(TAG, "Browser acknowledgment timeout - continuing anyway");
+    }
+
     return ESP_OK;
 }
 
@@ -450,6 +474,33 @@ static esp_err_t get_restart_handler(httpd_req_t *req)
     esp_restart();
 
     // Never reached
+    return ESP_OK;
+}
+
+/**
+ * POST "/ack" - Browser acknowledgment
+ *
+ * Called by browser after displaying result.
+ * Signals that user has seen the message.
+ */
+static esp_err_t post_ack_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "Browser acknowledged result");
+
+    // Mark acknowledgment received
+    ack_state.ack_received = true;
+
+    // Signal waiting handler
+    if (ack_state.ack_semaphore)
+    {
+        xSemaphoreGive(ack_state.ack_semaphore);
+    }
+
+    // Return simple response
+    httpd_resp_set_type(req, "application/json");
+    const char *response = "{\"status\":\"ack_received\"}";
+    httpd_resp_send(req, response, strlen(response));
+
     return ESP_OK;
 }
 
@@ -519,9 +570,17 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
         .user_ctx = NULL,
     };
 
+    httpd_uri_t uri_post_ack = {
+        .uri      = "/ack",
+        .method   = HTTP_POST,
+        .handler  = post_ack_handler,
+        .user_ctx = NULL,
+    };
+
     httpd_register_uri_handler(server_handle, &uri_get_root);
     httpd_register_uri_handler(server_handle, &uri_post_configure);
     httpd_register_uri_handler(server_handle, &uri_get_restart);
+    httpd_register_uri_handler(server_handle, &uri_post_ack);
 
     // Register wildcard handler LAST - catches all other GET requests for captive portal
     // This must be registered after specific handlers so they take priority
@@ -676,4 +735,35 @@ esp_err_t wifi_http_server_wait_connection_result(uint32_t timeout_ms, bool *out
 bool wifi_http_server_is_running(void)
 {
     return server_running;
+}
+
+esp_err_t wifi_http_server_wait_for_ack(uint32_t timeout_ms)
+{
+    // Create semaphore on first use
+    if (ack_state.ack_semaphore == NULL)
+    {
+        ack_state.ack_semaphore = xSemaphoreCreateBinary();
+        if (ack_state.ack_semaphore == NULL)
+        {
+            ESP_LOGE(TAG, "Failed to create ack semaphore");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    // Reset acknowledgment flag
+    ack_state.ack_received = false;
+
+    // Wait for acknowledgment
+    BaseType_t ret = xSemaphoreTake(ack_state.ack_semaphore, pdMS_TO_TICKS(timeout_ms));
+
+    if (ret == pdTRUE)
+    {
+        ESP_LOGI(TAG, "Acknowledgment received from browser");
+        return ESP_OK;
+    }
+    else
+    {
+        ESP_LOGW(TAG, "Acknowledgment timeout - browser may not have received result");
+        return ESP_ERR_TIMEOUT;
+    }
 }

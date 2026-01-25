@@ -143,4 +143,18 @@ bool wifi_http_server_is_running(void);
  */
 esp_err_t wifi_http_server_wait_connection_result(uint32_t timeout_ms, bool *out_success, const char **out_error);
 
+/**
+ * Wait for browser acknowledgment
+ *
+ * Called by /configure handler after sending result.
+ * Blocks until browser sends acknowledgment or timeout.
+ *
+ * Browser sends acknowledgment to /ack endpoint after displaying result.
+ * This ensures result was received and displayed before proceeding.
+ *
+ * @param timeout_ms Maximum time to wait for acknowledgment (e.g., 10000 for 10s)
+ * @return ESP_OK if acknowledgment received, ESP_ERR_TIMEOUT if timeout
+ */
+esp_err_t wifi_http_server_wait_for_ack(uint32_t timeout_ms);
+
 #endif // WIFI_HTTP_SERVER_H
