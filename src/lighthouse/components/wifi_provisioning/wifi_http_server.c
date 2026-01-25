@@ -58,13 +58,17 @@ static bool spiffs_initialized = false;
 // Acknowledgment state for browser confirmation
 typedef struct
 {
-    bool             ack_received;
+    bool              ack_received;
     SemaphoreHandle_t ack_semaphore;
+    uint32_t          expected_ack_id;  // ID browser must send back
+    uint32_t          next_msg_id;      // Counter for generating unique IDs
 } ack_state_t;
 
 static ack_state_t ack_state = {
-    .ack_received  = false,
-    .ack_semaphore = NULL,
+    .ack_received    = false,
+    .ack_semaphore   = NULL,
+    .expected_ack_id = 0,
+    .next_msg_id     = 1,
 };
 
 // ============================================================================
@@ -382,26 +386,38 @@ static esp_err_t post_configure_handler(httpd_req_t *req)
     const char *error_msg = NULL;
     esp_err_t   wait_ret  = wifi_http_server_wait_connection_result(RESULT_WAIT_TIMEOUT_MS, &success, &error_msg);
 
-    // Send result to client
+    // Generate unique ack_id for this response
+    uint32_t ack_id = ack_state.next_msg_id++;
+    ack_state.expected_ack_id = ack_id;
+
+    // Send result to client with ack_id
     httpd_resp_set_type(req, "application/json");
+    char response[512];
 
     if (wait_ret == ESP_ERR_TIMEOUT)
     {
         ESP_LOGW(TAG, "Timeout waiting for connection result");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Connection test timeout\"}");
+        snprintf(response, sizeof(response),
+                 "{\"status\":\"error\",\"message\":\"Connection test timeout\",\"ack_id\":%lu}",
+                 (unsigned long)ack_id);
+        httpd_resp_sendstr(req, response);
     }
     else if (wait_ret == ESP_OK && success)
     {
-        ESP_LOGI(TAG, "Connection successful, sending success response");
-        httpd_resp_sendstr(req, "{\"status\":\"success\",\"message\":\"Connected successfully! Click the button below "
-                                "to restart the device.\"}");
+        ESP_LOGI(TAG, "Connection successful, sending success response with ack_id=%lu", (unsigned long)ack_id);
+        snprintf(response, sizeof(response),
+                 "{\"status\":\"success\",\"message\":\"Connected successfully! Click the button below "
+                 "to restart the device.\",\"ack_id\":%lu}",
+                 (unsigned long)ack_id);
+        httpd_resp_sendstr(req, response);
     }
     else
     {
-        char response[256];
-        snprintf(response, sizeof(response), "{\"status\":\"error\",\"message\":\"%s\"}",
-                 error_msg ? error_msg : "Connection failed");
-        ESP_LOGI(TAG, "Connection failed, sending error response");
+        snprintf(response, sizeof(response),
+                 "{\"status\":\"error\",\"message\":\"%s\",\"ack_id\":%lu}",
+                 error_msg ? error_msg : "Connection failed",
+                 (unsigned long)ack_id);
+        ESP_LOGI(TAG, "Connection failed, sending error response with ack_id=%lu", (unsigned long)ack_id);
         httpd_resp_sendstr(req, response);
     }
 
@@ -481,11 +497,42 @@ static esp_err_t get_restart_handler(httpd_req_t *req)
  * POST "/ack" - Browser acknowledgment
  *
  * Called by browser after displaying result.
- * Signals that user has seen the message.
+ * Verifies the ack_id matches expected, then signals that user has seen the message.
  */
 static esp_err_t post_ack_handler(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "Browser acknowledged result");
+    // Read request body to get ack_id
+    char content[64] = {0};
+    int  content_len = req->content_len;
+
+    if (content_len > 0 && content_len < (int)sizeof(content))
+    {
+        int received = httpd_req_recv(req, content, content_len);
+        if (received == content_len)
+        {
+            content[content_len] = '\0';
+        }
+    }
+
+    // Parse ack_id from content (format: "ack_id=123")
+    uint32_t received_id = 0;
+    char *id_str = strstr(content, "ack_id=");
+    if (id_str)
+    {
+        received_id = (uint32_t)strtoul(id_str + 7, NULL, 10);
+    }
+
+    ESP_LOGI(TAG, "Browser ack received: id=%lu, expected=%lu",
+             (unsigned long)received_id, (unsigned long)ack_state.expected_ack_id);
+
+    // Verify ID matches
+    if (received_id != ack_state.expected_ack_id)
+    {
+        ESP_LOGW(TAG, "Ack ID mismatch - ignoring stale acknowledgment");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"ignored\",\"reason\":\"id_mismatch\"}");
+        return ESP_OK;
+    }
 
     // Mark acknowledgment received
     ack_state.ack_received = true;
@@ -496,10 +543,9 @@ static esp_err_t post_ack_handler(httpd_req_t *req)
         xSemaphoreGive(ack_state.ack_semaphore);
     }
 
-    // Return simple response
+    // Return success response
     httpd_resp_set_type(req, "application/json");
-    const char *response = "{\"status\":\"ack_received\"}";
-    httpd_resp_send(req, response, strlen(response));
+    httpd_resp_sendstr(req, "{\"status\":\"ack_received\"}");
 
     return ESP_OK;
 }

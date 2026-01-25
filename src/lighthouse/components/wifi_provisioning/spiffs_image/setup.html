@@ -122,16 +122,21 @@
             try {
                 const res = await fetch('/configure', { method: 'POST', body: fd });
                 const json = await res.json();
+                const ackId = json.ack_id;
 
                 if (json.status === 'success') {
                     status.className = 'status show success';
                     status.innerHTML = json.message +
                         '<br><button class="restart-btn" onclick="handleRestart()">Restart Device</button>';
 
-                    // Send acknowledgment to ESP
+                    // Send acknowledgment with ack_id to ESP
                     try {
-                        await fetch('/ack', { method: 'POST' });
-                        console.log('Acknowledgment sent to ESP');
+                        await fetch('/ack', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'ack_id=' + ackId
+                        });
+                        console.log('Acknowledgment sent to ESP with ack_id=' + ackId);
                     } catch (err) {
                         console.warn('Failed to send acknowledgment:', err);
                     }
@@ -139,9 +144,13 @@
                     status.className = 'status show error';
                     status.textContent = json.message;
 
-                    // Send acknowledgment even for errors
+                    // Send acknowledgment with ack_id even for errors
                     try {
-                        await fetch('/ack', { method: 'POST' });
+                        await fetch('/ack', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'ack_id=' + ackId
+                        });
                     } catch (err) {
                         console.warn('Failed to send acknowledgment:', err);
                     }
