@@ -16,10 +16,12 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_spiffs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include <string.h>
+#include <stdio.h>
 
 static const char *TAG = "WIFI_HTTP";
 
@@ -50,88 +52,63 @@ static SemaphoreHandle_t result_semaphore = NULL;
 // AP info for display
 static char ap_ssid_display[33] = {0};
 
+// SPIFFS state
+static bool spiffs_initialized = false;
+
 // ============================================================================
-// HTML PAGE CONTENT
+// SPIFFS INITIALIZATION
 // ============================================================================
 
-static const char *PROVISIONING_PAGE_HTML =
-    "<!DOCTYPE html>"
-    "<html>"
-    "<head>"
-    "<title>Lighthouse WiFi Setup</title>"
-    "<meta charset=\"UTF-8\">"
-    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-    "<style>"
-    "body{font-family:Arial,sans-serif;margin:20px;background:#f5f5f5;}"
-    ".container{max-width:400px;margin:0 auto;background:#fff;padding:20px;"
-    "border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}"
-    "h1{font-size:22px;color:#333;margin-bottom:20px;}"
-    "form{margin:20px 0;}"
-    "label{display:block;margin-top:15px;font-weight:bold;color:#555;}"
-    "input[type=text],input[type=password]{width:100%;padding:10px;"
-    "margin:5px 0 10px 0;box-sizing:border-box;border:1px solid #ddd;"
-    "border-radius:4px;font-size:16px;}"
-    "button{padding:12px 20px;background:#007bff;color:white;border:none;"
-    "cursor:pointer;font-size:16px;width:100%;border-radius:4px;margin-top:10px;}"
-    "button:hover{background:#0056b3;}"
-    "button:disabled{background:#ccc;cursor:not-allowed;}"
-    ".status{margin-top:20px;padding:15px;border-radius:4px;display:none;}"
-    ".status.show{display:block;}"
-    ".status.info{background:#e7f3ff;border:1px solid #b3d7ff;color:#004085;}"
-    ".status.success{background:#d4edda;border:1px solid #c3e6cb;color:#155724;}"
-    ".status.error{background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;}"
-    ".restart-btn{background:#28a745;margin-top:15px;}"
-    ".restart-btn:hover{background:#1e7e34;}"
-    "</style>"
-    "</head>"
-    "<body>"
-    "<div class=\"container\">"
-    "<h1>Lighthouse WiFi Setup</h1>"
-    "<form id=\"setupForm\">"
-    "<label for=\"ssid\">WiFi Network (SSID):</label>"
-    "<input type=\"text\" id=\"ssid\" name=\"ssid\" required maxlength=\"31\" "
-    "placeholder=\"Enter network name\">"
-    "<label for=\"password\">Password:</label>"
-    "<input type=\"password\" id=\"password\" name=\"password\" required "
-    "minlength=\"8\" maxlength=\"63\" placeholder=\"Enter password (min 8 chars)\">"
-    "<button type=\"submit\" id=\"submitBtn\">Test Connection</button>"
-    "</form>"
-    "<div class=\"status\" id=\"status\"></div>"
-    "</div>"
-    "<script>"
-    "const form=document.getElementById('setupForm');"
-    "const status=document.getElementById('status');"
-    "const submitBtn=document.getElementById('submitBtn');"
-    "form.onsubmit=async(e)=>{"
-    "e.preventDefault();"
-    "const fd=new FormData(form);"
-    "submitBtn.disabled=true;"
-    "submitBtn.textContent='Testing...';"
-    "status.className='status show info';"
-    "status.textContent='Testing WiFi connection...';"
-    "try{"
-    "const res=await fetch('/configure',{method:'POST',body:fd});"
-    "const json=await res.json();"
-    "if(json.status==='success'){"
-    "status.className='status show success';"
-    "status.innerHTML=json.message+"
-    "'<br><button class=\"restart-btn\" onclick=\"location.href=\\'/restart\\'\">Restart Device</button>';"
-    "}else{"
-    "status.className='status show error';"
-    "status.textContent=json.message;"
-    "submitBtn.disabled=false;"
-    "submitBtn.textContent='Test Connection';"
-    "}"
-    "}catch(err){"
-    "status.className='status show error';"
-    "status.textContent='Connection error: '+err.message;"
-    "submitBtn.disabled=false;"
-    "submitBtn.textContent='Test Connection';"
-    "}"
-    "};"
-    "</script>"
-    "</body>"
-    "</html>";
+/**
+ * Initialize SPIFFS filesystem
+ * Must be called once before serving files
+ */
+static esp_err_t init_spiffs(void)
+{
+    if (spiffs_initialized)
+    {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Initializing SPIFFS");
+
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path              = "/spiffs",
+        .partition_label        = "spiffs",
+        .max_files              = 5,
+        .format_if_mount_failed = false,
+    };
+
+    esp_err_t ret = esp_vfs_spiffs_register(&conf);
+
+    if (ret != ESP_OK)
+    {
+        if (ret == ESP_ERR_NOT_FOUND)
+        {
+            ESP_LOGE(TAG, "SPIFFS partition not found. Check partitions.csv");
+        }
+        else
+        {
+            ESP_LOGE(TAG, "SPIFFS init failed: %s", esp_err_to_name(ret));
+        }
+        return ret;
+    }
+
+    // Verify files exist
+    FILE *f = fopen("/spiffs/setup.html", "r");
+    if (f == NULL)
+    {
+        ESP_LOGE(TAG, "setup.html not found in SPIFFS");
+        return ESP_ERR_NOT_FOUND;
+    }
+    fclose(f);
+
+    spiffs_initialized = true;
+    ESP_LOGI(TAG, "SPIFFS initialized successfully");
+
+    return ESP_OK;
+}
+
 
 // ============================================================================
 // INTERNAL HELPER FUNCTIONS
@@ -250,15 +227,48 @@ static char *extract_form_value(const char *content, const char *key)
 // ============================================================================
 
 /**
- * GET "/" - Serve provisioning webpage
+ * GET "/" - Serve provisioning webpage from SPIFFS
  */
 static esp_err_t get_provisioning_page_handler(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "Serving provisioning page");
+    ESP_LOGI(TAG, "GET / - Serving setup page from SPIFFS");
 
-    httpd_resp_set_type(req, "text/html");
+    // Open setup.html from SPIFFS
+    FILE *f = fopen("/spiffs/setup.html", "r");
+    if (f == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to open setup.html");
+        httpd_resp_send_404(req);
+        return ESP_OK;
+    }
+
+    // Determine file size
+    fseek(f, 0, SEEK_END);
+    long file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    // Set HTTP headers
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-    httpd_resp_send(req, PROVISIONING_PAGE_HTML, strlen(PROVISIONING_PAGE_HTML));
+
+    // Send file in chunks (avoid large buffer)
+    char buffer[512];
+    size_t read_bytes;
+    while ((read_bytes = fread(buffer, 1, sizeof(buffer), f)) > 0)
+    {
+        if (httpd_resp_send_chunk(req, buffer, read_bytes) != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Error sending setup page chunk");
+            fclose(f);
+            return ESP_FAIL;
+        }
+    }
+
+    // End response
+    httpd_resp_send_chunk(req, NULL, 0);
+    fclose(f);
+
+    ESP_LOGI(TAG, "Setup page served successfully (%ld bytes)", file_size);
 
     return ESP_OK;
 }
@@ -456,6 +466,14 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
     }
 
     ESP_LOGI(TAG, "Starting HTTP server");
+
+    // Initialize SPIFFS (load HTML file)
+    esp_err_t spiffs_ret = init_spiffs();
+    if (spiffs_ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "SPIFFS init failed, cannot serve setup page");
+        return spiffs_ret;
+    }
 
     // Store AP SSID for display
     if (ap_ssid)
