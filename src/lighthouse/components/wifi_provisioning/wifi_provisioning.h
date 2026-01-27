@@ -34,12 +34,13 @@
  */
 typedef enum
 {
-    WIFI_STATE_UNCONFIGURED    = 0, // No config saved; waiting for user action
-    WIFI_STATE_SETUP_REQUESTED = 1, // User triggered setup; reboot flag set
-    WIFI_STATE_AP_ACTIVE       = 2, // Broadcasting AP, serving provisioning page
-    WIFI_STATE_CONNECTING      = 3, // Attempting STA connection with credentials
-    WIFI_STATE_CONNECTED       = 4, // Successfully connected to WiFi network
-    WIFI_STATE_OFFLINE         = 5, // Connection failed; running in offline mode
+    WIFI_STATE_UNCONFIGURED        = 0, // No config saved; waiting for user action
+    WIFI_STATE_SETUP_REQUESTED     = 1, // User triggered setup; reboot flag set
+    WIFI_STATE_AP_ACTIVE           = 2, // Broadcasting AP, serving provisioning page
+    WIFI_STATE_CONNECTING          = 3, // Attempting STA connection with credentials
+    WIFI_STATE_CONNECTED           = 4, // Successfully connected to WiFi network
+    WIFI_STATE_OFFLINE             = 5, // Connection failed; running in offline mode
+    WIFI_STATE_AP_ACTIVE_CONNECTED = 6, // Connection failed; running in offline mode
 } wifi_state_t;
 
 /**

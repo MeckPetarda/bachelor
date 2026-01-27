@@ -1,5 +1,5 @@
 /**
- * wifi_settings_storage.h - WiFi Credential Storage Interface
+ * settings_storage.h - WiFi Credential Storage Interface
  *
  * Manages encrypted storage of WiFi credentials in NVS partition.
  * Credentials are decrypted only in RAM during use.
@@ -7,8 +7,8 @@
  * Reference: WIFI_PROVISIONING_IMPLEMENTATION_PLAN.md Section 2.1
  */
 
-#ifndef WIFI_SETTINGS_STORAGE_H
-#define WIFI_SETTINGS_STORAGE_H
+#ifndef SETTINGS_STORAGE_H
+#define SETTINGS_STORAGE_H
 
 #include "esp_err.h"
 #include <stdbool.h>
@@ -20,13 +20,13 @@
 
 typedef enum
 {
-    WIFI_STORAGE_OK               = 0,
-    WIFI_STORAGE_NOT_FOUND        = 1,
-    WIFI_STORAGE_CORRUPT          = 2,
-    WIFI_STORAGE_ENCRYPTION_ERROR = 3,
-    WIFI_STORAGE_WRITE_ERROR      = 4,
-    WIFI_STORAGE_INVALID_PARAM    = 5,
-} wifi_storage_error_t;
+    SETTINGS_STORAGE_OK               = 0,
+    SETTINGS_STORAGE_NOT_FOUND        = 1,
+    SETTINGS_STORAGE_CORRUPT          = 2,
+    SETTINGS_STORAGE_ENCRYPTION_ERROR = 3,
+    SETTINGS_STORAGE_WRITE_ERROR      = 4,
+    SETTINGS_STORAGE_INVALID_PARAM    = 5,
+} settings_storage_error_t;
 
 // ============================================================================
 // DATA STRUCTURES
@@ -52,10 +52,10 @@ typedef struct
  * Opens nvs_settings partition, validates structure.
  * Safe to call multiple times.
  *
- * @return WIFI_STORAGE_OK on success
- *         WIFI_STORAGE_NOT_FOUND if partition missing
+ * @return SETTINGS_STORAGE_OK on success
+ *         SETTINGS_STORAGE_NOT_FOUND if partition missing
  */
-wifi_storage_error_t wifi_settings_init(void);
+settings_storage_error_t settings_storage_init(void);
 
 /**
  * Check if device has been configured for WiFi
@@ -77,11 +77,11 @@ bool wifi_settings_is_configured(void);
  * Structure is NOT modified if function fails.
  *
  * @param creds Output: decrypted credentials (must not be NULL)
- * @return WIFI_STORAGE_OK on success
- *         WIFI_STORAGE_NOT_FOUND if not yet configured
- *         WIFI_STORAGE_ENCRYPTION_ERROR if decryption fails
+ * @return SETTINGS_STORAGE_OK on success
+ *         SETTINGS_STORAGE_NOT_FOUND if not yet configured
+ *         SETTINGS_STORAGE_ENCRYPTION_ERROR if decryption fails
  */
-wifi_storage_error_t wifi_settings_load(wifi_credentials_t *creds);
+settings_storage_error_t wifi_settings_load(wifi_credentials_t *creds);
 
 /**
  * Save WiFi credentials to partition
@@ -100,11 +100,11 @@ wifi_storage_error_t wifi_settings_load(wifi_credentials_t *creds);
  *
  * @param ssid WiFi network name (null-terminated)
  * @param password WiFi password (null-terminated)
- * @return WIFI_STORAGE_OK on success
- *         WIFI_STORAGE_INVALID_PARAM if validation fails
- *         WIFI_STORAGE_WRITE_ERROR if write to NVS fails
+ * @return SETTINGS_STORAGE_OK on success
+ *         SETTINGS_STORAGE_INVALID_PARAM if validation fails
+ *         SETTINGS_STORAGE_WRITE_ERROR if write to NVS fails
  */
-wifi_storage_error_t wifi_settings_save(const char *ssid, const char *password);
+settings_storage_error_t wifi_settings_save(const char *ssid, const char *password);
 
 /**
  * Factory reset - clear all WiFi configuration
@@ -115,10 +115,10 @@ wifi_storage_error_t wifi_settings_save(const char *ssid, const char *password);
  * IMPORTANT: After calling this function successfully,
  * caller MUST trigger esp_restart() for changes to take effect.
  *
- * @return WIFI_STORAGE_OK on success
- *         WIFI_STORAGE_WRITE_ERROR if erase fails
+ * @return SETTINGS_STORAGE_OK on success
+ *         SETTINGS_STORAGE_WRITE_ERROR if erase fails
  */
-wifi_storage_error_t wifi_settings_factory_reset(void);
+settings_storage_error_t wifi_settings_factory_reset(void);
 
 /**
  * Get human-readable error description
@@ -126,6 +126,6 @@ wifi_storage_error_t wifi_settings_factory_reset(void);
  * @param err Error code from previous operation
  * @return String description (never NULL, always valid C string)
  */
-const char *wifi_settings_error_to_string(wifi_storage_error_t err);
+const char *settings_storage_error_to_string(settings_storage_error_t err);
 
-#endif // WIFI_SETTINGS_STORAGE_H
+#endif // SETTINGS_STORAGE_H

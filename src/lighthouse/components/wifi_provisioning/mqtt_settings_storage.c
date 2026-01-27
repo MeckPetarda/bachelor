@@ -283,7 +283,7 @@ bool mqtt_settings_validate_ip(const char *ip)
 
 bool mqtt_settings_validate_port(uint16_t port)
 {
-    return (port >= 1 && port <= 65535);
+    return (port >= 1); //  && port <= 65535 is implicit by datatype
 }
 
 const char *mqtt_settings_error_to_string(mqtt_storage_error_t err)

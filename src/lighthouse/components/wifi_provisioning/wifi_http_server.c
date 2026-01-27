@@ -13,20 +13,20 @@
  */
 
 #include "wifi_http_server.h"
-#include "mqtt_settings_storage.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
-#include "esp_system.h"
 #include "esp_spiffs.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "freertos/event_groups.h"
 #include "lwip/sockets.h"
 #include "mqtt_client.h"
-#include <string.h>
+#include "mqtt_settings_storage.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static const char *TAG = "WIFI_HTTP";
 
@@ -63,16 +63,16 @@ static char ap_ssid_display[33] = {0};
 static bool spiffs_initialized = false;
 
 // MQTT test state
-static EventGroupHandle_t     mqtt_test_event_group = NULL;
-static esp_mqtt_client_handle_t mqtt_test_client    = NULL;
+static EventGroupHandle_t       mqtt_test_event_group = NULL;
+static esp_mqtt_client_handle_t mqtt_test_client      = NULL;
 
 // Acknowledgment state for browser confirmation
 typedef struct
 {
     bool              ack_received;
     SemaphoreHandle_t ack_semaphore;
-    uint32_t          expected_ack_id;  // ID browser must send back
-    uint32_t          next_msg_id;      // Counter for generating unique IDs
+    uint32_t          expected_ack_id; // ID browser must send back
+    uint32_t          next_msg_id;     // Counter for generating unique IDs
 } ack_state_t;
 
 static ack_state_t ack_state = {
@@ -136,7 +136,6 @@ static esp_err_t init_spiffs(void)
     return ESP_OK;
 }
 
-
 // ============================================================================
 // INTERNAL HELPER FUNCTIONS
 // ============================================================================
@@ -171,50 +170,6 @@ static void url_decode(char *str)
         }
     }
     *dst = '\0';
-}
-
-static char *extract_multipart_value(const char *content, const char *key)
-{
-    // Build the pattern we're looking for: name="<key>"
-    char name_pattern[128];
-    snprintf(name_pattern, sizeof(name_pattern), "name=\"%s\"", key);
-
-    // Find the field in the multipart data
-    const char *field_start = strstr(content, name_pattern);
-    if (!field_start)
-    {
-        return NULL;
-    }
-
-    // Move past the name="key" line to find the value
-    // The value starts after the next \r\n\r\n (empty line separating headers from content)
-    const char *value_start = strstr(field_start, "\r\n\r\n");
-    if (!value_start)
-    {
-        return NULL;
-    }
-
-    value_start += 4; // Skip the \r\n\r\n
-
-    // Find the end of the value (next boundary marker which starts with \r\n---)
-    const char *value_end = strstr(value_start, "\r\n");
-    if (!value_end)
-    {
-        return NULL;
-    }
-
-    size_t len = (size_t)(value_end - value_start);
-
-    char *value = malloc(len + 1);
-    if (!value)
-    {
-        return NULL;
-    }
-
-    strncpy(value, value_start, len);
-    value[len] = '\0';
-
-    return value;
 }
 
 /**
@@ -279,7 +234,7 @@ static esp_err_t get_provisioning_page_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
 
     // Send file in chunks (avoid large buffer)
-    char buffer[512];
+    char   buffer[512];
     size_t read_bytes;
     while ((read_bytes = fread(buffer, 1, sizeof(buffer), f)) > 0)
     {
@@ -296,212 +251,6 @@ static esp_err_t get_provisioning_page_handler(httpd_req_t *req)
     fclose(f);
 
     ESP_LOGI(TAG, "Setup page served successfully (%ld bytes)", file_size);
-
-    return ESP_OK;
-}
-
-/**
- * POST "/configure" - Handle credential submission
- */
-static esp_err_t post_configure_handler(httpd_req_t *req)
-{
-    ESP_LOGI(TAG, "Received configuration request");
-
-    // Read request body
-    char content[512] = {0};
-    int  content_len  = req->content_len;
-
-    if (content_len <= 0 || content_len >= (int)sizeof(content))
-    {
-        ESP_LOGE(TAG, "Invalid content length: %d", content_len);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Invalid request\"}");
-        return ESP_OK;
-    }
-
-    int received = httpd_req_recv(req, content, content_len);
-    if (received != content_len)
-    {
-        ESP_LOGE(TAG, "Failed to receive content: expected %d, got %d", content_len, received);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Failed to read request\"}");
-        return ESP_OK;
-    }
-    content[content_len] = '\0';
-
-    ESP_LOGI(TAG, "Form data: %s", content);
-
-    // Extract SSID and password
-    char *ssid     = extract_multipart_value(content, "ssid");
-    char *password = extract_multipart_value(content, "password");
-
-    if (!ssid || !password)
-    {
-        ESP_LOGE(TAG, "Missing SSID or password in form data");
-        free(ssid);
-        free(password);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"SSID and password are required\"}");
-        return ESP_OK;
-    }
-
-    // Extract MQTT settings
-    char *mqtt_ip   = extract_multipart_value(content, "mqtt_ip");
-    char *mqtt_port_str = extract_multipart_value(content, "mqtt_port");
-
-    if (!mqtt_ip || !mqtt_port_str)
-    {
-        ESP_LOGE(TAG, "Missing MQTT IP or port in form data");
-        free(ssid);
-        free(password);
-        free(mqtt_ip);
-        free(mqtt_port_str);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"MQTT broker IP and port are required\"}");
-        return ESP_OK;
-    }
-
-    // Validate MQTT IP
-    if (!mqtt_settings_validate_ip(mqtt_ip))
-    {
-        ESP_LOGE(TAG, "Invalid MQTT broker IP: %s", mqtt_ip);
-        free(ssid);
-        free(password);
-        free(mqtt_ip);
-        free(mqtt_port_str);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Invalid MQTT broker IP address format\"}");
-        return ESP_OK;
-    }
-
-    // Parse and validate MQTT port
-    uint16_t mqtt_port = (uint16_t)atoi(mqtt_port_str);
-    if (!mqtt_settings_validate_port(mqtt_port))
-    {
-        ESP_LOGE(TAG, "Invalid MQTT port: %s", mqtt_port_str);
-        free(ssid);
-        free(password);
-        free(mqtt_ip);
-        free(mqtt_port_str);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"MQTT port must be between 1 and 65535\"}");
-        return ESP_OK;
-    }
-
-    // Validate SSID
-    size_t ssid_len = strlen(ssid);
-    if (ssid_len == 0 || ssid_len > 31)
-    {
-        ESP_LOGE(TAG, "Invalid SSID length: %zu", ssid_len);
-        free(ssid);
-        free(password);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"SSID must be 1-31 characters\"}");
-        return ESP_OK;
-    }
-
-    // Validate password
-    size_t password_len = strlen(password);
-    if (password_len < 8 || password_len > 63)
-    {
-        ESP_LOGE(TAG, "Invalid password length: %zu", password_len);
-        free(ssid);
-        free(password);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Password must be 8-63 characters\"}");
-        return ESP_OK;
-    }
-
-    ESP_LOGI(TAG, "Testing connection to SSID: %s", ssid);
-    ESP_LOGI(TAG, "MQTT broker: %s:%u", mqtt_ip, mqtt_port);
-
-    // Save MQTT settings before connection test
-    mqtt_storage_error_t mqtt_err = mqtt_settings_save(mqtt_ip, mqtt_port);
-    if (mqtt_err != MQTT_STORAGE_OK)
-    {
-        ESP_LOGW(TAG, "Failed to save MQTT settings: %s", mqtt_settings_error_to_string(mqtt_err));
-        // Continue anyway - WiFi connection is more important
-    }
-    else
-    {
-        ESP_LOGI(TAG, "MQTT settings saved successfully");
-    }
-
-    free(mqtt_ip);
-    free(mqtt_port_str);
-
-    // Clear previous result
-    wifi_http_server_clear_result();
-
-    // Call callback to initiate connection test
-    if (credentials_callback)
-    {
-        credentials_callback(ssid, password);
-    }
-    else
-    {
-        ESP_LOGW(TAG, "No credentials callback registered");
-        free(ssid);
-        free(password);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"error\",\"message\":\"Server not ready\"}");
-        return ESP_OK;
-    }
-
-    free(ssid);
-    free(password);
-
-    // Wait for connection result using semaphore (with timeout)
-    bool        success   = false;
-    const char *error_msg = NULL;
-    esp_err_t   wait_ret  = wifi_http_server_wait_connection_result(RESULT_WAIT_TIMEOUT_MS, &success, &error_msg);
-
-    // Generate unique ack_id for this response
-    uint32_t ack_id = ack_state.next_msg_id++;
-    ack_state.expected_ack_id = ack_id;
-
-    // Send result to client with ack_id
-    httpd_resp_set_type(req, "application/json");
-    char response[512];
-
-    if (wait_ret == ESP_ERR_TIMEOUT)
-    {
-        ESP_LOGW(TAG, "Timeout waiting for connection result");
-        snprintf(response, sizeof(response),
-                 "{\"status\":\"error\",\"message\":\"Connection test timeout\",\"ack_id\":%lu}",
-                 (unsigned long)ack_id);
-        httpd_resp_sendstr(req, response);
-    }
-    else if (wait_ret == ESP_OK && success)
-    {
-        ESP_LOGI(TAG, "Connection successful, sending success response with ack_id=%lu", (unsigned long)ack_id);
-        snprintf(response, sizeof(response),
-                 "{\"status\":\"success\",\"message\":\"Connected successfully! Click the button below "
-                 "to restart the device.\",\"ack_id\":%lu}",
-                 (unsigned long)ack_id);
-        httpd_resp_sendstr(req, response);
-    }
-    else
-    {
-        snprintf(response, sizeof(response),
-                 "{\"status\":\"error\",\"message\":\"%s\",\"ack_id\":%lu}",
-                 error_msg ? error_msg : "Connection failed",
-                 (unsigned long)ack_id);
-        ESP_LOGI(TAG, "Connection failed, sending error response with ack_id=%lu", (unsigned long)ack_id);
-        httpd_resp_sendstr(req, response);
-    }
-
-    // Wait for browser acknowledgment (max 10 seconds)
-    // Browser must display result and send /ack before we continue
-    esp_err_t ack_ret = wifi_http_server_wait_for_ack(10000);
-    if (ack_ret == ESP_OK)
-    {
-        ESP_LOGI(TAG, "Browser acknowledged result");
-    }
-    else
-    {
-        ESP_LOGW(TAG, "Browser acknowledgment timeout - continuing anyway");
-    }
 
     return ESP_OK;
 }
@@ -586,14 +335,14 @@ static esp_err_t post_ack_handler(httpd_req_t *req)
 
     // Parse ack_id from content (format: "ack_id=123")
     uint32_t received_id = 0;
-    char *id_str = strstr(content, "ack_id=");
+    char    *id_str      = strstr(content, "ack_id=");
     if (id_str)
     {
         received_id = (uint32_t)strtoul(id_str + 7, NULL, 10);
     }
 
-    ESP_LOGI(TAG, "Browser ack received: id=%lu, expected=%lu",
-             (unsigned long)received_id, (unsigned long)ack_state.expected_ack_id);
+    ESP_LOGI(TAG, "Browser ack received: id=%lu, expected=%lu", (unsigned long)received_id,
+             (unsigned long)ack_state.expected_ack_id);
 
     // Verify ID matches
     if (received_id != ack_state.expected_ack_id)
@@ -826,11 +575,11 @@ static esp_err_t post_test_mqtt_handler(httpd_req_t *req)
 
     // Configure MQTT client for test
     esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri              = broker_uri,
-        .session.protocol_ver            = MQTT_PROTOCOL_V_3_1_1,
-        .session.keepalive               = 10,
-        .network.reconnect_timeout_ms    = 1000,
-        .network.timeout_ms              = MQTT_TEST_TIMEOUT_MS,
+        .broker.address.uri           = broker_uri,
+        .session.protocol_ver         = MQTT_PROTOCOL_V_3_1_1,
+        .session.keepalive            = 10,
+        .network.reconnect_timeout_ms = 1000,
+        .network.timeout_ms           = MQTT_TEST_TIMEOUT_MS,
     };
 
     // Create test client
@@ -857,12 +606,10 @@ static esp_err_t post_test_mqtt_handler(httpd_req_t *req)
     }
 
     // Wait for connection result
-    EventBits_t bits = xEventGroupWaitBits(
-        mqtt_test_event_group,
-        MQTT_CONNECTED_BIT,
-        pdTRUE,  // Clear on exit
-        pdFALSE, // Wait for any bit
-        pdMS_TO_TICKS(MQTT_TEST_TIMEOUT_MS));
+    EventBits_t bits = xEventGroupWaitBits(mqtt_test_event_group, MQTT_CONNECTED_BIT,
+                                           pdTRUE,  // Clear on exit
+                                           pdFALSE, // Wait for any bit
+                                           pdMS_TO_TICKS(MQTT_TEST_TIMEOUT_MS));
 
     // Cleanup test client
     esp_mqtt_client_stop(mqtt_test_client);
@@ -918,9 +665,9 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
     // Configure HTTP server
     httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
     config.stack_size       = 8192;
-    config.max_uri_handlers = 10;  // Increased to accommodate test endpoints
+    config.max_uri_handlers = 10;                       // Increased to accommodate test endpoints
     config.lru_purge_enable = true;
-    config.uri_match_fn     = httpd_uri_match_wildcard;  // Enable wildcard matching
+    config.uri_match_fn     = httpd_uri_match_wildcard; // Enable wildcard matching
 
     // Start HTTP server
     esp_err_t ret = httpd_start(&server_handle, &config);
@@ -935,13 +682,6 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
         .uri      = "/",
         .method   = HTTP_GET,
         .handler  = get_provisioning_page_handler,
-        .user_ctx = NULL,
-    };
-
-    httpd_uri_t uri_post_configure = {
-        .uri      = "/configure",
-        .method   = HTTP_POST,
-        .handler  = post_configure_handler,
         .user_ctx = NULL,
     };
 
@@ -960,7 +700,6 @@ esp_err_t wifi_http_server_start(const char *ap_ssid, const char *ap_password)
     };
 
     httpd_register_uri_handler(server_handle, &uri_get_root);
-    httpd_register_uri_handler(server_handle, &uri_post_configure);
     httpd_register_uri_handler(server_handle, &uri_get_restart);
     httpd_register_uri_handler(server_handle, &uri_post_ack);
 

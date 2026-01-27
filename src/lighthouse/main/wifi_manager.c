@@ -17,7 +17,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "nvs_flash.h"
-#include "wifi_settings_storage.h"
+#include "settings_storage.h"
 #include <string.h>
 
 // ============================================================================
@@ -168,7 +168,8 @@ esp_err_t wifi_manager_init(void)
         ESP_LOGE(TAG, "Failed to initialize network interface: %s", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI(TAG, "  ✓ Network interface (lwIP) %s", ret == ESP_ERR_INVALID_STATE ? "already initialized" : "initialized");
+    ESP_LOGI(TAG, "  ✓ Network interface (lwIP) %s",
+             ret == ESP_ERR_INVALID_STATE ? "already initialized" : "initialized");
 
     ret = esp_event_loop_create_default();
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
@@ -281,10 +282,10 @@ esp_err_t wifi_manager_init(void)
     };
 
     // Try to load saved credentials from NVS
-    wifi_credentials_t   creds    = {0};
-    wifi_storage_error_t load_err = wifi_settings_load(&creds);
+    wifi_credentials_t       creds    = {0};
+    settings_storage_error_t load_err = wifi_settings_load(&creds);
 
-    if (load_err == WIFI_STORAGE_OK && creds.ssid[0] != '\0')
+    if (load_err == SETTINGS_STORAGE_OK && creds.ssid[0] != '\0')
     {
         // Use saved credentials from NVS (user-provisioned)
         strncpy((char *)wifi_config.sta.ssid, creds.ssid, sizeof(wifi_config.sta.ssid) - 1);
@@ -301,9 +302,9 @@ esp_err_t wifi_manager_init(void)
     else
     {
         // Fall back to SDK config (factory defaults)
-        if (load_err != WIFI_STORAGE_OK)
+        if (load_err != SETTINGS_STORAGE_OK)
         {
-            ESP_LOGW(TAG, "Failed to load saved credentials: %s", wifi_settings_error_to_string(load_err));
+            ESP_LOGW(TAG, "Failed to load saved credentials: %s", settings_storage_error_to_string(load_err));
         }
         else
         {

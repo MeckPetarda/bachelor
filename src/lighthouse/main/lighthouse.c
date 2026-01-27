@@ -17,6 +17,8 @@
 #include "driver/gpio.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_log_level.h"
+#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdint.h>
@@ -531,10 +533,6 @@ esp_err_t init_wifi()
 
     ESP_LOGI(TAG, "════════════════════════════════════\n");
 
-    ret = init_mqtt();
-    if (ret != ESP_OK)
-        return ret;
-
     return ESP_OK;
 }
 
@@ -620,10 +618,15 @@ void app_main(void)
     ESP_LOGI(TAG, "════════════════════════════════════\n");
 
     gpio_init();
-    if (init_wifi_provisioning() != ESP_OK)
+
+    esp_err_t ret = init_wifi_provisioning();
+    if (ret != ESP_OK)
         return;
     if (init_wifi() != ESP_OK)
         return;
+    if (init_mqtt() != ESP_OK)
+        return;
+
     if (init_offline_event_logger() != ESP_OK)
         return;
     if (init_rfid_reader() != ESP_OK)

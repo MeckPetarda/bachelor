@@ -1,5 +1,5 @@
 /**
- * test_wifi_storage.c - Test harness for WiFi settings storage
+ * test_settings_storage.c - Test harness for WiFi settings storage
  *
  * Compile and run this to verify storage module works correctly.
  * To be run once, then deleted or moved to test directory.
@@ -15,15 +15,15 @@
  * Reference: WIFI_PROVISIONING_IMPLEMENTATION_PLAN.md Step 1.5
  */
 
-#include <stdio.h>
-#include <string.h>
-#include "wifi_settings_storage.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "nvs_flash.h"
+#include "settings_storage.h"
+#include <stdio.h>
+#include <string.h>
 
-static const char* TAG = "TEST_STORAGE";
+static const char *TAG = "TEST_STORAGE";
 
 // Test result tracking
 static int tests_passed = 0;
@@ -32,12 +32,15 @@ static int tests_failed = 0;
 /**
  * Log test result and update counters
  */
-static void log_test_result(const char* test_name, bool passed, const char* message)
+static void log_test_result(const char *test_name, bool passed, const char *message)
 {
-    if (passed) {
+    if (passed)
+    {
         ESP_LOGI(TAG, "[PASS] %s", test_name);
         tests_passed++;
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "[FAIL] %s: %s", test_name, message ? message : "");
         tests_failed++;
     }
@@ -50,10 +53,11 @@ static bool test_init(void)
 {
     ESP_LOGI(TAG, "\n--- Test 1: Initialize NVS Storage ---");
 
-    wifi_storage_error_t err = wifi_settings_init();
-    if (err != WIFI_STORAGE_OK) {
+    settings_storage_error_t err = wifi_settings_init();
+    if (err != SETTINGS_STORAGE_OK)
+    {
         char msg[64];
-        snprintf(msg, sizeof(msg), "Init failed: %s", wifi_settings_error_to_string(err));
+        snprintf(msg, sizeof(msg), "Init failed: %s", settings_storage_error_to_string(err));
         log_test_result("Initialize NVS", false, msg);
         return false;
     }
@@ -71,25 +75,30 @@ static bool test_initial_state(void)
 
     bool configured = wifi_settings_is_configured();
 
-    if (configured) {
+    if (configured)
+    {
         ESP_LOGW(TAG, "Device already configured - performing factory reset first");
-        wifi_storage_error_t err = wifi_settings_factory_reset();
-        if (err != WIFI_STORAGE_OK) {
+        settings_storage_error_t err = wifi_settings_factory_reset();
+        if (err != SETTINGS_STORAGE_OK)
+        {
             char msg[64];
-            snprintf(msg, sizeof(msg), "Factory reset failed: %s", wifi_settings_error_to_string(err));
+            snprintf(msg, sizeof(msg), "Factory reset failed: %s", settings_storage_error_to_string(err));
             log_test_result("Initial State (reset)", false, msg);
             return false;
         }
 
         // Verify reset worked
         configured = wifi_settings_is_configured();
-        if (configured) {
+        if (configured)
+        {
             log_test_result("Initial State (reset)", false, "Still configured after reset");
             return false;
         }
 
         log_test_result("Initial State (after reset)", true, NULL);
-    } else {
+    }
+    else
+    {
         log_test_result("Initial State (unconfigured)", true, NULL);
     }
 
@@ -103,13 +112,14 @@ static bool test_save_credentials(void)
 {
     ESP_LOGI(TAG, "\n--- Test 3: Save Credentials ---");
 
-    const char* test_ssid = "TestNetwork_123";
-    const char* test_password = "SecurePassword456";
+    const char *test_ssid     = "TestNetwork_123";
+    const char *test_password = "SecurePassword456";
 
-    wifi_storage_error_t err = wifi_settings_save(test_ssid, test_password);
-    if (err != WIFI_STORAGE_OK) {
+    settings_storage_error_t err = wifi_settings_save(test_ssid, test_password);
+    if (err != SETTINGS_STORAGE_OK)
+    {
         char msg[64];
-        snprintf(msg, sizeof(msg), "Save failed: %s", wifi_settings_error_to_string(err));
+        snprintf(msg, sizeof(msg), "Save failed: %s", settings_storage_error_to_string(err));
         log_test_result("Save Credentials", false, msg);
         return false;
     }
@@ -126,7 +136,8 @@ static bool test_configured_state(void)
     ESP_LOGI(TAG, "\n--- Test 4: Check Configured State ---");
 
     bool configured = wifi_settings_is_configured();
-    if (!configured) {
+    if (!configured)
+    {
         log_test_result("Configured State", false, "Device should be configured after save");
         return false;
     }
@@ -142,35 +153,38 @@ static bool test_load_credentials(void)
 {
     ESP_LOGI(TAG, "\n--- Test 5: Load and Verify Credentials ---");
 
-    const char* expected_ssid = "TestNetwork_123";
-    const char* expected_password = "SecurePassword456";
+    const char *expected_ssid     = "TestNetwork_123";
+    const char *expected_password = "SecurePassword456";
 
-    wifi_credentials_t creds = {0};
-    wifi_storage_error_t err = wifi_settings_load(&creds);
-    if (err != WIFI_STORAGE_OK) {
+    wifi_credentials_t       creds = {0};
+    settings_storage_error_t err   = wifi_settings_load(&creds);
+    if (err != SETTINGS_STORAGE_OK)
+    {
         char msg[64];
-        snprintf(msg, sizeof(msg), "Load failed: %s", wifi_settings_error_to_string(err));
+        snprintf(msg, sizeof(msg), "Load failed: %s", settings_storage_error_to_string(err));
         log_test_result("Load Credentials", false, msg);
         return false;
     }
 
     // Verify SSID
-    if (strcmp(creds.ssid, expected_ssid) != 0) {
+    if (strcmp(creds.ssid, expected_ssid) != 0)
+    {
         char msg[128];
-        snprintf(msg, sizeof(msg), "SSID mismatch: expected '%s', got '%s'",
-                 expected_ssid, creds.ssid);
+        snprintf(msg, sizeof(msg), "SSID mismatch: expected '%s', got '%s'", expected_ssid, creds.ssid);
         log_test_result("Load Credentials (SSID)", false, msg);
         return false;
     }
 
     // Verify password
-    if (strcmp(creds.password, expected_password) != 0) {
+    if (strcmp(creds.password, expected_password) != 0)
+    {
         log_test_result("Load Credentials (Password)", false, "Password mismatch");
         return false;
     }
 
     // Verify configured flag
-    if (creds.configured != 1) {
+    if (creds.configured != 1)
+    {
         log_test_result("Load Credentials (Flag)", false, "Configured flag not set");
         return false;
     }
@@ -190,11 +204,12 @@ static bool test_invalid_inputs(void)
 {
     ESP_LOGI(TAG, "\n--- Test 6: Test Invalid Inputs ---");
 
-    wifi_storage_error_t err;
+    settings_storage_error_t err;
 
     // Test empty SSID
     err = wifi_settings_save("", "validpassword123");
-    if (err == WIFI_STORAGE_OK) {
+    if (err == SETTINGS_STORAGE_OK)
+    {
         log_test_result("Invalid Input (Empty SSID)", false, "Should reject empty SSID");
         return false;
     }
@@ -202,7 +217,8 @@ static bool test_invalid_inputs(void)
 
     // Test too short password (less than 8 chars)
     err = wifi_settings_save("ValidSSID", "short");
-    if (err == WIFI_STORAGE_OK) {
+    if (err == SETTINGS_STORAGE_OK)
+    {
         log_test_result("Invalid Input (Short Password)", false, "Should reject password < 8 chars");
         return false;
     }
@@ -210,14 +226,16 @@ static bool test_invalid_inputs(void)
 
     // Test NULL pointers
     err = wifi_settings_save(NULL, "validpassword123");
-    if (err == WIFI_STORAGE_OK) {
+    if (err == SETTINGS_STORAGE_OK)
+    {
         log_test_result("Invalid Input (NULL SSID)", false, "Should reject NULL SSID");
         return false;
     }
     ESP_LOGI(TAG, "NULL SSID correctly rejected");
 
     err = wifi_settings_save("ValidSSID", NULL);
-    if (err == WIFI_STORAGE_OK) {
+    if (err == SETTINGS_STORAGE_OK)
+    {
         log_test_result("Invalid Input (NULL Password)", false, "Should reject NULL password");
         return false;
     }
@@ -225,7 +243,8 @@ static bool test_invalid_inputs(void)
 
     // Test NULL credentials pointer on load
     err = wifi_settings_load(NULL);
-    if (err == WIFI_STORAGE_OK) {
+    if (err == SETTINGS_STORAGE_OK)
+    {
         log_test_result("Invalid Input (NULL Load)", false, "Should reject NULL creds pointer");
         return false;
     }
@@ -243,34 +262,38 @@ static bool test_max_length_credentials(void)
     ESP_LOGI(TAG, "\n--- Test 7: Test Maximum Length Credentials ---");
 
     // Max SSID: 31 chars (32 with null terminator)
-    const char* max_ssid = "1234567890123456789012345678901";  // 31 chars
+    const char *max_ssid = "1234567890123456789012345678901"; // 31 chars
     // Max password: 63 chars
-    const char* max_password = "123456789012345678901234567890123456789012345678901234567890123";  // 63 chars
+    const char *max_password = "123456789012345678901234567890123456789012345678901234567890123"; // 63 chars
 
-    wifi_storage_error_t err = wifi_settings_save(max_ssid, max_password);
-    if (err != WIFI_STORAGE_OK) {
+    settings_storage_error_t err = wifi_settings_save(max_ssid, max_password);
+    if (err != SETTINGS_STORAGE_OK)
+    {
         char msg[64];
-        snprintf(msg, sizeof(msg), "Save max length failed: %s", wifi_settings_error_to_string(err));
+        snprintf(msg, sizeof(msg), "Save max length failed: %s", settings_storage_error_to_string(err));
         log_test_result("Max Length Save", false, msg);
         return false;
     }
 
     // Load and verify
     wifi_credentials_t creds = {0};
-    err = wifi_settings_load(&creds);
-    if (err != WIFI_STORAGE_OK) {
+    err                      = wifi_settings_load(&creds);
+    if (err != SETTINGS_STORAGE_OK)
+    {
         char msg[64];
-        snprintf(msg, sizeof(msg), "Load max length failed: %s", wifi_settings_error_to_string(err));
+        snprintf(msg, sizeof(msg), "Load max length failed: %s", settings_storage_error_to_string(err));
         log_test_result("Max Length Load", false, msg);
         return false;
     }
 
-    if (strcmp(creds.ssid, max_ssid) != 0) {
+    if (strcmp(creds.ssid, max_ssid) != 0)
+    {
         log_test_result("Max Length SSID", false, "Max length SSID mismatch");
         return false;
     }
 
-    if (strcmp(creds.password, max_password) != 0) {
+    if (strcmp(creds.password, max_password) != 0)
+    {
         log_test_result("Max Length Password", false, "Max length password mismatch");
         return false;
     }
@@ -287,28 +310,32 @@ static bool test_factory_reset(void)
     ESP_LOGI(TAG, "\n--- Test 8: Factory Reset ---");
 
     // Ensure we have credentials saved first
-    if (!wifi_settings_is_configured()) {
+    if (!wifi_settings_is_configured())
+    {
         wifi_settings_save("TempNetwork", "TempPassword123");
     }
 
-    wifi_storage_error_t err = wifi_settings_factory_reset();
-    if (err != WIFI_STORAGE_OK) {
+    settings_storage_error_t err = wifi_settings_factory_reset();
+    if (err != SETTINGS_STORAGE_OK)
+    {
         char msg[64];
-        snprintf(msg, sizeof(msg), "Factory reset failed: %s", wifi_settings_error_to_string(err));
+        snprintf(msg, sizeof(msg), "Factory reset failed: %s", settings_storage_error_to_string(err));
         log_test_result("Factory Reset", false, msg);
         return false;
     }
 
     // Verify device is unconfigured
-    if (wifi_settings_is_configured()) {
+    if (wifi_settings_is_configured())
+    {
         log_test_result("Factory Reset", false, "Device still configured after reset");
         return false;
     }
 
     // Verify load fails after reset
     wifi_credentials_t creds = {0};
-    err = wifi_settings_load(&creds);
-    if (err != WIFI_STORAGE_NOT_FOUND) {
+    err                      = wifi_settings_load(&creds);
+    if (err != SETTINGS_STORAGE_NOT_FOUND)
+    {
         log_test_result("Factory Reset", false, "Load should return NOT_FOUND after reset");
         return false;
     }
@@ -325,36 +352,38 @@ static bool test_error_strings(void)
     ESP_LOGI(TAG, "\n--- Test 9: Error String Conversion ---");
 
     // Verify all error codes have valid strings
-    const char* str;
+    const char *str;
 
-    str = wifi_settings_error_to_string(WIFI_STORAGE_OK);
-    if (str == NULL || strlen(str) == 0) {
+    str = settings_storage_error_to_string(SETTINGS_STORAGE_OK);
+    if (str == NULL || strlen(str) == 0)
+    {
         log_test_result("Error String (OK)", false, "NULL or empty string");
         return false;
     }
-    ESP_LOGI(TAG, "WIFI_STORAGE_OK: '%s'", str);
+    ESP_LOGI(TAG, "SETTINGS_STORAGE_OK: '%s'", str);
 
-    str = wifi_settings_error_to_string(WIFI_STORAGE_NOT_FOUND);
-    if (str == NULL || strlen(str) == 0) {
+    str = settings_storage_error_to_string(SETTINGS_STORAGE_NOT_FOUND);
+    if (str == NULL || strlen(str) == 0)
+    {
         log_test_result("Error String (NOT_FOUND)", false, "NULL or empty string");
         return false;
     }
-    ESP_LOGI(TAG, "WIFI_STORAGE_NOT_FOUND: '%s'", str);
+    ESP_LOGI(TAG, "SETTINGS_STORAGE_NOT_FOUND: '%s'", str);
 
-    str = wifi_settings_error_to_string(WIFI_STORAGE_CORRUPT);
-    ESP_LOGI(TAG, "WIFI_STORAGE_CORRUPT: '%s'", str);
+    str = settings_storage_error_to_string(SETTINGS_STORAGE_CORRUPT);
+    ESP_LOGI(TAG, "SETTINGS_STORAGE_CORRUPT: '%s'", str);
 
-    str = wifi_settings_error_to_string(WIFI_STORAGE_ENCRYPTION_ERROR);
-    ESP_LOGI(TAG, "WIFI_STORAGE_ENCRYPTION_ERROR: '%s'", str);
+    str = settings_storage_error_to_string(SETTINGS_STORAGE_ENCRYPTION_ERROR);
+    ESP_LOGI(TAG, "SETTINGS_STORAGE_ENCRYPTION_ERROR: '%s'", str);
 
-    str = wifi_settings_error_to_string(WIFI_STORAGE_WRITE_ERROR);
-    ESP_LOGI(TAG, "WIFI_STORAGE_WRITE_ERROR: '%s'", str);
+    str = settings_storage_error_to_string(SETTINGS_STORAGE_WRITE_ERROR);
+    ESP_LOGI(TAG, "SETTINGS_STORAGE_WRITE_ERROR: '%s'", str);
 
-    str = wifi_settings_error_to_string(WIFI_STORAGE_INVALID_PARAM);
-    ESP_LOGI(TAG, "WIFI_STORAGE_INVALID_PARAM: '%s'", str);
+    str = settings_storage_error_to_string(SETTINGS_STORAGE_INVALID_PARAM);
+    ESP_LOGI(TAG, "SETTINGS_STORAGE_INVALID_PARAM: '%s'", str);
 
     // Test unknown error code
-    str = wifi_settings_error_to_string((wifi_storage_error_t)99);
+    str = settings_storage_error_to_string((settings_storage_error_t)99);
     ESP_LOGI(TAG, "Unknown error (99): '%s'", str);
 
     log_test_result("Error Strings", true, NULL);
@@ -375,16 +404,19 @@ static void run_all_tests(void)
     ESP_LOGI(TAG, "");
 
     // Run tests in sequence - stop on critical failures
-    if (!test_init()) {
+    if (!test_init())
+    {
         ESP_LOGE(TAG, "Critical failure: Cannot continue without NVS initialization");
         goto summary;
     }
 
-    if (!test_initial_state()) {
+    if (!test_initial_state())
+    {
         ESP_LOGW(TAG, "Initial state test failed, but continuing...");
     }
 
-    if (!test_save_credentials()) {
+    if (!test_save_credentials())
+    {
         ESP_LOGE(TAG, "Critical failure: Cannot test load without successful save");
         goto summary;
     }
@@ -405,9 +437,12 @@ summary:
     ESP_LOGI(TAG, "║  Tests Failed: %2d                                        ║", tests_failed);
     ESP_LOGI(TAG, "╠══════════════════════════════════════════════════════════╣");
 
-    if (tests_failed == 0) {
+    if (tests_failed == 0)
+    {
         ESP_LOGI(TAG, "║  ✓ ALL TESTS PASSED - Storage module is working!        ║");
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "║  ✗ SOME TESTS FAILED - Review errors above              ║");
     }
 
@@ -426,13 +461,15 @@ void app_main(void)
 
     // Initialize default NVS partition first (required by ESP-IDF)
     esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
         ESP_LOGW(TAG, "NVS partition needs erase, reinitializing...");
         nvs_flash_erase();
         ret = nvs_flash_init();
     }
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Default NVS initialization failed: %s", esp_err_to_name(ret));
         ESP_LOGE(TAG, "Cannot proceed with tests.");
         return;
@@ -447,7 +484,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Tests complete. Device will idle.");
     ESP_LOGI(TAG, "Press reset button to run tests again.");
 
-    while (1) {
+    while (1)
+    {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

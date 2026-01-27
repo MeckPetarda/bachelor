@@ -16,9 +16,9 @@
 
 #include "wifi_provisioning.h"
 #include "dns_server.h"
+#include "settings_storage.h"
 #include "wifi_http_server.h"
 #include "wifi_provisioning_config.h"
-#include "wifi_settings_storage.h"
 
 #include "driver/gpio.h"
 #include "esp_event.h"
@@ -791,10 +791,11 @@ static void process_connecting(void)
             // Connection successful - save credentials
             ESP_LOGI(TAG, "Connection successful! Saving credentials...");
 
-            wifi_storage_error_t storage_ret = wifi_settings_save(prov_state.pending_ssid, prov_state.pending_password);
-            if (storage_ret != WIFI_STORAGE_OK)
+            settings_storage_error_t storage_ret =
+                wifi_settings_save(prov_state.pending_ssid, prov_state.pending_password);
+            if (storage_ret != SETTINGS_STORAGE_OK)
             {
-                ESP_LOGE(TAG, "Failed to save credentials: %s", wifi_settings_error_to_string(storage_ret));
+                ESP_LOGE(TAG, "Failed to save credentials: %s", settings_storage_error_to_string(storage_ret));
                 strncpy(prov_state.error_message, "Failed to save credentials", sizeof(prov_state.error_message) - 1);
                 prov_state.connection_success = false;
             }
@@ -811,7 +812,7 @@ static void process_connecting(void)
             {
                 // Transition to CONNECTED - AP stays active for browser to show restart button
                 // Device will restart when user clicks restart button
-                transition_to(WIFI_STATE_CONNECTED);
+                transition_to(WIFI_STATE_AP_ACTIVE_CONNECTED);
             }
             else
             {
@@ -918,10 +919,10 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
     }
 
     // Initialize WiFi settings storage
-    wifi_storage_error_t storage_ret = wifi_settings_init();
-    if (storage_ret != WIFI_STORAGE_OK)
+    settings_storage_error_t storage_ret = settings_storage_init();
+    if (storage_ret != SETTINGS_STORAGE_OK)
     {
-        ESP_LOGW(TAG, "WiFi settings storage init failed: %s", wifi_settings_error_to_string(storage_ret));
+        ESP_LOGW(TAG, "WiFi settings storage init failed: %s", settings_storage_error_to_string(storage_ret));
         // Continue anyway - device can still work in setup mode
     }
 
@@ -940,14 +941,19 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
 
         // Start AP and HTTP server
         enter_ap_active_state();
+
+        prov_state.state_enter_time_ms = get_time_ms();
+        prov_state.initialized         = true;
+
+        return ESP_OK;
     }
     else if (is_configured)
     {
         // Device has stored credentials - load them and auto-connect
-        wifi_credentials_t   creds    = {0};
-        wifi_storage_error_t load_err = wifi_settings_load(&creds);
+        wifi_credentials_t       creds    = {0};
+        settings_storage_error_t load_err = wifi_settings_load(&creds);
 
-        if (load_err == WIFI_STORAGE_OK)
+        if (load_err == SETTINGS_STORAGE_OK)
         {
             // Store credentials in state machine for auto-connection
             strncpy(prov_state.pending_ssid, creds.ssid, sizeof(prov_state.pending_ssid) - 1);
@@ -968,7 +974,7 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
         else
         {
             // Load failed despite being configured - fall back to unconfigured
-            ESP_LOGW(TAG, "Failed to load credentials: %s", wifi_settings_error_to_string(load_err));
+            ESP_LOGW(TAG, "Failed to load credentials: %s", settings_storage_error_to_string(load_err));
             prov_state.current_state = WIFI_STATE_UNCONFIGURED;
             ESP_LOGI(TAG, "Falling back to unconfigured state");
             ESP_LOGI(TAG, "Press BUTTON2 for 5 seconds to enter setup mode");
@@ -1018,6 +1024,7 @@ void wifi_provisioning_process(void)
 {
     if (!prov_state.initialized)
     {
+        ESP_LOGW(TAG, "Provisioning process running, but state is uninitialized");
         return;
     }
 
@@ -1036,6 +1043,7 @@ void wifi_provisioning_process(void)
         break;
 
     case WIFI_STATE_AP_ACTIVE:
+    case WIFI_STATE_AP_ACTIVE_CONNECTED:
         process_ap_active();
         break;
 
@@ -1081,6 +1089,8 @@ const char *wifi_provisioning_state_to_string(wifi_state_t state)
         return "CONNECTING";
     case WIFI_STATE_CONNECTED:
         return "CONNECTED";
+    case WIFI_STATE_AP_ACTIVE_CONNECTED:
+        return "CONNECTED";
     case WIFI_STATE_OFFLINE:
         return "OFFLINE";
     default:
@@ -1111,7 +1121,7 @@ esp_err_t wifi_provisioning_submit_credentials(const char *ssid, const char *pas
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE)
+    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE && prov_state.current_state != WIFI_STATE_AP_ACTIVE_CONNECTED)
     {
         ESP_LOGW(TAG, "Cannot submit credentials - not in AP_ACTIVE state");
         return ESP_ERR_INVALID_STATE;
@@ -1143,6 +1153,7 @@ esp_err_t wifi_provisioning_submit_credentials(const char *ssid, const char *pas
     prov_state.credentials_pending = true;
 
     ESP_LOGI(TAG, "Credentials submitted for SSID: %s", ssid);
+    ESP_LOGI(TAG, "Credentials submitted for SSID: %s", password);
 
     return ESP_OK;
 }
