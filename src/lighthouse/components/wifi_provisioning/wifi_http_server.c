@@ -23,7 +23,7 @@
 #include "freertos/task.h"
 #include "lwip/sockets.h"
 #include "mqtt_client.h"
-#include "mqtt_settings_storage.h"
+#include "settings_storage.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -565,6 +565,8 @@ static esp_err_t post_test_mqtt_handler(httpd_req_t *req)
     {
         xEventGroupClearBits(mqtt_test_event_group, MQTT_CONNECTED_BIT);
     }
+
+    mqtt_settings_save(mqtt_ip, mqtt_port);
 
     // Build broker URI
     char broker_uri[64];

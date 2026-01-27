@@ -408,7 +408,7 @@ esp_err_t init_wifi_provisioning()
     ESP_LOGI(TAG, "════════════════════════════════════\n");
 
     // Block here until configured or ready (AP mode, etc.)
-    while (!wifi_provisioning_is_ready())
+    while (true)
     {
         wifi_provisioning_process();
 
@@ -417,11 +417,6 @@ esp_err_t init_wifi_provisioning()
 
         vTaskDelay(pdMS_TO_TICKS(50));
     }
-
-    ESP_LOGI(TAG, "WiFi provisioning ready, state: %s",
-             wifi_provisioning_state_to_string(wifi_provisioning_get_state()));
-
-    return ESP_OK;
 }
 
 esp_err_t init_mqtt()

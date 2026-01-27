@@ -12,13 +12,13 @@
  */
 
 #include "my_mqtt_client.h"
-#include "mqtt_settings_storage.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "offline_event_logger.h"
+#include "settings_storage.h"
 #include "uart_reader.h"
 #include <stdio.h>
 #include <string.h>
@@ -290,19 +290,19 @@ esp_err_t mqtt_client_init(void)
     // ========================================================================
 
     // Initialize MQTT settings storage
-    mqtt_storage_error_t storage_err = mqtt_settings_init();
-    if (storage_err != MQTT_STORAGE_OK)
+    settings_storage_error_t storage_err = settings_storage_init();
+    if (storage_err != SETTINGS_STORAGE_OK)
     {
-        ESP_LOGW(TAG, "Failed to init MQTT settings storage: %s", mqtt_settings_error_to_string(storage_err));
+        ESP_LOGW(TAG, "Failed to init MQTT settings storage: %s", settings_storage_error_to_string(storage_err));
         ESP_LOGW(TAG, "Using default broker configuration");
     }
 
     // Load broker configuration
     mqtt_broker_config_t broker_config;
     storage_err = mqtt_settings_load(&broker_config);
-    if (storage_err != MQTT_STORAGE_OK)
+    if (storage_err != SETTINGS_STORAGE_OK)
     {
-        ESP_LOGW(TAG, "Failed to load MQTT settings: %s", mqtt_settings_error_to_string(storage_err));
+        ESP_LOGW(TAG, "Failed to load MQTT settings: %s", settings_storage_error_to_string(storage_err));
         // Defaults are already populated by mqtt_settings_load
     }
 

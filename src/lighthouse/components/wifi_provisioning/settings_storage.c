@@ -11,6 +11,7 @@
 
 #include "settings_storage.h"
 #include "esp_log.h"
+#include "lwip/inet.h"
 #include "mbedtls/aes.h"
 #include "nvs_flash.h"
 #include "wifi_provisioning_config.h"
@@ -24,10 +25,13 @@ static const char *TAG = "SETTINGS_STORAGE";
 // ============================================================================
 
 #define NVS_PARTITION_NAME "nvs_settings"
-#define NVS_NAMESPACE      "settings_storage"
+#define NVS_NAMESPACE      "ss"
 #define NVS_CONFIGURED_KEY "configured"
 #define NVS_SSID_KEY       "ssid_enc"
 #define NVS_PASSWORD_KEY   "pass_enc"
+
+#define NVS_BROKER_IP_KEY   "mqtt_ip"
+#define NVS_BROKER_PORT_KEY "mqtt_port"
 
 #define SSID_MAX_LEN     31 // 32 with null terminator
 #define PASSWORD_MIN_LEN 8  // WPA2 requirement
@@ -178,6 +182,19 @@ settings_storage_error_t settings_storage_init(void)
     nvs_initialized = true;
     ESP_LOGI(TAG, "WiFi settings storage initialized successfully");
 
+    // Check if defaults need to be written
+    if (!mqtt_settings_is_configured())
+    {
+        ESP_LOGI(TAG, "No MQTT config found, writing defaults");
+        settings_storage_error_t err = mqtt_settings_save(MQTT_DEFAULT_BROKER_IP, MQTT_DEFAULT_BROKER_PORT);
+        if (err != SETTINGS_STORAGE_OK)
+        {
+            ESP_LOGW(TAG, "Failed to write default MQTT settings");
+        }
+    }
+
+    ESP_LOGI(TAG, "MQTT settings storage initialized successfully");
+
     return SETTINGS_STORAGE_OK;
 }
 
@@ -195,6 +212,29 @@ bool wifi_settings_is_configured(void)
     if (ret == ESP_ERR_NVS_NOT_FOUND)
     {
         // Key doesn't exist yet (first boot or after factory reset)
+        return false;
+    }
+    else if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Failed to read configured flag: %s", esp_err_to_name(ret));
+        return false;
+    }
+
+    return (configured == 1);
+}
+
+bool mqtt_settings_is_configured(void)
+{
+    if (!nvs_initialized)
+    {
+        return false;
+    }
+
+    uint8_t   configured = 0;
+    esp_err_t ret        = nvs_get_u8(settings_storage_nvs_handle, NVS_CONFIGURED_KEY, &configured);
+
+    if (ret == ESP_ERR_NVS_NOT_FOUND)
+    {
         return false;
     }
     else if (ret != ESP_OK)
@@ -372,6 +412,121 @@ settings_storage_error_t wifi_settings_save(const char *ssid, const char *passwo
     return SETTINGS_STORAGE_OK;
 }
 
+settings_storage_error_t mqtt_settings_load(mqtt_broker_config_t *config)
+{
+    if (!config)
+    {
+        return SETTINGS_STORAGE_INVALID_PARAM;
+    }
+
+    if (!nvs_initialized)
+    {
+        ESP_LOGE(TAG, "MQTT storage not initialized");
+        // Return defaults
+        strncpy(config->broker_ip, MQTT_DEFAULT_BROKER_IP, sizeof(config->broker_ip) - 1);
+        config->broker_ip[sizeof(config->broker_ip) - 1] = '\0';
+        config->broker_port                              = MQTT_DEFAULT_BROKER_PORT;
+        return SETTINGS_STORAGE_OK;
+    }
+
+    // Read broker IP
+    size_t    ip_len = sizeof(config->broker_ip);
+    esp_err_t ret    = nvs_get_str(settings_storage_nvs_handle, NVS_BROKER_IP_KEY, config->broker_ip, &ip_len);
+    if (ret == ESP_ERR_NVS_NOT_FOUND)
+    {
+        ESP_LOGD(TAG, "Broker IP not found, using default");
+        strncpy(config->broker_ip, MQTT_DEFAULT_BROKER_IP, sizeof(config->broker_ip) - 1);
+        config->broker_ip[sizeof(config->broker_ip) - 1] = '\0';
+    }
+    else if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to read broker IP: %s", esp_err_to_name(ret));
+        strncpy(config->broker_ip, MQTT_DEFAULT_BROKER_IP, sizeof(config->broker_ip) - 1);
+        config->broker_ip[sizeof(config->broker_ip) - 1] = '\0';
+    }
+
+    // Read broker port
+    ret = nvs_get_u16(settings_storage_nvs_handle, NVS_BROKER_PORT_KEY, &config->broker_port);
+    if (ret == ESP_ERR_NVS_NOT_FOUND)
+    {
+        ESP_LOGD(TAG, "Broker port not found, using default");
+        config->broker_port = MQTT_DEFAULT_BROKER_PORT;
+    }
+    else if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to read broker port: %s", esp_err_to_name(ret));
+        config->broker_port = MQTT_DEFAULT_BROKER_PORT;
+    }
+
+    ESP_LOGI(TAG, "Loaded MQTT config: %s:%u", config->broker_ip, config->broker_port);
+
+    return SETTINGS_STORAGE_OK;
+}
+
+settings_storage_error_t mqtt_settings_save(const char *broker_ip, uint16_t broker_port)
+{
+    if (!broker_ip)
+    {
+        return SETTINGS_STORAGE_INVALID_PARAM;
+    }
+
+    // Validate IP format
+    if (!mqtt_settings_validate_ip(broker_ip))
+    {
+        ESP_LOGE(TAG, "Invalid IP address format: %s", broker_ip);
+        return SETTINGS_STORAGE_INVALID_PARAM;
+    }
+
+    // Validate port
+    if (!mqtt_settings_validate_port(broker_port))
+    {
+        ESP_LOGE(TAG, "Invalid port number: %u", broker_port);
+        return SETTINGS_STORAGE_INVALID_PARAM;
+    }
+
+    if (!nvs_initialized)
+    {
+        ESP_LOGE(TAG, "MQTT storage not initialized");
+        return SETTINGS_STORAGE_WRITE_ERROR;
+    }
+
+    // Write broker IP
+    esp_err_t ret = nvs_set_str(settings_storage_nvs_handle, NVS_BROKER_IP_KEY, broker_ip);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to write broker IP: %s", esp_err_to_name(ret));
+        return SETTINGS_STORAGE_WRITE_ERROR;
+    }
+
+    // Write broker port
+    ret = nvs_set_u16(settings_storage_nvs_handle, NVS_BROKER_PORT_KEY, broker_port);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to write broker port: %s", esp_err_to_name(ret));
+        return SETTINGS_STORAGE_WRITE_ERROR;
+    }
+
+    // Write configured flag
+    ret = nvs_set_u8(settings_storage_nvs_handle, NVS_CONFIGURED_KEY, 1);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to write configured flag: %s", esp_err_to_name(ret));
+        return SETTINGS_STORAGE_WRITE_ERROR;
+    }
+
+    // Commit changes to flash
+    ret = nvs_commit(settings_storage_nvs_handle);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to commit NVS changes: %s", esp_err_to_name(ret));
+        return SETTINGS_STORAGE_WRITE_ERROR;
+    }
+
+    ESP_LOGI(TAG, "MQTT config saved: %s:%u", broker_ip, broker_port);
+
+    return SETTINGS_STORAGE_OK;
+}
+
 settings_storage_error_t wifi_settings_factory_reset(void)
 {
     if (!nvs_initialized)
@@ -401,6 +556,23 @@ settings_storage_error_t wifi_settings_factory_reset(void)
     ESP_LOGI(TAG, "Factory reset complete - device is now unconfigured");
 
     return SETTINGS_STORAGE_OK;
+}
+
+bool mqtt_settings_validate_ip(const char *ip)
+{
+    if (!ip || strlen(ip) == 0 || strlen(ip) > MQTT_BROKER_IP_MAX_LEN)
+    {
+        return false;
+    }
+
+    // Use lwIP inet_aton for validation
+    struct in_addr addr;
+    return (inet_aton(ip, &addr) != 0);
+}
+
+bool mqtt_settings_validate_port(uint16_t port)
+{
+    return (port >= 1); //  && port <= 65535 is implicit by datatype
 }
 
 const char *settings_storage_error_to_string(settings_storage_error_t err)

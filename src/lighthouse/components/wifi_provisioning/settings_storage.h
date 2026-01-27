@@ -29,6 +29,15 @@ typedef enum
 } settings_storage_error_t;
 
 // ============================================================================
+// CONFIGURATION DEFAULTS
+// ============================================================================
+
+#define MQTT_DEFAULT_BROKER_IP   "192.168.1.1"
+#define MQTT_DEFAULT_BROKER_PORT 1883
+
+#define MQTT_BROKER_IP_MAX_LEN 15 // "255.255.255.255"
+
+// ============================================================================
 // DATA STRUCTURES
 // ============================================================================
 
@@ -41,6 +50,15 @@ typedef struct
     char    password[64]; // Network password (null-terminated)
     uint8_t configured;   // Flag from partition (0=no, 1=yes)
 } wifi_credentials_t;
+
+/**
+ * MQTT Broker Configuration
+ */
+typedef struct
+{
+    char     broker_ip[16]; // IPv4 address (null-terminated)
+    uint16_t broker_port;   // Port number (1-65535)
+} mqtt_broker_config_t;
 
 // ============================================================================
 // PUBLIC API
@@ -66,6 +84,13 @@ settings_storage_error_t settings_storage_init(void);
  * @return true if credentials have been saved, false otherwise
  */
 bool wifi_settings_is_configured(void);
+
+/**
+ * Check if MQTT settings have been configured
+ *
+ * @return true if MQTT settings exist in NVS, false otherwise
+ */
+bool mqtt_settings_is_configured(void);
 
 /**
  * Load WiFi credentials from partition
@@ -119,6 +144,51 @@ settings_storage_error_t wifi_settings_save(const char *ssid, const char *passwo
  *         SETTINGS_STORAGE_WRITE_ERROR if erase fails
  */
 settings_storage_error_t wifi_settings_factory_reset(void);
+
+/*
+ * Load MQTT broker configuration from NVS
+ *
+ * Reads broker IP and port from NVS partition.
+ * If keys don't exist, returns default values.
+ *
+ * @param config Output: broker configuration (must not be NULL)
+ * @return MQTT_STORAGE_OK on success
+ *         MQTT_STORAGE_INVALID_PARAM if config is NULL
+ */
+settings_storage_error_t mqtt_settings_load(mqtt_broker_config_t *config);
+
+/**
+ * Save MQTT broker configuration to NVS
+ *
+ * Validates and stores broker IP and port to NVS.
+ *
+ * Validation:
+ * - IP: Valid IPv4 format (uses inet_aton)
+ * - Port: 1-65535 range
+ *
+ * @param broker_ip IPv4 address string (null-terminated)
+ * @param broker_port Port number (1-65535)
+ * @return MQTT_STORAGE_OK on success
+ *         MQTT_STORAGE_INVALID_PARAM if validation fails
+ *         MQTT_STORAGE_WRITE_ERROR if write to NVS fails
+ */
+settings_storage_error_t mqtt_settings_save(const char *broker_ip, uint16_t broker_port);
+
+/**
+ * Validate IPv4 address format
+ *
+ * @param ip IPv4 address string to validate
+ * @return true if valid IPv4 format, false otherwise
+ */
+bool mqtt_settings_validate_ip(const char *ip);
+
+/**
+ * Validate port number
+ *
+ * @param port Port number to validate
+ * @return true if port is in valid range (1-65535), false otherwise
+ */
+bool mqtt_settings_validate_port(uint16_t port);
 
 /**
  * Get human-readable error description
