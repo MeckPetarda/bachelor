@@ -7,7 +7,8 @@
     "dev": "bun run --watch src/index.ts",
     "test": "bun test",
     "test:mqtt": "bun test tests/mqtt-broker.test.ts",
-    "test:api": "bun test tests/api-routes.test.ts"
+    "test:api": "bun test tests/api-routes.test.ts",
+    "test:retention": "bun test tests/retention-cleanup.test.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5",

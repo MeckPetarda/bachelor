@@ -1,9 +1,9 @@
-import { getDatabase, schema } from "../database/client";
-import { createLogger } from "../utils/logger";
+import { getDatabase, schema } from "../../database/client";
+import { createLogger } from "../../utils/logger";
 import { eq } from "drizzle-orm";
-import { extractMacAddress } from "./topics";
+import { extractMacAddress } from "../topics";
 
-const logger = createLogger("MQTT Handlers");
+const logger = createLogger("Scan Handler");
 
 /**
  * Scan message payload structure from lighthouse
@@ -29,7 +29,7 @@ export interface ScanEventEmitter {
 }
 
 // Placeholder for event emitter - will be set when WebSocket is implemented
-let eventEmitter: ScanEventEmitter | null = null;
+export let eventEmitter: ScanEventEmitter | null = null;
 
 /**
  * Set the event emitter for WebSocket notifications
@@ -210,3 +210,4 @@ export async function handleBatchScanMessage(
     await handleScanMessage(topic, singlePayload);
   }
 }
+

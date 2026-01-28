@@ -2,7 +2,6 @@ import Aedes from "aedes";
 import { createServer, Server } from "net";
 import { getConfig } from "../config";
 import { createLogger } from "../utils/logger";
-import { handleScanMessage } from "./handlers";
 import {
   SCAN_TOPIC_PATTERN,
   STATUS_TOPIC_PATTERN,
@@ -10,6 +9,7 @@ import {
 } from "./topics";
 import { handleStatusMessage } from "./handlers/status";
 import { handleHealthMessage } from "./handlers/health";
+import { handleScanMessage } from "./handlers/scan";
 
 const logger = createLogger("MQTT Broker");
 
