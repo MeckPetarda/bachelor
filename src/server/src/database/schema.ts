@@ -12,6 +12,7 @@ import {
   index,
   uniqueIndex,
   pgEnum,
+  serial,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
@@ -22,11 +23,10 @@ export const userType = pgEnum('user_type', ["STANDALONE", "INSIDE", "OUTSIDE"])
 export const lighthouses = pgTable(
   'lighthouses',
   {
-    id: integer().primaryKey(),
+    id: serial().primaryKey(),
     name: varchar({ length: 255 }).notNull().unique(),
     deviceId: varchar({ length: 255 }).notNull().unique(),
     placement: lighthousePlacement().notNull().default(lighthousePlacement.enumValues[0]),
-    label: varchar({ length: 255 }),
     comment: varchar({length: 256}),
     firmwareVersion: varchar({ length: 50 }),
     lastSeenAt: timestamp({ withTimezone: true }),
