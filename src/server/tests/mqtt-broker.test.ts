@@ -7,7 +7,9 @@ import {
   buildScanTopic,
   buildStatusTopic,
   buildHealthTopic,
+  buildConfigTopic,
 } from "../src/mqtt/topics";
+import { publishConfig } from "../src/mqtt/handlers/config";
 import { clearAllStates, getLighthouseState } from "../src/mqtt/state";
 
 // Test configuration
@@ -888,6 +890,258 @@ describe("MQTT Broker Integration", () => {
     // Runtime state should still be updated
     const state = getLighthouseState(unknownMac);
     expect(state?.latestHealth).toBeDefined();
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  // ==================== Graceful/Ungraceful Disconnect Tests ====================
+
+  it("should record graceful disconnect with isGraceful=true", async () => {
+    const db = getDatabase();
+
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-graceful-disconnect-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    const topic = buildStatusTopic(TEST_DEVICE_ID);
+
+    // Send online status first
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, "online", { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Simulate graceful disconnect by sending offline before disconnecting
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, "offline", { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait for event to be recorded
+    await waitFor(async () => {
+      const events = await db
+        .select()
+        .from(schema.lighthouseConnectionEvents)
+        .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+        .orderBy(desc(schema.lighthouseConnectionEvents.recordedAt));
+      return events.some(e => e.eventType === "disconnected");
+    }, 3000);
+
+    // Verify disconnect event was recorded as graceful
+    const events = await db
+      .select()
+      .from(schema.lighthouseConnectionEvents)
+      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+      .orderBy(desc(schema.lighthouseConnectionEvents.recordedAt));
+
+    const disconnectEvent = events.find(e => e.eventType === "disconnected");
+    expect(disconnectEvent).toBeDefined();
+    expect(disconnectEvent?.isGraceful).toBe(true);
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  it("should record ungraceful disconnect with isGraceful=false when no prior online seen", async () => {
+    const db = getDatabase();
+
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-ungraceful-disconnect-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    const topic = buildStatusTopic(TEST_DEVICE_ID);
+
+    // Simulate LWT-triggered offline (no prior online message in this test run)
+    // Clear state first to simulate fresh scenario
+    clearAllStates();
+
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, "offline", { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait for event to be recorded
+    await waitFor(async () => {
+      const events = await db
+        .select()
+        .from(schema.lighthouseConnectionEvents)
+        .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+        .orderBy(desc(schema.lighthouseConnectionEvents.recordedAt));
+      return events.some(e => e.eventType === "disconnected");
+    }, 3000);
+
+    // Verify disconnect event was recorded as ungraceful
+    const events = await db
+      .select()
+      .from(schema.lighthouseConnectionEvents)
+      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+      .orderBy(desc(schema.lighthouseConnectionEvents.recordedAt));
+
+    const disconnectEvent = events.find(e => e.eventType === "disconnected");
+    expect(disconnectEvent).toBeDefined();
+    expect(disconnectEvent?.isGraceful).toBe(false);
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  // ==================== Config Publisher Tests ====================
+
+  it("should publish config message to correct topic", async () => {
+    let receivedMessage: { topic: string; payload: string } | null = null;
+
+    // Connect MQTT client as subscriber
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-config-subscriber-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Subscribe to config topics for our test device
+    const configTopic = buildConfigTopic(TEST_DEVICE_ID, "+");
+    await new Promise<void>((resolve, reject) => {
+      client!.subscribe(configTopic, { qos: 1 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Set up message handler
+    client.on("message", (topic, payload) => {
+      receivedMessage = { topic, payload: payload.toString() };
+    });
+
+    // Use the server's publishConfig function
+    publishConfig(TEST_DEVICE_ID, "scan_interval", 30);
+
+    // Wait for message to be received
+    await waitFor(async () => receivedMessage !== null, 3000);
+
+    // Verify the message
+    expect(receivedMessage).not.toBeNull();
+    expect(receivedMessage?.topic).toBe(buildConfigTopic(TEST_DEVICE_ID, "scan_interval"));
+
+    const payload = JSON.parse(receivedMessage!.payload);
+    expect(payload.value).toBe(30);
+    expect(payload.timestamp).toBeDefined();
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  it("should publish config with various value types", async () => {
+    const receivedMessages: Array<{ topic: string; payload: string }> = [];
+
+    // Connect MQTT client as subscriber
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-config-types-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Subscribe to config topics
+    const configTopic = buildConfigTopic(TEST_DEVICE_ID, "+");
+    await new Promise<void>((resolve, reject) => {
+      client!.subscribe(configTopic, { qos: 1 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Set up message handler
+    client.on("message", (topic, payload) => {
+      receivedMessages.push({ topic, payload: payload.toString() });
+    });
+
+    // Publish configs with different value types
+    publishConfig(TEST_DEVICE_ID, "string_config", "test_value");
+    publishConfig(TEST_DEVICE_ID, "number_config", 42.5);
+    publishConfig(TEST_DEVICE_ID, "boolean_config", true);
+    publishConfig(TEST_DEVICE_ID, "object_config", { nested: "value", count: 10 });
+
+    // Wait for all messages to be received
+    await waitFor(async () => receivedMessages.length >= 4, 3000);
+
+    // Verify each message type
+    const stringMsg = receivedMessages.find(m => m.topic.includes("string_config"));
+    const numberMsg = receivedMessages.find(m => m.topic.includes("number_config"));
+    const boolMsg = receivedMessages.find(m => m.topic.includes("boolean_config"));
+    const objectMsg = receivedMessages.find(m => m.topic.includes("object_config"));
+
+    expect(JSON.parse(stringMsg!.payload).value).toBe("test_value");
+    expect(JSON.parse(numberMsg!.payload).value).toBe(42.5);
+    expect(JSON.parse(boolMsg!.payload).value).toBe(true);
+    expect(JSON.parse(objectMsg!.payload).value).toEqual({ nested: "value", count: 10 });
 
     // Disconnect
     await new Promise<void>((resolve) => {

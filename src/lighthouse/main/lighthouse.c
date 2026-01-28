@@ -21,11 +21,12 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include "cJSON.h"
 #include "hal/gpio_types.h"
 #include "my_mqtt_client.h"
 #include "offline_event_logger.h"
@@ -85,10 +86,176 @@ static const char *extract_config_key(const char *topic)
 }
 
 /**
+ * Parse integer value from config JSON payload
+ *
+ * Expected format: {"value": 60, "timestamp": "..."}
+ *
+ * @param payload JSON payload string
+ * @param out_value Pointer to store parsed integer value
+ * @return 0 on success, -1 on parse failure
+ */
+static int parse_config_int_value(const char *payload, int *out_value)
+{
+    const char *value_key = strstr(payload, "\"value\":");
+    if (value_key == NULL)
+    {
+        return -1;
+    }
+
+    // Skip past "value":
+    const char *value_start = value_key + 8; // strlen("\"value\":")
+
+    // Skip whitespace
+    while (*value_start == ' ')
+        value_start++;
+
+    char *end;
+    long  val = strtol(value_start, &end, 10);
+    if (end == value_start)
+    {
+        return -1; // No valid number found
+    }
+
+    *out_value = (int)val;
+    return 0;
+}
+
+/**
+ * Parse string value from config JSON payload
+ *
+ * Expected format: {"value": "some_string", "timestamp": "..."}
+ *
+ * @param payload JSON payload string
+ * @param out_buffer Buffer to store parsed string value
+ * @param buffer_size Size of output buffer
+ * @return 0 on success, -1 on parse failure
+ */
+static int parse_config_string_value(const char *payload, char *out_buffer, size_t buffer_size)
+{
+    const char *value_key = strstr(payload, "\"value\":");
+    if (value_key == NULL)
+    {
+        return -1;
+    }
+
+    // Skip past "value":
+    const char *value_start = value_key + 8; // strlen("\"value\":")
+
+    // Skip whitespace
+    while (*value_start == ' ')
+        value_start++;
+
+    // Check if it's a string (starts with quote)
+    if (*value_start != '"')
+    {
+        return -1; // Not a string value
+    }
+
+    value_start++; // Skip opening quote
+
+    // Find closing quote
+    const char *value_end = strchr(value_start, '"');
+    if (value_end == NULL)
+    {
+        return -1; // No closing quote found
+    }
+
+    // Calculate length and copy
+    size_t len = value_end - value_start;
+    if (len >= buffer_size)
+    {
+        len = buffer_size - 1; // Truncate to fit buffer
+    }
+
+    strncpy(out_buffer, value_start, len);
+    out_buffer[len] = '\0';
+
+    return 0;
+}
+
+/**
+ * Parse boolean value from config JSON payload
+ *
+ * Expected format: {"value": true, "timestamp": "..."} or {"value": false, ...}
+ *
+ * @param payload JSON payload string
+ * @param out_value Pointer to store parsed boolean value
+ * @return 0 on success, -1 on parse failure
+ */
+static int parse_config_bool_value(const char *payload, bool *out_value)
+{
+    const char *value_key = strstr(payload, "\"value\":");
+    if (value_key == NULL)
+    {
+        return -1;
+    }
+
+    // Skip past "value":
+    const char *value_start = value_key + 8; // strlen("\"value\":")
+
+    // Skip whitespace
+    while (*value_start == ' ')
+        value_start++;
+
+    if (strncmp(value_start, "true", 4) == 0)
+    {
+        *out_value = true;
+        return 0;
+    }
+    else if (strncmp(value_start, "false", 5) == 0)
+    {
+        *out_value = false;
+        return 0;
+    }
+
+    return -1; // Not a boolean value
+}
+
+/**
+ * Detect value type in config JSON payload
+ *
+ * @param payload JSON payload string
+ * @return 'i' for integer, 's' for string, 'b' for boolean, '?' for unknown
+ */
+static char detect_config_value_type(const char *payload)
+{
+    const char *value_key = strstr(payload, "\"value\":");
+    if (value_key == NULL)
+    {
+        return '?';
+    }
+
+    // Skip past "value":
+    const char *value_start = value_key + 8;
+
+    // Skip whitespace
+    while (*value_start == ' ')
+        value_start++;
+
+    if (*value_start == '"')
+    {
+        return 's'; // String
+    }
+    else if (*value_start == 't' || *value_start == 'f')
+    {
+        return 'b'; // Boolean (true/false)
+    }
+    else if (*value_start == '-' || (*value_start >= '0' && *value_start <= '9'))
+    {
+        return 'i'; // Integer/number
+    }
+
+    return '?'; // Unknown type
+}
+
+/**
  * Called when a configuration message is received from MQTT broker
  * This runs in the MQTT event handler context - keep it fast!
  *
  * Expected payload format: {"value": <value>, "timestamp": "..."}
+ *
+ * Uses manual string parsing (no cJSON dependency) following the existing
+ * pattern of building JSON with snprintf.
  */
 static void on_mqtt_config_message(const char *topic, const char *payload)
 {
@@ -99,7 +266,7 @@ static void on_mqtt_config_message(const char *topic, const char *payload)
     ESP_LOGI(TAG, "║  Payload: %s", payload);
     ESP_LOGI(TAG, "╚════════════════════════════════════╝");
 
-    // Extract config key from topic
+    // Extract config key from topic (everything after /config/)
     const char *config_key = extract_config_key(topic);
     if (config_key == NULL)
     {
@@ -107,74 +274,71 @@ static void on_mqtt_config_message(const char *topic, const char *payload)
         return;
     }
 
-    // Parse JSON payload
-    cJSON *root = cJSON_Parse(payload);
-    if (root == NULL)
-    {
-        const char *error_ptr = cJSON_GetErrorPtr();
-        if (error_ptr != NULL)
-        {
-            ESP_LOGE(TAG, "JSON parse error before: %s", error_ptr);
-        }
-        else
-        {
-            ESP_LOGE(TAG, "Failed to parse config JSON payload");
-        }
-        return;
-    }
-
-    // Extract "value" field
-    cJSON *value_item = cJSON_GetObjectItemCaseSensitive(root, "value");
-    if (value_item == NULL)
+    // Check if payload contains "value" key
+    if (strstr(payload, "\"value\":") == NULL)
     {
         ESP_LOGW(TAG, "Config payload missing 'value' field");
-        cJSON_Delete(root);
         return;
     }
 
-    // Extract optional "timestamp" field
-    cJSON      *timestamp_item = cJSON_GetObjectItemCaseSensitive(root, "timestamp");
-    const char *timestamp_str  = (timestamp_item != NULL && cJSON_IsString(timestamp_item)) ? timestamp_item->valuestring : "N/A";
+    // Detect value type and parse accordingly
+    char value_type = detect_config_value_type(payload);
 
-    // Log the parsed config (stub implementation - actual application of settings is a future task)
     ESP_LOGI(TAG, "╔════════════════════════════════════╗");
     ESP_LOGI(TAG, "║  Parsed Configuration              ║");
     ESP_LOGI(TAG, "╠════════════════════════════════════╣");
     ESP_LOGI(TAG, "║  Key: %s", config_key);
 
-    if (cJSON_IsString(value_item))
+    switch (value_type)
     {
-        ESP_LOGI(TAG, "║  Value (string): %s", value_item->valuestring);
-    }
-    else if (cJSON_IsNumber(value_item))
+    case 'i':
     {
-        ESP_LOGI(TAG, "║  Value (number): %g", value_item->valuedouble);
-    }
-    else if (cJSON_IsBool(value_item))
-    {
-        ESP_LOGI(TAG, "║  Value (bool): %s", cJSON_IsTrue(value_item) ? "true" : "false");
-    }
-    else if (cJSON_IsObject(value_item) || cJSON_IsArray(value_item))
-    {
-        char *value_str = cJSON_PrintUnformatted(value_item);
-        if (value_str != NULL)
+        int int_value;
+        if (parse_config_int_value(payload, &int_value) == 0)
         {
-            ESP_LOGI(TAG, "║  Value (json): %s", value_str);
-            cJSON_free(value_str);
+            ESP_LOGI(TAG, "║  Value (int): %d", int_value);
         }
+        else
+        {
+            ESP_LOGW(TAG, "║  Value: (failed to parse integer)");
+        }
+        break;
     }
-    else
+    case 's':
     {
-        ESP_LOGI(TAG, "║  Value: (unknown type)");
+        char string_value[128];
+        if (parse_config_string_value(payload, string_value, sizeof(string_value)) == 0)
+        {
+            ESP_LOGI(TAG, "║  Value (string): %s", string_value);
+        }
+        else
+        {
+            ESP_LOGW(TAG, "║  Value: (failed to parse string)");
+        }
+        break;
+    }
+    case 'b':
+    {
+        bool bool_value;
+        if (parse_config_bool_value(payload, &bool_value) == 0)
+        {
+            ESP_LOGI(TAG, "║  Value (bool): %s", bool_value ? "true" : "false");
+        }
+        else
+        {
+            ESP_LOGW(TAG, "║  Value: (failed to parse boolean)");
+        }
+        break;
+    }
+    default:
+        ESP_LOGW(TAG, "║  Value: (unknown or unsupported type)");
+        break;
     }
 
-    ESP_LOGI(TAG, "║  Timestamp: %s", timestamp_str);
     ESP_LOGI(TAG, "╚════════════════════════════════════╝");
 
     // TODO: Apply configuration settings based on config_key
     // This is a stub implementation - actual setting application is a future task
-
-    cJSON_Delete(root);
 }
 
 // ============================================================================
