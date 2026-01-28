@@ -54,7 +54,7 @@
  * ├── config/{device_id}/+       - Configuration updates (subscribe)
  * └── health/{device_id}/+       - Health metrics (QoS 0)
  */
-#define MQTT_TOPIC_TAG_DETECTED  "attendance/tags/detected"
+#define MQTT_TOPIC_TAG_DETECTED  "attendance/lighthouse/ESP32_ATTENDANCE_01/scans"
 #define MQTT_TOPIC_DEVICE_STATUS "attendance/device/ESP32_ATTENDANCE_01/status"
 #define MQTT_TOPIC_CONFIG_BASE   "attendance/config/ESP32_ATTENDANCE_01/"
 #define MQTT_TOPIC_HEALTH_BASE   "attendance/health/ESP32_ATTENDANCE_01/"

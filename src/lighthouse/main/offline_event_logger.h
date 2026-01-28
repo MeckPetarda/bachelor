@@ -61,7 +61,7 @@
  * Grace period before starting replay (seconds)
  * Allows server to prepare for offline event ingestion
  */
-#define OFFLINE_REPLAY_GRACE_PERIOD 30
+#define OFFLINE_REPLAY_GRACE_PERIOD 5
 
 // ============================================================================
 // DATA STRUCTURES

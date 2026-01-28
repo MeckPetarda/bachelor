@@ -1,4 +1,5 @@
 import { getDatabase, schema } from "../database/client";
+import { lighthousePlacement } from "../database/schema";
 import { createLogger } from "../utils/logger";
 import { eq } from "drizzle-orm";
 
@@ -53,6 +54,7 @@ function extractDeviceId(topic: string): string | null {
  */
 function validatePayload(payload: unknown): payload is ScanPayload {
   if (typeof payload !== "object" || payload === null) {
+    logger.error("Invalid payload", payload)
     return false;
   }
 
@@ -60,10 +62,12 @@ function validatePayload(payload: unknown): payload is ScanPayload {
 
   // Required fields
   if (typeof p.epc !== "string" || p.epc.length === 0) {
+    logger.error("Invalid epc", p.epc)
     return false;
   }
 
   if (typeof p.timestampMs !== "number") {
+    logger.error("Invalid timestamp", p.timestampMs)
     return false;
   }
 
@@ -77,7 +81,7 @@ function validatePayload(payload: unknown): payload is ScanPayload {
  */
 export async function handleScanMessage(
   topic: string,
-  payload: Buffer
+  payload: string | Buffer
 ): Promise<void> {
   const deviceId = extractDeviceId(topic);
   if (!deviceId) {
@@ -112,7 +116,7 @@ export async function handleScanMessage(
       .where(eq(schema.lighthouses.deviceId, deviceId))
       .limit(1);
 
-    if (lighthouses.length === 0) {
+    if (lighthouses.length === 0 || lighthouses[0] === undefined) {
       logger.warn(`Unknown lighthouse device: ${deviceId}`);
       // Could optionally store in a separate "unknown_scans" table
       return;

@@ -467,14 +467,14 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
         uint64_t replay_time = esp_timer_get_time() / 1000; // Current time in ms
         len                  = snprintf(payload, sizeof(payload),
                                         "{"
-                                                         "\"tag_id\":\"%s\","
-                                                         "\"timestamp\":%lu,"
-                                                         "\"rssi_dbm\":%d,"
-                                                         "\"antenna_id\":%u,"
+                                                         "\"epc\":\"%s\","
+                                                         "\"timestampMs\":%lu,"
+                                                         "\"rssiDbm\":%d,"
+                                                         "\"antennaId\":%u,"
                                                          "\"frequency\":%u,"
-                                                         "\"device_id\":\"%s\","
+                                                         "\"deviceId\":\"%s\","
                                                          "\"offline\":true,"
-                                                         "\"replay_time\":%llu"
+                                                         "\"replayTime\":%llu"
                                                          "}",
                                         epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, MQTT_CLIENT_ID,
                                         replay_time);
@@ -484,12 +484,12 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
         // Real-time event (offline = false)
         len = snprintf(payload, sizeof(payload),
                        "{"
-                       "\"tag_id\":\"%s\","
-                       "\"timestamp\":%lu,"
-                       "\"rssi_dbm\":%d,"
-                       "\"antenna_id\":%u,"
+                       "\"epc\":\"%s\","
+                       "\"timestampMs\":%lu,"
+                       "\"rssiDbm\":%d,"
+                       "\"antennaId\":%u,"
                        "\"frequency\":%u,"
-                       "\"device_id\":\"%s\","
+                       "\"deviceId\":\"%s\","
                        "\"offline\":false"
                        "}",
                        epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, MQTT_CLIENT_ID);

@@ -184,7 +184,12 @@ describe("MQTT Broker Integration", () => {
       .limit(1);
 
     expect(storedScans.length).toBe(1);
+
+
     const storedScan = storedScans[0];
+
+    if (storedScan === undefined) return;
+
     expect(storedScan.epc).toBe(scanPayload.epc);
     expect(storedScan.rssiDbm).toBe(scanPayload.rssiDbm);
     expect(storedScan.antennaId).toBe(scanPayload.antennaId);
