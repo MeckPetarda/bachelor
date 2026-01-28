@@ -14,7 +14,9 @@
 #include "my_mqtt_client.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_timer.h"
+#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "offline_event_logger.h"
@@ -59,6 +61,17 @@ static mqtt_stats_t s_stats = {0};
  */
 static mqtt_config_callback_t s_config_callback = NULL;
 
+/**
+ * Device MAC address string (formatted as "AA:BB:CC:DD:EE:FF")
+ */
+static char s_device_mac[MQTT_MAC_STR_LEN] = {0};
+
+/**
+ * Topic buffer for building dynamic topics
+ * Size: base (22) + MAC (17) + "/" (1) + suffix (max ~20) + null = ~64 bytes, using 128 for safety
+ */
+static char s_topic_buffer[128] = {0};
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -90,6 +103,23 @@ static void epc_to_hex_string(const uint8_t *epc, uint8_t len, char *output)
 static int rssi_to_dbm(uint8_t rssi)
 {
     return rssi - 129;
+}
+
+/**
+ * Initialize device MAC address string
+ *
+ * Retrieves the factory-programmed MAC address from eFuse and formats it
+ * as a colon-separated uppercase hex string (e.g., "AA:BB:CC:DD:EE:FF").
+ *
+ * Reference: ESP32 Technical Reference Manual Section 4.4
+ */
+static void init_device_mac(void)
+{
+    uint8_t mac[6];
+    esp_efuse_mac_get_default(mac);
+    snprintf(s_device_mac, sizeof(s_device_mac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4],
+             mac[5]);
+    ESP_LOGI(TAG, "Device MAC: %s", s_device_mac);
 }
 
 /**
@@ -147,13 +177,16 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         s_stats.connection_count++;
         xEventGroupSetBits(s_mqtt_event_group, MQTT_CONNECTED_BIT);
 
-        // Publish online status
-        esp_mqtt_client_publish(event->client, MQTT_TOPIC_DEVICE_STATUS, "online",
-                                0,  // Use default length (null-terminated)
-                                1,  // QoS 1
-                                1); // Retain flag
+        // Publish online status to dynamic topic
+        {
+            const char *status_topic = mqtt_client_get_topic("status");
+            esp_mqtt_client_publish(event->client, status_topic, "online",
+                                    0,  // Use default length (null-terminated)
+                                    1,  // QoS 1
+                                    1); // Retain flag
 
-        ESP_LOGI(TAG, "Published online status");
+            ESP_LOGI(TAG, "Published online status to %s", status_topic);
+        }
 
         // Re-subscribe to configuration topics if callback is registered
         // This ensures subscriptions are restored after broker restart or
@@ -161,7 +194,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         if (s_config_callback != NULL)
         {
             char topic[128];
-            snprintf(topic, sizeof(topic), "%s+", MQTT_TOPIC_CONFIG_BASE);
+            snprintf(topic, sizeof(topic), "%s%s/config/+", MQTT_TOPIC_BASE, s_device_mac);
 
             int msg_id = esp_mqtt_client_subscribe(event->client, topic, MQTT_QOS_CONFIG_COMMANDS);
             if (msg_id >= 0)
@@ -274,7 +307,14 @@ esp_err_t mqtt_client_init(void)
     ESP_LOGI(TAG, "Initializing MQTT client...");
 
     // ========================================================================
-    // STEP 1: Create Event Group
+    // STEP 1: Initialize Device MAC Address
+    // ========================================================================
+
+    init_device_mac();
+    ESP_LOGI(TAG, "  ✓ Device MAC initialized: %s", s_device_mac);
+
+    // ========================================================================
+    // STEP 2: Create Event Group
     // ========================================================================
 
     s_mqtt_event_group = xEventGroupCreate();
@@ -286,7 +326,7 @@ esp_err_t mqtt_client_init(void)
     ESP_LOGI(TAG, "  ✓ Event group created");
 
     // ========================================================================
-    // STEP 2: Load MQTT Configuration from NVS
+    // STEP 3: Load MQTT Configuration from NVS
     // ========================================================================
 
     // Initialize MQTT settings storage
@@ -313,15 +353,19 @@ esp_err_t mqtt_client_init(void)
     ESP_LOGI(TAG, "  ✓ Loaded broker config: %s", broker_uri);
 
     // ========================================================================
-    // STEP 3: Configure MQTT Client
+    // STEP 4: Configure MQTT Client
     // ========================================================================
+
+    // Build status topic for LWT (must persist - use separate buffer)
+    static char lwt_topic[128];
+    snprintf(lwt_topic, sizeof(lwt_topic), "%s%s/status", MQTT_TOPIC_BASE, s_device_mac);
 
     esp_mqtt_client_config_t mqtt_cfg = {
         // Broker configuration (from NVS)
         .broker.address.uri = broker_uri,
 
-        // Client credentials
-        .credentials.client_id               = MQTT_CLIENT_ID,
+        // Client credentials - use MAC address as client ID
+        .credentials.client_id               = s_device_mac,
         .credentials.username                = NULL, // No authentication for testing
         .credentials.authentication.password = NULL,
 
@@ -332,10 +376,10 @@ esp_err_t mqtt_client_init(void)
         // Last Will & Testament - published when device disconnects unexpectedly
         .session.last_will =
             {
-                .topic   = MQTT_TOPIC_DEVICE_STATUS,
+                .topic   = lwt_topic,
                 .msg     = "offline",
                 .msg_len = 0, // Use default (null-terminated)
-                .qos     = 2, // QoS 2 for critical status
+                .qos     = 1, // QoS 1 for status
                 .retain  = 1, // Retain offline status
             },
 
@@ -346,10 +390,11 @@ esp_err_t mqtt_client_init(void)
 
     ESP_LOGI(TAG, "  ✓ MQTT configuration created");
     ESP_LOGI(TAG, "    Broker: %s", broker_uri);
-    ESP_LOGI(TAG, "    Client ID: %s", MQTT_CLIENT_ID);
+    ESP_LOGI(TAG, "    Client ID: %s", s_device_mac);
+    ESP_LOGI(TAG, "    LWT Topic: %s", lwt_topic);
 
     // ========================================================================
-    // STEP 3: Initialize Client
+    // STEP 5: Initialize Client
     // ========================================================================
 
     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
@@ -361,7 +406,7 @@ esp_err_t mqtt_client_init(void)
     ESP_LOGI(TAG, "  ✓ MQTT client initialized");
 
     // ========================================================================
-    // STEP 4: Register Event Handler
+    // STEP 6: Register Event Handler
     // ========================================================================
 
     esp_err_t ret = esp_mqtt_client_register_event(s_mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
@@ -373,7 +418,7 @@ esp_err_t mqtt_client_init(void)
     ESP_LOGI(TAG, "  ✓ Event handler registered");
 
     // ========================================================================
-    // STEP 5: Start MQTT Client
+    // STEP 7: Start MQTT Client
     // ========================================================================
 
     ret = esp_mqtt_client_start(s_mqtt_client);
@@ -476,7 +521,7 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
                                                          "\"offline\":true,"
                                                          "\"replayTime\":%llu"
                                                          "}",
-                                        epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, MQTT_CLIENT_ID,
+                                        epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac,
                                         replay_time);
     }
     else
@@ -492,7 +537,7 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
                        "\"deviceId\":\"%s\","
                        "\"offline\":false"
                        "}",
-                       epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, MQTT_CLIENT_ID);
+                       epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac);
     }
 
     if (len >= sizeof(payload))
@@ -504,10 +549,11 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
     // Publish to MQTT Broker with QoS 2
     // ========================================================================
 
-    int msg_id = esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_TAG_DETECTED, payload,
-                                         0,                   // Use default length
-                                         MQTT_QOS_TAG_EVENTS, // QoS 2
-                                         0);                  // Don't retain
+    const char *scans_topic = mqtt_client_get_topic("scans");
+    int         msg_id      = esp_mqtt_client_publish(s_mqtt_client, scans_topic, payload,
+                                                      0,                   // Use default length
+                                                      MQTT_QOS_TAG_EVENTS, // QoS 2
+                                                      0);                  // Don't retain
 
     if (msg_id < 0)
     {
@@ -536,78 +582,108 @@ esp_err_t mqtt_client_publish_health_metrics(void)
     }
 
     // ========================================================================
-    // Publish Memory Information
+    // Gather System Health Metrics
     // ========================================================================
 
-    uint32_t free_heap = esp_get_free_heap_size();
-    char     memory_payload[64];
-    snprintf(memory_payload, sizeof(memory_payload), "{\"free_heap\":%lu}", free_heap);
+    uint32_t free_heap     = esp_get_free_heap_size();
+    uint32_t min_free_heap = esp_get_minimum_free_heap_size();
+    uint32_t uptime_sec    = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
 
-    esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_HEALTH_BASE "memory", memory_payload, 0, MQTT_QOS_HEALTH_METRICS,
-                            0);
-
-    // ========================================================================
-    // Publish Uptime
-    // ========================================================================
-
-    uint32_t uptime_sec = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
-    char     uptime_payload[64];
-    snprintf(uptime_payload, sizeof(uptime_payload), "{\"uptime_sec\":%lu}", uptime_sec);
-
-    esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_HEALTH_BASE "uptime", uptime_payload, 0, MQTT_QOS_HEALTH_METRICS,
-                            0);
+    // Get WiFi RSSI
+    int8_t   wifi_rssi     = 0;
+    wifi_ap_record_t ap_info;
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK)
+    {
+        wifi_rssi = ap_info.rssi;
+    }
 
     // ========================================================================
-    // Publish RFID Reader Health Status
+    // Gather RFID Health Metrics
     // ========================================================================
 
     rfid_health_t       rfid_health;
     rfid_reader_state_t rfid_state = rfid_reader_get_state();
 
+    // Convert state enum to string for readability
+    const char *state_str;
+    switch (rfid_state)
+    {
+    case RFID_STATE_UNINITIALIZED:
+        state_str = "UNINITIALIZED";
+        break;
+    case RFID_STATE_POWERED_OFF:
+        state_str = "POWERED_OFF";
+        break;
+    case RFID_STATE_STARTUP_PENDING:
+        state_str = "STARTUP_PENDING";
+        break;
+    case RFID_STATE_RESPONSIVE:
+        state_str = "RESPONSIVE";
+        break;
+    case RFID_STATE_UNRESPONSIVE:
+        state_str = "UNRESPONSIVE";
+        break;
+    default:
+        state_str = "UNKNOWN";
+        break;
+    }
+
+    // Get RFID health data (use defaults if unavailable)
+    bool rfid_is_responsive      = false;
+    bool rfid_power_rail_present = false;
+    char rfid_fw_version[8]      = "0.0";
+    int  rfid_last_error         = 0;
+
     if (rfid_reader_get_health(&rfid_health) == ESP_OK)
     {
-        // Convert state enum to string for readability
-        const char *state_str;
-        switch (rfid_state)
-        {
-        case RFID_STATE_UNINITIALIZED:
-            state_str = "UNINITIALIZED";
-            break;
-        case RFID_STATE_POWERED_OFF:
-            state_str = "POWERED_OFF";
-            break;
-        case RFID_STATE_STARTUP_PENDING:
-            state_str = "STARTUP_PENDING";
-            break;
-        case RFID_STATE_RESPONSIVE:
-            state_str = "RESPONSIVE";
-            break;
-        case RFID_STATE_UNRESPONSIVE:
-            state_str = "UNRESPONSIVE";
-            break;
-        default:
-            state_str = "UNKNOWN";
-            break;
-        }
-
-        // Build JSON payload with all health metrics
-        char rfid_payload[256];
-        snprintf(rfid_payload, sizeof(rfid_payload),
-                 "{\"state\":\"%s\",\"is_responsive\":%s,\"power_rail_present\":%s,"
-                 "\"fw_version\":\"%u.%u\",\"last_error\":%d,\"last_check_ms\":%lu}",
-                 state_str, rfid_health.is_responsive ? "true" : "false",
-                 rfid_health.power_rail_present ? "true" : "false", rfid_health.fw_major, rfid_health.fw_minor,
-                 rfid_health.last_error, rfid_health.last_check_ms);
-
-        esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_HEALTH_BASE "rfid_status", rfid_payload, 0,
-                                MQTT_QOS_HEALTH_METRICS, 0);
+        rfid_is_responsive      = rfid_health.is_responsive;
+        rfid_power_rail_present = rfid_health.power_rail_present;
+        snprintf(rfid_fw_version, sizeof(rfid_fw_version), "%u.%u", rfid_health.fw_major, rfid_health.fw_minor);
+        rfid_last_error = rfid_health.last_error;
     }
-    else
+
+    // ========================================================================
+    // Build Consolidated Health JSON Payload
+    // ========================================================================
+
+    char payload[384];
+    int  len = snprintf(payload, sizeof(payload),
+                        "{"
+                        "\"uptime_sec\":%lu,"
+                        "\"free_heap_bytes\":%lu,"
+                        "\"min_free_heap_bytes\":%lu,"
+                        "\"wifi_rssi_dbm\":%d,"
+                        "\"rfid\":{"
+                        "\"state\":\"%s\","
+                        "\"is_responsive\":%s,"
+                        "\"power_rail_present\":%s,"
+                        "\"fw_version\":\"%s\","
+                        "\"last_error\":%d"
+                        "}"
+                        "}",
+                        uptime_sec, free_heap, min_free_heap, wifi_rssi, state_str,
+                        rfid_is_responsive ? "true" : "false", rfid_power_rail_present ? "true" : "false",
+                        rfid_fw_version, rfid_last_error);
+
+    if (len >= sizeof(payload))
     {
-        ESP_LOGW(TAG, "Failed to get RFID health data");
+        ESP_LOGW(TAG, "Health payload truncated");
     }
 
-    ESP_LOGD(TAG, "Published health metrics");
+    // ========================================================================
+    // Publish to Consolidated Health Topic
+    // ========================================================================
+
+    const char *health_topic = mqtt_client_get_topic("health");
+    int         msg_id       = esp_mqtt_client_publish(s_mqtt_client, health_topic, payload, 0, MQTT_QOS_HEALTH_METRICS, 0);
+
+    if (msg_id < 0)
+    {
+        ESP_LOGE(TAG, "Failed to publish health metrics");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGD(TAG, "Published health metrics to %s", health_topic);
 
     return ESP_OK;
 }
@@ -628,9 +704,9 @@ esp_err_t mqtt_client_subscribe_config(mqtt_config_callback_t callback)
     // Store callback for event handler
     s_config_callback = callback;
 
-    // Subscribe to configuration topics with wildcard
+    // Subscribe to configuration topics with wildcard: attendance/lighthouse/{MAC}/config/+
     char topic[128];
-    snprintf(topic, sizeof(topic), "%s+", MQTT_TOPIC_CONFIG_BASE);
+    snprintf(topic, sizeof(topic), "%s%s/config/+", MQTT_TOPIC_BASE, s_device_mac);
 
     int msg_id = esp_mqtt_client_subscribe(s_mqtt_client, topic, MQTT_QOS_CONFIG_COMMANDS);
 
@@ -654,10 +730,13 @@ esp_err_t mqtt_client_disconnect(void)
 
     ESP_LOGI(TAG, "Disconnecting from MQTT broker...");
 
-    // Publish offline status before disconnecting
-    esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC_DEVICE_STATUS, "offline", 0,
-                            2,  // QoS 2
+    // Publish offline status before disconnecting (graceful disconnect)
+    const char *status_topic = mqtt_client_get_topic("status");
+    esp_mqtt_client_publish(s_mqtt_client, status_topic, "offline", 0,
+                            1,  // QoS 1
                             1); // Retain
+
+    ESP_LOGI(TAG, "Published offline status to %s", status_topic);
 
     return esp_mqtt_client_disconnect(s_mqtt_client);
 }
@@ -719,4 +798,15 @@ void mqtt_client_clear_stats(void)
 mqtt_connection_state_t mqtt_client_get_state(void)
 {
     return s_connection_state;
+}
+
+const char *mqtt_client_get_device_mac(void)
+{
+    return s_device_mac;
+}
+
+const char *mqtt_client_get_topic(const char *suffix)
+{
+    snprintf(s_topic_buffer, sizeof(s_topic_buffer), "%s%s/%s", MQTT_TOPIC_BASE, s_device_mac, suffix);
+    return s_topic_buffer;
 }

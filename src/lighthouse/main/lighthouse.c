@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "cJSON.h"
 #include "hal/gpio_types.h"
 #include "my_mqtt_client.h"
 #include "offline_event_logger.h"
@@ -67,8 +68,27 @@ static bool           mqtt_initialized = false;
 // ============================================================================
 
 /**
+ * Extract config key from topic string
+ *
+ * Topic format: attendance/lighthouse/{MAC}/config/{key}
+ * Returns pointer to key portion or NULL if not found
+ */
+static const char *extract_config_key(const char *topic)
+{
+    // Find "/config/" in the topic and return the key after it
+    const char *config_marker = strstr(topic, "/config/");
+    if (config_marker != NULL)
+    {
+        return config_marker + 8; // Skip "/config/"
+    }
+    return NULL;
+}
+
+/**
  * Called when a configuration message is received from MQTT broker
  * This runs in the MQTT event handler context - keep it fast!
+ *
+ * Expected payload format: {"value": <value>, "timestamp": "..."}
  */
 static void on_mqtt_config_message(const char *topic, const char *payload)
 {
@@ -78,6 +98,83 @@ static void on_mqtt_config_message(const char *topic, const char *payload)
     ESP_LOGI(TAG, "║  Topic: %s", topic);
     ESP_LOGI(TAG, "║  Payload: %s", payload);
     ESP_LOGI(TAG, "╚════════════════════════════════════╝");
+
+    // Extract config key from topic
+    const char *config_key = extract_config_key(topic);
+    if (config_key == NULL)
+    {
+        ESP_LOGW(TAG, "Could not extract config key from topic");
+        return;
+    }
+
+    // Parse JSON payload
+    cJSON *root = cJSON_Parse(payload);
+    if (root == NULL)
+    {
+        const char *error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr != NULL)
+        {
+            ESP_LOGE(TAG, "JSON parse error before: %s", error_ptr);
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Failed to parse config JSON payload");
+        }
+        return;
+    }
+
+    // Extract "value" field
+    cJSON *value_item = cJSON_GetObjectItemCaseSensitive(root, "value");
+    if (value_item == NULL)
+    {
+        ESP_LOGW(TAG, "Config payload missing 'value' field");
+        cJSON_Delete(root);
+        return;
+    }
+
+    // Extract optional "timestamp" field
+    cJSON      *timestamp_item = cJSON_GetObjectItemCaseSensitive(root, "timestamp");
+    const char *timestamp_str  = (timestamp_item != NULL && cJSON_IsString(timestamp_item)) ? timestamp_item->valuestring : "N/A";
+
+    // Log the parsed config (stub implementation - actual application of settings is a future task)
+    ESP_LOGI(TAG, "╔════════════════════════════════════╗");
+    ESP_LOGI(TAG, "║  Parsed Configuration              ║");
+    ESP_LOGI(TAG, "╠════════════════════════════════════╣");
+    ESP_LOGI(TAG, "║  Key: %s", config_key);
+
+    if (cJSON_IsString(value_item))
+    {
+        ESP_LOGI(TAG, "║  Value (string): %s", value_item->valuestring);
+    }
+    else if (cJSON_IsNumber(value_item))
+    {
+        ESP_LOGI(TAG, "║  Value (number): %g", value_item->valuedouble);
+    }
+    else if (cJSON_IsBool(value_item))
+    {
+        ESP_LOGI(TAG, "║  Value (bool): %s", cJSON_IsTrue(value_item) ? "true" : "false");
+    }
+    else if (cJSON_IsObject(value_item) || cJSON_IsArray(value_item))
+    {
+        char *value_str = cJSON_PrintUnformatted(value_item);
+        if (value_str != NULL)
+        {
+            ESP_LOGI(TAG, "║  Value (json): %s", value_str);
+            cJSON_free(value_str);
+        }
+    }
+    else
+    {
+        ESP_LOGI(TAG, "║  Value: (unknown type)");
+    }
+
+    ESP_LOGI(TAG, "║  Timestamp: %s", timestamp_str);
+    ESP_LOGI(TAG, "╚════════════════════════════════════╝");
+
+    // TODO: Apply configuration settings based on config_key
+    // This is a stub implementation - actual setting application is a future task
+
+    cJSON_Delete(root);
 }
 
 // ============================================================================

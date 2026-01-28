@@ -40,24 +40,23 @@
  * For testing, use local Mosquitto broker:
  *   mosquitto -p 1883
  */
-#define MQTT_CLIENT_ID   "ESP32_ATTENDANCE_01"
 
 // Maximum length for broker URI (mqtt://255.255.255.255:65535)
 #define MQTT_BROKER_URI_MAX_LEN 32
 
 /**
- * MQTT Topic Structure
+ * MQTT Topic Structure (MAC-based)
  *
- * attendance/
- * ├── tags/detected              - Tag detection events (QoS 2)
- * ├── device/{device_id}/status  - Device online/offline (Last Will)
- * ├── config/{device_id}/+       - Configuration updates (subscribe)
- * └── health/{device_id}/+       - Health metrics (QoS 0)
+ * attendance/lighthouse/{MAC}/
+ * ├── scans   - Tag detection events (QoS 2)
+ * ├── status  - Device online/offline (Last Will)
+ * ├── health  - Consolidated health metrics (QoS 0)
+ * └── config/+ - Configuration updates (subscribe)
+ *
+ * MAC format: "AA:BB:CC:DD:EE:FF" (17 characters + null terminator)
  */
-#define MQTT_TOPIC_TAG_DETECTED  "attendance/lighthouse/ESP32_ATTENDANCE_01/scans"
-#define MQTT_TOPIC_DEVICE_STATUS "attendance/device/ESP32_ATTENDANCE_01/status"
-#define MQTT_TOPIC_CONFIG_BASE   "attendance/config/ESP32_ATTENDANCE_01/"
-#define MQTT_TOPIC_HEALTH_BASE   "attendance/health/ESP32_ATTENDANCE_01/"
+#define MQTT_TOPIC_BASE    "attendance/lighthouse/"
+#define MQTT_MAC_STR_LEN   18  // "AA:BB:CC:DD:EE:FF" + null terminator
 
 /**
  * Quality of Service Levels
@@ -264,5 +263,26 @@ void mqtt_client_clear_stats(void);
  * @return Current MQTT connection state
  */
 mqtt_connection_state_t mqtt_client_get_state(void);
+
+/**
+ * Get the device's MAC address as formatted string
+ * Format: "AA:BB:CC:DD:EE:FF"
+ *
+ * @return Pointer to static buffer containing MAC string
+ *
+ * Reference: ESP32 Technical Reference Manual Section 4.4
+ */
+const char *mqtt_client_get_device_mac(void);
+
+/**
+ * Get the full topic string for a given suffix
+ * Example: mqtt_client_get_topic("scans") returns "attendance/lighthouse/AA:BB:CC:DD:EE:FF/scans"
+ *
+ * @param suffix Topic suffix (e.g., "scans", "status", "health")
+ * @return Pointer to static buffer containing full topic
+ *
+ * Note: Uses single static buffer - not reentrant. Copy result if needed.
+ */
+const char *mqtt_client_get_topic(const char *suffix);
 
 #endif // MQTT_CLIENT_H
