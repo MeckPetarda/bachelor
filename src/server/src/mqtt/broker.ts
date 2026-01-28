@@ -2,7 +2,14 @@ import Aedes from "aedes";
 import { createServer, Server } from "net";
 import { getConfig } from "../config";
 import { createLogger } from "../utils/logger";
-import { handleScanMessage, SCAN_TOPIC_PATTERN } from "./handlers";
+import { handleScanMessage } from "./handlers";
+import {
+  SCAN_TOPIC_PATTERN,
+  STATUS_TOPIC_PATTERN,
+  HEALTH_TOPIC_PATTERN,
+} from "./topics";
+import { handleStatusMessage } from "./handlers/status";
+import { handleHealthMessage } from "./handlers/health";
 
 const logger = createLogger("MQTT Broker");
 
@@ -77,12 +84,24 @@ export function startMqttBroker(): Aedes {
       logger.debug(`Message received from ${client.id} on topic: ${packet.topic}`);
     }
 
-    // Check if this is a scan topic
+    // Route to appropriate handler based on topic pattern
     if (SCAN_TOPIC_PATTERN.test(packet.topic)) {
       try {
         await handleScanMessage(packet.topic, packet.payload);
       } catch (error) {
         logger.error(`Failed to handle scan message:`, error);
+      }
+    } else if (STATUS_TOPIC_PATTERN.test(packet.topic)) {
+      try {
+        await handleStatusMessage(packet.topic, packet.payload);
+      } catch (error) {
+        logger.error(`Failed to handle status message:`, error);
+      }
+    } else if (HEALTH_TOPIC_PATTERN.test(packet.topic)) {
+      try {
+        await handleHealthMessage(packet.topic, packet.payload);
+      } catch (error) {
+        logger.error(`Failed to handle health message:`, error);
       }
     }
   });

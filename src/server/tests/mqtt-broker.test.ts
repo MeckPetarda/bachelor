@@ -3,11 +3,18 @@ import mqtt from "mqtt";
 import { startMqttBroker, closeMqttBroker, getMqttBrokerStats } from "../src/mqtt/broker";
 import { initDatabase, closeDatabase, getDatabase, schema } from "../src/database/client";
 import { eq, desc } from "drizzle-orm";
+import {
+  buildScanTopic,
+  buildStatusTopic,
+  buildHealthTopic,
+} from "../src/mqtt/topics";
+import { clearAllStates, getLighthouseState } from "../src/mqtt/state";
 
 // Test configuration
 const MQTT_PORT = 1883;
 const MQTT_URL = `mqtt://localhost:${MQTT_PORT}`;
-const TEST_DEVICE_ID = "test-lighthouse-001";
+// Use valid MAC address format for device ID
+const TEST_DEVICE_ID = "AA:BB:CC:DD:EE:01";
 const TEST_LIGHTHOUSE_ID = 999;
 
 // Helper to wait for a condition with timeout
@@ -80,11 +87,19 @@ describe("MQTT Broker Integration", () => {
   });
 
   beforeEach(async () => {
-    // Clean up any scans from previous tests
+    // Clean up any data from previous tests
     const db = getDatabase();
     await db
       .delete(schema.rawScans)
       .where(eq(schema.rawScans.lighthouseId, TEST_LIGHTHOUSE_ID));
+    await db
+      .delete(schema.lighthouseHealthSnapshots)
+      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+    await db
+      .delete(schema.lighthouseConnectionEvents)
+      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID));
+    // Clear runtime state
+    clearAllStates();
   });
 
   it("should start the MQTT broker on configured port", () => {
@@ -158,7 +173,7 @@ describe("MQTT Broker Integration", () => {
     };
 
     // Publish to scan topic
-    const topic = `attendance/lighthouse/${TEST_DEVICE_ID}/scans`;
+    const topic = buildScanTopic(TEST_DEVICE_ID);
     await new Promise<void>((resolve, reject) => {
       client!.publish(topic, JSON.stringify(scanPayload), { qos: 0 }, (err) => {
         if (err) reject(err);
@@ -228,7 +243,7 @@ describe("MQTT Broker Integration", () => {
     });
 
     // Publish multiple scan messages
-    const topic = `attendance/lighthouse/${TEST_DEVICE_ID}/scans`;
+    const topic = buildScanTopic(TEST_DEVICE_ID);
     const publishPromises: Promise<void>[] = [];
 
     for (let i = 0; i < numScans; i++) {
@@ -295,8 +310,9 @@ describe("MQTT Broker Integration", () => {
       });
     });
 
-    // Publish from unknown device
-    const topic = "attendance/lighthouse/unknown-device-xyz/scans";
+    // Publish from unknown device (use valid MAC format for unknown device)
+    const unknownMac = "FF:FF:FF:FF:FF:FF";
+    const topic = buildScanTopic(unknownMac);
     const scanPayload = {
       epc: "E200001234567890FFFF",
       timestampMs: Date.now(),
@@ -347,7 +363,7 @@ describe("MQTT Broker Integration", () => {
     });
 
     // Publish invalid JSON
-    const topic = `attendance/lighthouse/${TEST_DEVICE_ID}/scans`;
+    const topic = buildScanTopic(TEST_DEVICE_ID);
     await new Promise<void>((resolve, reject) => {
       client!.publish(topic, "not valid json {{{", { qos: 0 }, (err) => {
         if (err) reject(err);
@@ -391,7 +407,7 @@ describe("MQTT Broker Integration", () => {
     });
 
     // Publish payload missing required epc field
-    const topic = `attendance/lighthouse/${TEST_DEVICE_ID}/scans`;
+    const topic = buildScanTopic(TEST_DEVICE_ID);
     const invalidPayload = {
       timestampMs: Date.now(),
       rssiDbm: -45,
@@ -414,6 +430,464 @@ describe("MQTT Broker Integration", () => {
       .where(eq(schema.rawScans.lighthouseId, TEST_LIGHTHOUSE_ID));
 
     expect(storedScans.length).toBe(0);
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  // ==================== Status Handler Tests ====================
+
+  it("should update runtime state on online message", async () => {
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-status-online-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Publish online status
+    const topic = buildStatusTopic(TEST_DEVICE_ID);
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, "online", { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait for state update
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Verify runtime state
+    const state = getLighthouseState(TEST_DEVICE_ID);
+    expect(state).toBeDefined();
+    expect(state?.isConnected).toBe(true);
+    expect(state?.connectedAt).toBeDefined();
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  it("should record connection event on status change", async () => {
+    const db = getDatabase();
+
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-status-event-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Publish online status
+    const topic = buildStatusTopic(TEST_DEVICE_ID);
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, "online", { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait for event to be recorded
+    await waitFor(async () => {
+      const events = await db
+        .select()
+        .from(schema.lighthouseConnectionEvents)
+        .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+        .limit(1);
+      return events.length > 0;
+    }, 3000);
+
+    // Verify connection event was recorded
+    const events = await db
+      .select()
+      .from(schema.lighthouseConnectionEvents)
+      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+      .limit(1);
+
+    expect(events.length).toBe(1);
+    expect(events[0]?.eventType).toBe("connected");
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  it("should mark lighthouse disconnected on offline message", async () => {
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-status-offline-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    const topic = buildStatusTopic(TEST_DEVICE_ID);
+
+    // First send online
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, "online", { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Then send offline
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, "offline", { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Verify runtime state shows disconnected
+    const state = getLighthouseState(TEST_DEVICE_ID);
+    expect(state).toBeDefined();
+    expect(state?.isConnected).toBe(false);
+    expect(state?.disconnectedAt).toBeDefined();
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  it("should handle unknown lighthouse status gracefully", async () => {
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-status-unknown-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Publish status from unknown device
+    const unknownMac = "FF:FF:FF:FF:FF:FE";
+    const topic = buildStatusTopic(unknownMac);
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, "online", { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait a bit
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Broker should still be running
+    const stats = getMqttBrokerStats();
+    expect(stats.isRunning).toBe(true);
+
+    // Runtime state should still be updated for unknown device
+    const state = getLighthouseState(unknownMac);
+    expect(state).toBeDefined();
+    expect(state?.isConnected).toBe(true);
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  // ==================== Health Handler Tests ====================
+
+  it("should store health snapshot from valid message", async () => {
+    const db = getDatabase();
+
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-health-store-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Create valid health payload
+    const healthPayload = {
+      uptime_sec: 3600,
+      free_heap_bytes: 45000,
+      min_free_heap_bytes: 38000,
+      wifi_rssi_dbm: -52,
+      rfid: {
+        state: "RESPONSIVE",
+        is_responsive: true,
+        power_rail_present: true,
+        fw_version: "1.2",
+        last_error: 0,
+      },
+    };
+
+    // Publish health message
+    const topic = buildHealthTopic(TEST_DEVICE_ID);
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, JSON.stringify(healthPayload), { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait for snapshot to be stored
+    await waitFor(async () => {
+      const snapshots = await db
+        .select()
+        .from(schema.lighthouseHealthSnapshots)
+        .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID))
+        .limit(1);
+      return snapshots.length > 0;
+    }, 3000);
+
+    // Verify snapshot was stored
+    const snapshots = await db
+      .select()
+      .from(schema.lighthouseHealthSnapshots)
+      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID))
+      .limit(1);
+
+    expect(snapshots.length).toBe(1);
+    const snapshot = snapshots[0];
+    expect(snapshot?.uptimeSec).toBe(3600);
+    expect(snapshot?.freeHeapBytes).toBe(45000);
+    expect(snapshot?.wifiRssiDbm).toBe(-52);
+    expect(snapshot?.rfidState).toBe("RESPONSIVE");
+    expect(snapshot?.rfidIsResponsive).toBe(true);
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  it("should update runtime health state", async () => {
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-health-runtime-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Create valid health payload
+    const healthPayload = {
+      uptime_sec: 7200,
+      free_heap_bytes: 40000,
+      min_free_heap_bytes: 35000,
+      wifi_rssi_dbm: -60,
+      rfid: {
+        state: "IDLE",
+        is_responsive: true,
+        power_rail_present: true,
+        fw_version: "1.3",
+        last_error: 0,
+      },
+    };
+
+    // Publish health message
+    const topic = buildHealthTopic(TEST_DEVICE_ID);
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, JSON.stringify(healthPayload), { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait for state update
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Verify runtime state
+    const state = getLighthouseState(TEST_DEVICE_ID);
+    expect(state).toBeDefined();
+    expect(state?.latestHealth).toBeDefined();
+    expect(state?.latestHealth?.uptimeSec).toBe(7200);
+    expect(state?.latestHealth?.freeHeapBytes).toBe(40000);
+    expect(state?.lastHealthAt).toBeDefined();
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  it("should reject malformed health payload", async () => {
+    const db = getDatabase();
+
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-health-malformed-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Publish malformed health message (missing required fields)
+    const topic = buildHealthTopic(TEST_DEVICE_ID);
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, JSON.stringify({ uptime_sec: 100 }), { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait a bit
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Verify no snapshot was stored
+    const snapshots = await db
+      .select()
+      .from(schema.lighthouseHealthSnapshots)
+      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+
+    expect(snapshots.length).toBe(0);
+
+    // Broker should still be running
+    const stats = getMqttBrokerStats();
+    expect(stats.isRunning).toBe(true);
+
+    // Disconnect
+    await new Promise<void>((resolve) => {
+      client!.end(false, {}, () => resolve());
+    });
+    client = null;
+  });
+
+  it("should handle unknown lighthouse health gracefully", async () => {
+    const db = getDatabase();
+
+    // Connect MQTT client
+    client = mqtt.connect(MQTT_URL, {
+      clientId: "test-health-unknown-client",
+      connectTimeout: 5000,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      client!.on("connect", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      client!.on("error", (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    // Publish health from unknown device
+    const unknownMac = "FF:FF:FF:FF:FF:FD";
+    const topic = buildHealthTopic(unknownMac);
+    const healthPayload = {
+      uptime_sec: 100,
+      free_heap_bytes: 50000,
+      min_free_heap_bytes: 45000,
+      wifi_rssi_dbm: -50,
+      rfid: {
+        state: "READY",
+        is_responsive: true,
+        power_rail_present: true,
+        fw_version: "1.0",
+        last_error: 0,
+      },
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      client!.publish(topic, JSON.stringify(healthPayload), { qos: 0 }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    // Wait a bit
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Broker should still be running
+    const stats = getMqttBrokerStats();
+    expect(stats.isRunning).toBe(true);
+
+    // Runtime state should still be updated
+    const state = getLighthouseState(unknownMac);
+    expect(state?.latestHealth).toBeDefined();
 
     // Disconnect
     await new Promise<void>((resolve) => {

@@ -1,12 +1,9 @@
 import { getDatabase, schema } from "../database/client";
-import { lighthousePlacement } from "../database/schema";
 import { createLogger } from "../utils/logger";
 import { eq } from "drizzle-orm";
+import { extractMacAddress } from "./topics";
 
 const logger = createLogger("MQTT Handlers");
-
-// Topic pattern: attendance/lighthouse/{device_id}/scans
-export const SCAN_TOPIC_PATTERN = /^attendance\/lighthouse\/([^/]+)\/scans$/;
 
 /**
  * Scan message payload structure from lighthouse
@@ -39,14 +36,6 @@ let eventEmitter: ScanEventEmitter | null = null;
  */
 export function setScanEventEmitter(emitter: ScanEventEmitter): void {
   eventEmitter = emitter;
-}
-
-/**
- * Parse device_id from topic
- */
-function extractDeviceId(topic: string): string | null {
-  const match = topic.match(SCAN_TOPIC_PATTERN);
-  return match ? match[1] : null;
 }
 
 /**
@@ -83,8 +72,8 @@ export async function handleScanMessage(
   topic: string,
   payload: string | Buffer
 ): Promise<void> {
-  const deviceId = extractDeviceId(topic);
-  if (!deviceId) {
+  const macAddress = extractMacAddress(topic);
+  if (!macAddress) {
     logger.warn(`Invalid scan topic format: ${topic}`);
     return;
   }
@@ -95,29 +84,29 @@ export async function handleScanMessage(
     const payloadStr = payload.toString("utf-8");
     scanData = JSON.parse(payloadStr);
   } catch (error) {
-    logger.error(`Failed to parse scan payload from ${deviceId}:`, error);
+    logger.error(`Failed to parse scan payload from ${macAddress}:`, error);
     return;
   }
 
   // Validate payload
   if (!validatePayload(scanData)) {
-    logger.warn(`Invalid scan payload from ${deviceId}:`, scanData);
+    logger.warn(`Invalid scan payload from ${macAddress}:`, scanData);
     return;
   }
 
-  logger.debug(`Processing scan from device ${deviceId}: EPC=${scanData.epc}`);
+  logger.debug(`Processing scan from device ${macAddress}: EPC=${scanData.epc}`);
 
   try {
-    // Look up lighthouse by device_id
+    // Look up lighthouse by deviceId (MAC address)
     const db = getDatabase();
     const lighthouses = await db
       .select({ id: schema.lighthouses.id })
       .from(schema.lighthouses)
-      .where(eq(schema.lighthouses.deviceId, deviceId))
+      .where(eq(schema.lighthouses.deviceId, macAddress))
       .limit(1);
 
     if (lighthouses.length === 0 || lighthouses[0] === undefined) {
-      logger.warn(`Unknown lighthouse device: ${deviceId}`);
+      logger.warn(`Unknown lighthouse device: ${macAddress}`);
       // Could optionally store in a separate "unknown_scans" table
       return;
     }
@@ -164,7 +153,7 @@ export async function handleScanMessage(
     // This will be implemented in Task 2.2
     queueScanForProcessing(scanId, lighthouseId, scanData.epc);
   } catch (error) {
-    logger.error(`Failed to store scan from ${deviceId}:`, error);
+    logger.error(`Failed to store scan from ${macAddress}:`, error);
     // Don't rethrow - we don't want to crash the broker for a single failed insert
   }
 }
@@ -192,8 +181,8 @@ export async function handleBatchScanMessage(
   topic: string,
   payload: Buffer
 ): Promise<void> {
-  const deviceId = extractDeviceId(topic);
-  if (!deviceId) {
+  const macAddress = extractMacAddress(topic);
+  if (!macAddress) {
     logger.warn(`Invalid scan topic format: ${topic}`);
     return;
   }
@@ -205,14 +194,14 @@ export async function handleBatchScanMessage(
     const parsed = JSON.parse(payloadStr);
     scansData = Array.isArray(parsed) ? parsed : [parsed];
   } catch (error) {
-    logger.error(`Failed to parse batch scan payload from ${deviceId}:`, error);
+    logger.error(`Failed to parse batch scan payload from ${macAddress}:`, error);
     return;
   }
 
   // Process each scan
   for (const scanData of scansData) {
     if (!validatePayload(scanData)) {
-      logger.warn(`Invalid scan in batch from ${deviceId}:`, scanData);
+      logger.warn(`Invalid scan in batch from ${macAddress}:`, scanData);
       continue;
     }
 

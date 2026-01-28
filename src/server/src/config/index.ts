@@ -16,6 +16,10 @@ interface Config {
   http: {
     port: number;
   };
+  retention: {
+    healthRetentionDays: number;
+    connectionRetentionDays: number;
+  };
   nodeEnv: 'development' | 'production' | 'test';
 }
 
@@ -56,6 +60,10 @@ export function loadConfig(): Config {
     },
     http: {
       port: getEnvVarAsInt('HTTP_PORT', 3000),
+    },
+    retention: {
+      healthRetentionDays: getEnvVarAsInt('HEALTH_RETENTION_DAYS', 7),
+      connectionRetentionDays: getEnvVarAsInt('CONNECTION_RETENTION_DAYS', 30),
     },
     nodeEnv: (getEnvVar('NODE_ENV', 'development') as Config['nodeEnv']),
   };

@@ -26,6 +26,7 @@ export const lighthouses = pgTable(
     name: varchar({ length: 255 }).notNull().unique(),
     deviceId: varchar({ length: 255 }).notNull().unique(),
     placement: lighthousePlacement().notNull().default(lighthousePlacement.enumValues[0]),
+    label: varchar({ length: 255 }),
     comment: varchar({length: 256}),
     firmwareVersion: varchar({ length: 50 }),
     lastSeenAt: timestamp({ withTimezone: true }),
@@ -172,5 +173,42 @@ export const dashboardUsers = pgTable(
   },
   (table) => ([
     index("idx_dashboard_users_username").on(table.username),
+  ])
+)
+
+export const lighthouseHealthSnapshots = pgTable(
+  'lighthouse_health_snapshots',
+  {
+    id: bigserial({ mode: 'bigint' }).primaryKey(),
+    lighthouseId: integer().notNull().references(() => lighthouses.id),
+    uptimeSec: integer(),
+    freeHeapBytes: integer(),
+    minFreeHeapBytes: integer(),
+    wifiRssiDbm: integer(),
+    rfidState: varchar({ length: 50 }),
+    rfidIsResponsive: boolean(),
+    rfidPowerRailPresent: boolean(),
+    rfidFwVersion: varchar({ length: 20 }),
+    rfidLastError: integer(),
+    recordedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ([
+    index("idx_health_snapshots_lighthouse_recorded").on(table.lighthouseId, table.recordedAt),
+    index("idx_health_snapshots_recorded").on(table.recordedAt),
+  ])
+)
+
+export const lighthouseConnectionEvents = pgTable(
+  'lighthouse_connection_events',
+  {
+    id: bigserial({ mode: 'bigint' }).primaryKey(),
+    lighthouseId: integer().notNull().references(() => lighthouses.id),
+    eventType: varchar({ length: 20 }).notNull(),
+    isGraceful: boolean(),
+    recordedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ([
+    index("idx_connection_events_lighthouse_recorded").on(table.lighthouseId, table.recordedAt),
+    index("idx_connection_events_recorded").on(table.recordedAt),
   ])
 )

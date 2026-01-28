@@ -5,6 +5,7 @@ import {
   schema
 } from "./database/client";
 import { startMqttBroker, closeMqttBroker, getMqttBrokerStats } from "./mqtt/broker";
+import { startRetentionScheduler, stopRetentionScheduler } from "./database/cleanup";
 import { app } from "./api/routes";
 import { getConfig } from "./config";
 import { createLogger } from "./utils/logger";
@@ -38,6 +39,9 @@ async function gracefulShutdown(signal: string) {
       httpServer.stop();
       httpServer = null;
     }
+
+    // Stop retention cleanup scheduler
+    stopRetentionScheduler();
 
     // Close MQTT broker (stop accepting new messages)
     await closeMqttBroker();
@@ -99,6 +103,9 @@ async function startup() {
         logger.info(`MQTT broker running on port ${stats.port}`);
       }
     }, 100);
+
+    // Start retention cleanup scheduler
+    startRetentionScheduler();
 
     // Start HTTP server
     const config = getConfig();
