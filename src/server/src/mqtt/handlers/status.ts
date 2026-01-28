@@ -58,6 +58,14 @@ export async function handleStatusMessage(
       } else {
         setLighthouseDisconnected(macAddress, false);
       }
+
+      // This should not really be automatic and there should be a more defined process
+      await db.insert(schema.lighthouses).values({
+        name: macAddress, 
+        placement: "STANDALONE",
+        isActive: true,
+        deviceId: macAddress
+      })
       return;
     }
 
