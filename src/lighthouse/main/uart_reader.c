@@ -16,6 +16,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "hal/gpio_types.h"
 
 static const char *TAG = "RFID";
 
@@ -447,7 +448,7 @@ esp_err_t rfid_reader_init(void)
     // Logic: GPIO HIGH = reader powered, GPIO LOW = reader disabled
     gpio_config_t pwr_ctrl_config = {
         .pin_bit_mask = (1ULL << RFID_POWER_CONTROL_PIN),
-        .mode         = GPIO_MODE_OUTPUT,
+        .mode         = GPIO_MODE_INPUT_OUTPUT,
         .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type    = GPIO_INTR_DISABLE,
@@ -722,6 +723,14 @@ esp_err_t rfid_reader_handshake(uint8_t *major, uint8_t *minor)
         return ESP_ERR_INVALID_STATE;
     }
 
+    bool is_powered = rfid_reader_is_powered();
+
+    if (!is_powered)
+    {
+        ESP_LOGI(TAG, "Reader unpowered, powering on to perform handshake");
+        rfid_reader_power_on();
+    }
+
     // Power is present - attempt handshake
     uint8_t   fw_major = 0, fw_minor = 0;
     esp_err_t ret = rfid_reader_get_firmware(&fw_major, &fw_minor);
@@ -756,6 +765,12 @@ esp_err_t rfid_reader_handshake(uint8_t *major, uint8_t *minor)
     }
 
     xSemaphoreGive(rfid_state.mutex);
+
+    if (!is_powered)
+    {
+        ESP_LOGI(TAG, "Powering off after standalone handshake");
+        rfid_reader_power_off();
+    }
 
     return ret;
 }

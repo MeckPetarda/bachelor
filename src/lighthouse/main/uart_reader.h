@@ -44,7 +44,7 @@
 // Power control and sensing pins
 // GPIO2 was previously used but is a strapping pin that blocks firmware flashing
 // Migrated to GPIO22 (sensing) and GPIO5 (control) per tasks/reader_power_task.md
-#define RFID_POWER_CONTROL_PIN GPIO_NUM_5  // S9013 NPN transistor base (HIGH = reader ON)
+#define RFID_POWER_CONTROL_PIN GPIO_NUM_18  // S9013 NPN transistor base (HIGH = reader ON)
 #define RFID_POWER_SENSE_PIN   GPIO_NUM_22 // 3.3V rail feedback from reader power supply
 #define RFID_POWER_STABILIZATION_MS 100    // Delay after power ON for reader stabilization
 

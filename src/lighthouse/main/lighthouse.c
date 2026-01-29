@@ -50,7 +50,7 @@
 
 // NOTE: GPIO5 was moved to RFID reader power control (uart_reader.c)
 // WiFi status LED relocated to GPIO4 per tasks/reader_power_task.md
-#define WIFI_STATUS_LED GPIO_NUM_4  // WiFi connection status (ON = connected)
+#define WIFI_STATUS_LED GPIO_NUM_5  // WiFi connection status (ON = connected)
 #define MQTT_STATUS_LED GPIO_NUM_23 // MQTT broker status (ON = connected)
 #define ACTIVITY_LED    GPIO_NUM_19 // Tag detection activity (flashes on detection)
 #define SCANNING_LED    GPIO_NUM_18 // RFID scanning active (ON = scanning)
