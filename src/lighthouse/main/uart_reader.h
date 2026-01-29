@@ -41,7 +41,12 @@
 #define RFID_UART_RX_PIN 16              // ESP32 RX → Y300 TX
 #define RFID_UART_BAUD   115200          // R300 default (section 1.1)
 
-#define RFID_POWER_STATUS_PIN GPIO_NUM_2 // 3.3V rail feedback from reader power supply (pin 24)
+// Power control and sensing pins
+// GPIO2 was previously used but is a strapping pin that blocks firmware flashing
+// Migrated to GPIO22 (sensing) and GPIO5 (control) per tasks/reader_power_task.md
+#define RFID_POWER_CONTROL_PIN GPIO_NUM_5  // S9013 NPN transistor base (HIGH = reader ON)
+#define RFID_POWER_SENSE_PIN   GPIO_NUM_22 // 3.3V rail feedback from reader power supply
+#define RFID_POWER_STABILIZATION_MS 100    // Delay after power ON for reader stabilization
 
 // ============================================================================
 // FREQUENCY REGIONS (section 2.1.9, page 13)
@@ -131,10 +136,42 @@ typedef void (*rfid_tag_callback_t)(const rfid_tag_event_t *event);
  * Initialize RFID reader
  *
  * Sets up UART2, configures pins, starts background task.
+ * Reader power control pin is initialized LOW (reader OFF).
  *
  * @return ESP_OK on success
  */
 esp_err_t rfid_reader_init(void);
+
+/**
+ * Power ON the RFID reader
+ *
+ * Sets GPIO5 HIGH to enable the S9013 transistor, powering the reader.
+ * Includes stabilization delay for reader power-up.
+ * Call this before any RFID scanning/reading operations.
+ *
+ * Per YR300 datasheet: Operating current 300-380mA
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t rfid_reader_power_on(void);
+
+/**
+ * Power OFF the RFID reader
+ *
+ * Sets GPIO5 LOW to disable the S9013 transistor, cutting reader power.
+ * Reader enters sleep mode (<100µA per YR300 datasheet).
+ * Call after RFID operations complete to conserve power.
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t rfid_reader_power_off(void);
+
+/**
+ * Check if reader power is currently enabled
+ *
+ * @return true if power control GPIO is HIGH (reader powered)
+ */
+bool rfid_reader_is_powered(void);
 
 /**
  * Deinitialize and cleanup

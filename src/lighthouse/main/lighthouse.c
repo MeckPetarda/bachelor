@@ -2,8 +2,18 @@
  * ESP32 Attendance System - Main Application
  *
  * Integrates:
- *   - GPIO: Buttons, LEDs (PIR sensor disabled - GPIO 2 used for RFID power monitoring)
+ *   - GPIO: Buttons, LEDs, RFID power control
  *   - RFID: Y300 UHF RFID reader for contactless tag detection
+ *
+ * GPIO Pin Assignments:
+ *   - GPIO4:  WiFi status LED (moved from GPIO5)
+ *   - GPIO5:  RFID reader power control (S9013 transistor base)
+ *   - GPIO22: RFID power rail sense (moved from GPIO2 strapping pin)
+ *   - GPIO18: Scanning LED
+ *   - GPIO19: Activity LED
+ *   - GPIO23: MQTT status LED
+ *   - GPIO34: Button 1 (Start/Stop scanning)
+ *   - GPIO35: Button 2 (Statistics / WiFi setup)
  *
  * Press BUTTON1 to start/stop RFID scanning
  * Press BUTTON2 to show statistics
@@ -38,7 +48,9 @@
 // GPIO CONFIGURATION
 // ============================================================================
 
-#define WIFI_STATUS_LED GPIO_NUM_5  // WiFi connection status (ON = connected)
+// NOTE: GPIO5 was moved to RFID reader power control (uart_reader.c)
+// WiFi status LED relocated to GPIO4 per tasks/reader_power_task.md
+#define WIFI_STATUS_LED GPIO_NUM_4  // WiFi connection status (ON = connected)
 #define MQTT_STATUS_LED GPIO_NUM_23 // MQTT broker status (ON = connected)
 #define ACTIVITY_LED    GPIO_NUM_19 // Tag detection activity (flashes on detection)
 #define SCANNING_LED    GPIO_NUM_18 // RFID scanning active (ON = scanning)
@@ -457,6 +469,20 @@ static void rfid_reader_start_inventory_wrapper(void)
 {
     ESP_LOGI(TAG, "Attempting to start RFID scan...");
 
+    // Step 1: Power ON the reader (if not already powered)
+    if (!rfid_reader_is_powered())
+    {
+        ESP_LOGI(TAG, "Powering ON RFID reader...");
+        esp_err_t power_ret = rfid_reader_power_on();
+        if (power_ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "✗ Failed to power on reader: %s", esp_err_to_name(power_ret));
+            return;
+        }
+        // Additional stabilization delay after power-on
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+
     // Step 2: Perform handshake to verify reader communication
     ESP_LOGI(TAG, "Performing reader handshake...");
     esp_err_t handshake_result = rfid_reader_handshake(NULL, NULL);
@@ -465,6 +491,8 @@ static void rfid_reader_start_inventory_wrapper(void)
     {
         ESP_LOGE(TAG, "✗ Cannot start scanning");
         ESP_LOGE(TAG, "  Handshake error: %s (0x%X)", esp_err_to_name(handshake_result), handshake_result);
+        // Power off reader on handshake failure to save power
+        rfid_reader_power_off();
         return;
     }
 
@@ -483,6 +511,8 @@ static void rfid_reader_start_inventory_wrapper(void)
     else
     {
         ESP_LOGE(TAG, "✗ Failed to start inventory: %s", esp_err_to_name(ret));
+        // Power off reader on inventory start failure
+        rfid_reader_power_off();
     }
 }
 
@@ -517,6 +547,10 @@ static void process_buttons(void)
                     rfid_reader_stop_inventory();
                     gpio_set_level(SCANNING_LED, 0); // Turn off scanning indicator
                     rfid_scanning = false;
+
+                    // Power off reader to conserve power when not scanning
+                    // Per YR300 datasheet: sleep mode <100µA
+                    rfid_reader_power_off();
                 }
             }
         }
@@ -618,7 +652,6 @@ static void main_task(void *arg)
         wifi_provisioning_process();
 
         process_buttons();
-        // process_pir();  // Disabled - GPIO 2 used for RFID power monitoring
 
         // Update WiFi status LED (check every iteration)
         bool wifi_connected = wifi_manager_is_connected();
@@ -815,7 +848,16 @@ esp_err_t init_rfid_reader()
         return ret;
     }
 
-    // Small delay for module to stabilize
+    // Power ON the reader before configuration
+    ESP_LOGI(TAG, "Powering ON RFID reader for initial configuration...");
+    ret = rfid_reader_power_on();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to power on RFID reader: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Additional stabilization delay after power-on
     vTaskDelay(pdMS_TO_TICKS(500));
 
     ESP_LOGI(TAG, "Resetting RFID reader...");
@@ -859,6 +901,11 @@ esp_err_t init_rfid_reader()
     }
     vTaskDelay(pdMS_TO_TICKS(200));
 
+    // Power OFF reader after configuration to conserve power
+    // Reader will be powered ON when user starts scanning via BUTTON1
+    ESP_LOGI(TAG, "Powering OFF RFID reader until scanning requested...");
+    rfid_reader_power_off();
+
     return ESP_OK;
 }
 
@@ -893,7 +940,7 @@ void app_main(void)
     ESP_LOGI(TAG, "System ready!");
     ESP_LOGI(TAG, "  Press BUTTON1 to start/stop scanning");
     ESP_LOGI(TAG, "  Press BUTTON2 to show statistics");
-    ESP_LOGI(TAG, "  RFID power monitoring active on GPIO 2\n");
+    ESP_LOGI(TAG, "  RFID power control on GPIO5, sense on GPIO22\n");
 
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
 }

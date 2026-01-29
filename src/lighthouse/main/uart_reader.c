@@ -442,23 +442,44 @@ esp_err_t rfid_reader_init(void)
         return ret;
     }
 
-    // Configure GPIO for power status monitoring
-    gpio_config_t pwr_config = {
-        .pin_bit_mask = (1ULL << RFID_POWER_STATUS_PIN),
+    // Configure GPIO5 for reader power control (transistor base)
+    // Per tasks/reader_power_task.md: S9013 NPN transistor, 240Ω base resistor
+    // Logic: GPIO HIGH = reader powered, GPIO LOW = reader disabled
+    gpio_config_t pwr_ctrl_config = {
+        .pin_bit_mask = (1ULL << RFID_POWER_CONTROL_PIN),
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    ret = gpio_config(&pwr_ctrl_config);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to configure power control GPIO: %s", esp_err_to_name(ret));
+        uart_driver_delete(RFID_UART_PORT);
+        return ret;
+    }
+    // Initialize power control pin LOW (reader OFF at startup)
+    gpio_set_level(RFID_POWER_CONTROL_PIN, 0);
+    ESP_LOGI(TAG, "Power control configured on GPIO%d (initial: OFF)", RFID_POWER_CONTROL_PIN);
+
+    // Configure GPIO22 for power rail sensing (voltage monitoring)
+    // Migrated from GPIO2 (strapping pin) per tasks/reader_power_task.md
+    gpio_config_t pwr_sense_config = {
+        .pin_bit_mask = (1ULL << RFID_POWER_SENSE_PIN),
         .mode         = GPIO_MODE_INPUT,
         .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_ENABLE, // Safe default when unpowered
         .intr_type    = GPIO_INTR_DISABLE,
     };
-    ret = gpio_config(&pwr_config);
+    ret = gpio_config(&pwr_sense_config);
     if (ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "Failed to configure power status GPIO: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to configure power sense GPIO: %s", esp_err_to_name(ret));
         uart_driver_delete(RFID_UART_PORT);
         return ret;
     }
-
-    ESP_LOGI(TAG, "Power status monitoring configured on GPIO%d", RFID_POWER_STATUS_PIN);
+    ESP_LOGI(TAG, "Power sense configured on GPIO%d", RFID_POWER_SENSE_PIN);
 
     // Flush any startup garbage
     uart_flush(RFID_UART_PORT);
@@ -506,6 +527,10 @@ void rfid_reader_deinit(void)
     }
 
     rfid_reader_stop_inventory();
+
+    // Power off reader before cleanup
+    gpio_set_level(RFID_POWER_CONTROL_PIN, 0);
+    ESP_LOGI(TAG, "Reader power disabled during deinit");
 
     if (rfid_state.rx_task_handle)
     {
@@ -556,6 +581,78 @@ esp_err_t rfid_reader_reset(void)
     return ret;
 }
 
+esp_err_t rfid_reader_power_on(void)
+{
+    if (!rfid_state.initialized)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Powering ON RFID reader (GPIO%d HIGH)...", RFID_POWER_CONTROL_PIN);
+
+    // Set transistor base HIGH to enable reader power
+    gpio_set_level(RFID_POWER_CONTROL_PIN, 1);
+
+    // Wait for reader stabilization
+    // Per YR300 datasheet: reader needs time to power up
+    vTaskDelay(pdMS_TO_TICKS(RFID_POWER_STABILIZATION_MS));
+
+    // Verify power rail is present
+    bool power_present = gpio_get_level(RFID_POWER_SENSE_PIN);
+    if (power_present)
+    {
+        ESP_LOGI(TAG, "✓ Reader powered ON - power rail confirmed");
+
+        // Update state machine
+        xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
+        rfid_state.state                     = RFID_STATE_STARTUP_PENDING;
+        rfid_state.health.power_rail_present = true;
+        xSemaphoreGive(rfid_state.mutex);
+    }
+    else
+    {
+        ESP_LOGW(TAG, "⚠ Reader power control set HIGH but power rail not detected");
+        ESP_LOGW(TAG, "  Check hardware: transistor, sense circuit, power supply");
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t rfid_reader_power_off(void)
+{
+    if (!rfid_state.initialized)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Stop inventory before powering off
+    if (rfid_state.inventory_active)
+    {
+        rfid_reader_stop_inventory();
+    }
+
+    ESP_LOGI(TAG, "Powering OFF RFID reader (GPIO%d LOW)...", RFID_POWER_CONTROL_PIN);
+
+    // Set transistor base LOW to disable reader power
+    gpio_set_level(RFID_POWER_CONTROL_PIN, 0);
+
+    // Update state machine
+    xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
+    rfid_state.state                     = RFID_STATE_POWERED_OFF;
+    rfid_state.health.power_rail_present = false;
+    rfid_state.health.is_responsive      = false;
+    xSemaphoreGive(rfid_state.mutex);
+
+    ESP_LOGI(TAG, "✓ Reader powered OFF (sleep mode <100µA)");
+
+    return ESP_OK;
+}
+
+bool rfid_reader_is_powered(void)
+{
+    return gpio_get_level(RFID_POWER_CONTROL_PIN) == 1;
+}
+
 esp_err_t rfid_reader_get_firmware(uint8_t *major, uint8_t *minor)
 {
     if (!rfid_state.initialized)
@@ -602,8 +699,8 @@ esp_err_t rfid_reader_handshake(uint8_t *major, uint8_t *minor)
         return ESP_ERR_INVALID_STATE;
     }
 
-    // Check power rail status first
-    bool power_present = gpio_get_level(RFID_POWER_STATUS_PIN);
+    // Check power rail status first (GPIO22 - migrated from GPIO2 strapping pin)
+    bool power_present = gpio_get_level(RFID_POWER_SENSE_PIN);
 
     // Update health metrics with power status
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
