@@ -20,6 +20,22 @@ export const lighthousePlacement = pgEnum('lighthouse_placement', ["STANDALONE",
 
 export const userType = pgEnum('user_type', ["STANDALONE", "INSIDE", "OUTSIDE"])
 
+export const scanSource = pgEnum('scan_source', ['realtime', 'offline_sync'])
+
+export const lighthouseGroups = pgTable(
+  'lighthouse_groups',
+  {
+    id: serial().primaryKey(),
+    label: varchar({ length: 255 }).notNull(),
+    description: varchar({ length: 500 }),
+    createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ([
+    index("idx_lighthouse_groups_label").on(table.label),
+  ])
+)
+
 export const lighthouses = pgTable(
   'lighthouses',
   {
@@ -32,12 +48,14 @@ export const lighthouses = pgTable(
     lastSeenAt: timestamp({ withTimezone: true }),
     isActive: boolean().default(true),
     config: jsonb().default(sql`'{}'::jsonb`),
+    groupId: integer().references(() => lighthouseGroups.id, { onDelete: 'set null' }),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     cangedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ([
     index("idx_lighthouses_name").on(table.name),
     index("idx_lighthouses_device_id").on(table.deviceId),
+    index("idx_lighthouses_group_id").on(table.groupId),
   ])
 )
 
@@ -57,6 +75,7 @@ export const rawScans = pgTable(
     timestamp: timestamp({ withTimezone: true }).notNull(),
     receivedAt: timestamp({ withTimezone: true }).defaultNow(),
     processed: boolean().default(false),
+    source: scanSource().notNull().default('realtime'),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ([
