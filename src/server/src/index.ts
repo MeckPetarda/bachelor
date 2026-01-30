@@ -9,6 +9,13 @@ import { startRetentionScheduler, stopRetentionScheduler } from "./database/clea
 import { app } from "./api/routes";
 import { getConfig } from "./config";
 import { createLogger } from "./utils/logger";
+import {
+  handleWebSocketOpen,
+  handleWebSocketClose,
+  handleWebSocketMessage,
+  closeAllConnections,
+  getConnectedClientCount,
+} from "./api/websocket";
 
 const logger = createLogger("Server");
 
@@ -39,6 +46,9 @@ async function gracefulShutdown(signal: string) {
       httpServer.stop();
       httpServer = null;
     }
+
+    // Close all WebSocket connections
+    closeAllConnections();
 
     // Stop retention cleanup scheduler
     stopRetentionScheduler();
@@ -107,14 +117,44 @@ async function startup() {
     // Start retention cleanup scheduler
     startRetentionScheduler();
 
-    // Start HTTP server
+    // Start HTTP server with WebSocket support
     const config = getConfig();
     httpServer = Bun.serve({
       port: config.http.port,
-      fetch: app.fetch,
+      fetch(req, server) {
+        // Check for WebSocket upgrade
+        const url = new URL(req.url);
+        if (url.pathname === "/ws") {
+          const upgraded = server.upgrade(req, {
+            data: { connectedAt: new Date() },
+          });
+          if (upgraded) {
+            return undefined; // Bun handles the response
+          }
+          return new Response("WebSocket upgrade failed", { status: 500 });
+        }
+
+        // Handle regular HTTP requests via Hono
+        return app.fetch(req);
+      },
+      websocket: {
+        open(ws) {
+          handleWebSocketOpen(ws as unknown as WebSocket);
+        },
+        close(ws) {
+          handleWebSocketClose(ws as unknown as WebSocket);
+        },
+        message(ws, message) {
+          handleWebSocketMessage(
+            ws as unknown as WebSocket,
+            typeof message === "string" ? message : Buffer.from(message)
+          );
+        },
+      },
     });
 
     logger.info(`HTTP server running on port ${config.http.port}`);
+    logger.info(`WebSocket endpoint available at ws://localhost:${config.http.port}/ws`);
     logger.info("Server startup completed successfully");
   } catch (error) {
     logger.error("Startup failed:", error);

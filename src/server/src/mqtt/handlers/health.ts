@@ -7,6 +7,7 @@ import { getDatabase, schema } from "../../database/client";
 import { createLogger } from "../../utils/logger";
 import { extractMacAddress } from "../topics";
 import { updateLighthouseHealth, type HealthPayload } from "../state";
+import { broadcastDeviceHealth } from "../../api/websocket";
 
 const logger = createLogger("Health Handler");
 
@@ -118,9 +119,20 @@ export async function handleHealthMessage(
       .limit(1);
 
     if (lighthouses.length === 0 || lighthouses[0] === undefined) {
-      logger.warn(`Unknown lighthouse device: ${macAddress}`);
-      // Still update runtime state for unknown devices
-      updateLighthouseHealth(macAddress, convertToHealthPayload(healthData));
+      logger.info(`Pending device health update: ${macAddress}`);
+      // Update runtime state for unknown devices (pending, not registered)
+      const healthPayload = convertToHealthPayload(healthData);
+      updateLighthouseHealth(macAddress, healthPayload, false);
+
+      // Broadcast health update for pending device
+      broadcastDeviceHealth(macAddress, null, {
+        uptimeSec: healthPayload.uptimeSec,
+        freeHeapBytes: healthPayload.freeHeapBytes,
+        wifiRssiDbm: healthPayload.wifiRssiDbm,
+        rfidState: healthPayload.rfid.state,
+        rfidIsResponsive: healthPayload.rfid.isResponsive,
+      });
+
       return;
     }
 
@@ -129,8 +141,17 @@ export async function handleHealthMessage(
     // Convert to internal format
     const healthPayload = convertToHealthPayload(healthData);
 
-    // Update runtime state
-    updateLighthouseHealth(macAddress, healthPayload);
+    // Update runtime state (mark as registered since we found it in DB)
+    updateLighthouseHealth(macAddress, healthPayload, true);
+
+    // Broadcast health update for registered device
+    broadcastDeviceHealth(macAddress, lighthouseId, {
+      uptimeSec: healthPayload.uptimeSec,
+      freeHeapBytes: healthPayload.freeHeapBytes,
+      wifiRssiDbm: healthPayload.wifiRssiDbm,
+      rfidState: healthPayload.rfid.state,
+      rfidIsResponsive: healthPayload.rfid.isResponsive,
+    });
 
     // Insert health snapshot record
     await db.insert(schema.lighthouseHealthSnapshots).values({

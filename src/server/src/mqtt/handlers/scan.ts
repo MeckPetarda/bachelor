@@ -2,6 +2,7 @@ import { getDatabase, schema } from "../../database/client";
 import { createLogger } from "../../utils/logger";
 import { eq } from "drizzle-orm";
 import { extractMacAddress } from "../topics";
+import { broadcastScan } from "../../api/websocket";
 
 const logger = createLogger("Scan Handler");
 
@@ -18,6 +19,19 @@ export interface ScanPayload {
   detectionConfidence?: number;
   timestampMs: number;
   timestamp?: string; // ISO 8601 format
+  backfill?: boolean; // Indicates if this scan was synced from offline storage
+}
+
+/**
+ * Scan event data for WebSocket notifications
+ */
+export interface ScanEventData {
+  lighthouseId: number;
+  scanId: bigint;
+  epc: string;
+  rssiDbm: number | null;
+  timestamp: Date;
+  source: 'realtime' | 'offline_sync';
 }
 
 /**
@@ -25,7 +39,7 @@ export interface ScanPayload {
  * This will be implemented when WebSocket support is added
  */
 export interface ScanEventEmitter {
-  emit(event: "newScan", data: { lighthouseId: number; scanId: bigint }): void;
+  emit(event: "newScan", data: ScanEventData): void;
 }
 
 // Placeholder for event emitter - will be set when WebSocket is implemented
@@ -121,6 +135,9 @@ export async function handleScanMessage(
       scanTimestamp = new Date(Number(scanData.timestampMs));
     }
 
+    // Determine source based on backfill flag
+    const source = scanData.backfill === true ? 'offline_sync' : 'realtime';
+
     // Insert into raw_scans table
     const insertResult = await db
       .insert(schema.rawScans)
@@ -136,16 +153,35 @@ export async function handleScanMessage(
         timestampMs: BigInt(scanData.timestampMs),
         timestamp: scanTimestamp,
         processed: false,
+        source,
       })
       .returning({ id: schema.rawScans.id });
 
-    const scanId = insertResult[0].id;
+    const insertedScan = insertResult[0];
+    if (!insertedScan) {
+      logger.error(`Failed to insert scan from ${macAddress}`);
+      return;
+    }
+    const scanId = insertedScan.id;
     logger.debug(`Stored scan ${scanId} from lighthouse ${lighthouseId}`);
 
-    // Emit WebSocket event for dashboard (non-blocking)
+    // Broadcast WebSocket event for dashboard (non-blocking)
+    const eventData: ScanEventData = {
+      lighthouseId,
+      scanId,
+      epc: scanData.epc,
+      rssiDbm: scanData.rssiDbm ?? null,
+      timestamp: scanTimestamp,
+      source,
+    };
+    setImmediate(() => {
+      broadcastScan(eventData);
+    });
+
+    // Legacy event emitter support
     if (eventEmitter) {
       setImmediate(() => {
-        eventEmitter!.emit("newScan", { lighthouseId, scanId });
+        eventEmitter!.emit("newScan", eventData);
       });
     }
 

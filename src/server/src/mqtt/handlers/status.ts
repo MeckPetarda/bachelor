@@ -10,7 +10,13 @@ import {
   setLighthouseConnected,
   setLighthouseDisconnected,
   wasLighthouseConnected,
+  isPendingDevice,
 } from "../state";
+import {
+  broadcastDeviceOnline,
+  broadcastDeviceOffline,
+  broadcastPendingDevice,
+} from "../../api/websocket";
 
 const logger = createLogger("Status Handler");
 
@@ -51,12 +57,27 @@ export async function handleStatusMessage(
       .limit(1);
 
     if (lighthouses.length === 0 || lighthouses[0] === undefined) {
-      logger.warn(`Unknown lighthouse device: ${macAddress}`);
-      // Still update runtime state for unknown devices
+      // Check if this is a newly seen pending device
+      const wasAlreadyPending = isPendingDevice(macAddress);
+
+      // Update runtime state for unknown devices (pending)
       if (isOnline) {
-        setLighthouseConnected(macAddress);
+        setLighthouseConnected(macAddress, false);
+
+        // Broadcast new pending device if this is the first time we see it
+        if (!wasAlreadyPending) {
+          logger.info(`New pending device detected: ${macAddress}`);
+          broadcastPendingDevice(macAddress);
+        } else {
+          logger.info(`Pending device online: ${macAddress}`);
+        }
+
+        // Broadcast online status for pending device
+        broadcastDeviceOnline(macAddress, null);
       } else {
         setLighthouseDisconnected(macAddress, false);
+        logger.info(`Pending device offline: ${macAddress}`);
+        broadcastDeviceOffline(macAddress, null, false);
       }
 
       return;
@@ -77,11 +98,13 @@ export async function handleStatusMessage(
       isGraceful = wasLighthouseConnected(macAddress);
     }
 
-    // Update runtime state
+    // Update runtime state (mark as registered since we found it in DB)
     if (isOnline) {
-      setLighthouseConnected(macAddress);
+      setLighthouseConnected(macAddress, true);
+      broadcastDeviceOnline(macAddress, lighthouseId);
     } else {
       setLighthouseDisconnected(macAddress, isGraceful ?? false);
+      broadcastDeviceOffline(macAddress, lighthouseId, isGraceful ?? false);
     }
 
     // Insert connection event record
