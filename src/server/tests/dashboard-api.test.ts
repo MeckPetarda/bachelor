@@ -64,10 +64,25 @@ describe("Dashboard API Endpoints", () => {
   afterAll(async () => {
     const db = getDatabase();
 
-    // Clean up test data
+    // Clean up test data (including all test lighthouses)
     await db
       .delete(schema.lighthouses)
       .where(eq(schema.lighthouses.name, TEST_LIGHTHOUSE_NAME));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.name, "Group Member 1"));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.name, "Group Member 2"));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.deviceId, "XX:XX:XX:XX:XX:XX"));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.deviceId, "G1:G1:G1:G1:G1:G1"));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.deviceId, "G2:G2:G2:G2:G2:G2"));
 
     await db
       .delete(schema.lighthouseGroups)
@@ -88,9 +103,28 @@ describe("Dashboard API Endpoints", () => {
   beforeEach(async () => {
     // Clean up test data before each test
     const db = getDatabase();
+
+    // Delete test lighthouses (including group members created in some tests)
     await db
       .delete(schema.lighthouses)
       .where(eq(schema.lighthouses.name, TEST_LIGHTHOUSE_NAME));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.name, "Group Member 1"));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.name, "Group Member 2"));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.deviceId, "XX:XX:XX:XX:XX:XX"));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.deviceId, "G1:G1:G1:G1:G1:G1"));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.deviceId, "G2:G2:G2:G2:G2:G2"));
+
+    // Delete test groups
     await db
       .delete(schema.lighthouseGroups)
       .where(eq(schema.lighthouseGroups.label, TEST_GROUP_LABEL));
