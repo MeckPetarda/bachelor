@@ -342,11 +342,9 @@ protectedRoutes.patch("/lighthouses/:id", async (c) => {
   return c.json({ data: result[0] });
 });
 
-// Mount protected routes under /api/v1
-app.route("/api/v1", protectedRoutes);
-
 // ============================================================================
 // Public Dashboard Routes (No authentication required for PoC)
+// These must be defined BEFORE mounting protected routes
 // ============================================================================
 
 /**
@@ -987,5 +985,8 @@ app.get("/api/v1/scans", async (c) => {
     offset,
   });
 });
+
+// Mount protected routes under /api/v1 AFTER public routes
+app.route("/api/v1", protectedRoutes);
 
 export { app };
