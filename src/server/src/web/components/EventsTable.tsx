@@ -1,4 +1,4 @@
-import { Component, For, Show, createSignal, onMount } from 'solid-js';
+import { type Component, For, Show, createSignal, onMount } from 'solid-js';
 import type { Scan } from '../types';
 import styles from './EventsTable.module.css';
 

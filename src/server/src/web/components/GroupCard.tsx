@@ -1,4 +1,4 @@
-import { Component, For, Show } from 'solid-js';
+import { type Component, For, Show } from 'solid-js';
 import type { Group } from '../types';
 import styles from './GroupCard.module.css';
 

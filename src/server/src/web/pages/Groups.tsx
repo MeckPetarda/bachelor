@@ -1,4 +1,4 @@
-import { Component, For, Show, createSignal, onMount } from 'solid-js';
+import { type Component, For, Show, createSignal, onMount } from 'solid-js';
 import { GroupCard } from '../components/GroupCard';
 import { GroupModal } from '../components/GroupModal';
 import {

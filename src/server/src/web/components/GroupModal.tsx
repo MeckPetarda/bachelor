@@ -1,4 +1,4 @@
-import { Component, createSignal, Show } from 'solid-js';
+import { type Component, createSignal, Show } from 'solid-js';
 import type { Group } from '../types';
 import styles from './Modal.module.css';
 

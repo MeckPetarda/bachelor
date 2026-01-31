@@ -1,4 +1,4 @@
-import { Component, onMount, onCleanup, JSX } from 'solid-js';
+import { type Component, onMount, onCleanup, type JSX } from 'solid-js';
 import { A } from '@solidjs/router';
 import { Toast } from './components/Toast';
 import { connect, disconnect } from './stores/websocket';

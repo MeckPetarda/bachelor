@@ -1,4 +1,4 @@
-import { Component, createSignal, For, Show } from 'solid-js';
+import { type Component, createSignal, For, Show } from 'solid-js';
 import type { PendingDevice, Group, Placement } from '../types';
 import styles from './Modal.module.css';
 

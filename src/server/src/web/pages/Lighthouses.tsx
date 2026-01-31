@@ -1,4 +1,4 @@
-import { Component, For, Show, createSignal, onMount } from 'solid-js';
+import { type Component, For, Show, createSignal, onMount } from 'solid-js';
 import { LighthouseCard } from '../components/LighthouseCard';
 import { PendingDeviceCard } from '../components/PendingDeviceCard';
 import { ClaimModal } from '../components/ClaimModal';

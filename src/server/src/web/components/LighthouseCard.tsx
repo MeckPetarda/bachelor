@@ -1,4 +1,4 @@
-import { Component, Show, createSignal } from 'solid-js';
+import { type Component, Show, createSignal } from 'solid-js';
 import type { Lighthouse } from '../types';
 import styles from './LighthouseCard.module.css';
 
