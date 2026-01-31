@@ -989,4 +989,81 @@ app.get("/api/v1/scans", async (c) => {
 // Mount protected routes under /api/v1 AFTER public routes
 app.route("/api/v1", protectedRoutes);
 
+// ============================================================================
+// Static File Serving (Frontend SPA)
+// ============================================================================
+
+const STATIC_DIR = "./dist/web";
+const INDEX_HTML = `${STATIC_DIR}/index.html`;
+
+// Helper to determine MIME type
+function getMimeType(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    html: "text/html",
+    css: "text/css",
+    js: "application/javascript",
+    mjs: "application/javascript",
+    json: "application/json",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    svg: "image/svg+xml",
+    ico: "image/x-icon",
+    woff: "font/woff",
+    woff2: "font/woff2",
+    ttf: "font/ttf",
+  };
+  return mimeTypes[ext || ""] || "application/octet-stream";
+}
+
+// Catch-all route for static files and SPA fallback
+app.get("*", async (c) => {
+  const url = new URL(c.req.url);
+  let filePath = `${STATIC_DIR}${url.pathname}`;
+
+  // Try to serve the requested file
+  let file = Bun.file(filePath);
+  if (await file.exists()) {
+    const content = await file.arrayBuffer();
+    return new Response(content, {
+      headers: {
+        "Content-Type": getMimeType(filePath),
+        "Cache-Control": "public, max-age=31536000",
+      },
+    });
+  }
+
+  // For paths that look like file requests (have extension), return 404
+  if (url.pathname.includes(".")) {
+    return c.notFound();
+  }
+
+  // SPA fallback: serve index.html for all other routes
+  file = Bun.file(INDEX_HTML);
+  if (await file.exists()) {
+    const content = await file.text();
+    return new Response(content, {
+      headers: {
+        "Content-Type": "text/html",
+        "Cache-Control": "no-cache",
+      },
+    });
+  }
+
+  // No frontend built yet - show helpful message
+  return c.html(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>Lighthouse Dashboard</title></head>
+      <body style="font-family: system-ui; padding: 2rem; text-align: center;">
+        <h1>Frontend not built</h1>
+        <p>Run <code>bun run build:web</code> to build the frontend.</p>
+        <p>For development, run <code>bun run dev:web</code> to start the Vite dev server.</p>
+      </body>
+    </html>
+  `);
+});
+
 export { app };
