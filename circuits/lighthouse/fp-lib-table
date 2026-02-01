@@ -1,0 +1,6 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "ESP32")(type "KiCad")(uri "${KIPRJMOD}/components/ESP32")(options "")(descr "A devel board with ESP32 chip"))
+  (lib (name "SX1308_DCDC_boost")(type "KiCad")(uri "${KIPRJMOD}/components/DCDC boost")(options "")(descr ""))
+  (lib (name "TP4056_Charging_module")(type "KiCad")(uri "/media/kuba/Games/Documents/VUT/bachelor/circuits/lighthouse/components/TP4056_Charging_Module_Type_C_KICAD")(options "")(descr ""))
+)

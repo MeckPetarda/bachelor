@@ -59,7 +59,7 @@
     "ssh_key": ""
   },
   "meta": {
-    "filename": "project.kicad_prl",
+    "filename": "lighthouse.kicad_prl",
     "version": 5
   },
   "net_inspector_panel": {

@@ -1,0 +1,266 @@
+(footprint "TP4056_Charging_Module_Type_C"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0.03 -1.18 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "80a7ac2d-53b5-4148-a26b-5fe2c334ac99")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "5V-3.3V_MINI_CHARGER_TYPE_C"
+		(at 0 1 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "d3725193-d31a-4bd7-a5ed-5665fcf7946c")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at -14.04 8.8 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "35dcd0ae-74e1-4aa2-b620-52db7f0fa986")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at -14.04 8.8 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "76cf67a4-2a77-4049-a63a-56d901def806")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(fp_rect
+		(start -14.04 -8.86)
+		(end 13.96 8.8)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "41d2a5b1-d5c1-460d-982c-b1c5f95ac256")
+	)
+	(fp_rect
+		(start -14.04 -2.675)
+		(end -8.75 2.615)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "8c664cb3-d159-4756-b18e-4b79bae284a6")
+	)
+	(fp_rect
+		(start -14.15 -8.97)
+		(end 14.07 8.91)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "539ba77a-b554-4d0e-a93d-366eb7304a45")
+	)
+	(fp_text user "+OUT"
+		(at 5 -6.5 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "0a97394b-5d7d-4843-a942-81cb33612556")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(fp_text user "-IN"
+		(at -10.95 7.7 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "3198cc5a-3d10-44ba-a207-7e2e731a7db7")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(fp_text user "USB"
+		(at -10.01 1.45 90)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "5bf341e7-7e68-4c96-8dd9-0730aad47780")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(fp_text user "+IN"
+		(at -11.19 -6.67 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "6b0d20c0-aca6-4fc8-8361-799265ca7a7b")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(fp_text user "-BAT"
+		(at 5 5 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "7ffd7308-fd09-4cb8-be7c-7da6eff3433e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(fp_text user "-OUT"
+		(at 5 8 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "c977b722-32fe-4c0a-884e-3545485e8554")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(fp_text user "TYPEC"
+		(at -11.73 2.11 90)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "d605a35a-004b-4663-856b-8766acaca5fc")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(fp_text user "+BAT"
+		(at 5 -3.5 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "e3c467f0-f675-4150-8614-78e1cf1dd94b")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 2.5 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "501dc2f4-ccbb-4ca6-9de6-89dcd13b9243")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" thru_hole circle
+		(at -12.5 -7.21)
+		(size 1.524 1.524)
+		(drill 0.762)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "ea2ee688-7cd9-43df-bb2d-a2babad8d0ae")
+	)
+	(pad "2" thru_hole circle
+		(at -12.5 7.13)
+		(size 1.524 1.524)
+		(drill 0.762)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "aca0a22b-78e0-4b2d-ab7c-16f62b473c72")
+	)
+	(pad "3" thru_hole circle
+		(at 10.63 -7.22)
+		(size 1.524 1.524)
+		(drill 0.762)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "416c0bae-5d5b-40d8-a98c-1b1d5fff2e48")
+	)
+	(pad "4" thru_hole circle
+		(at 10.64 7.11)
+		(size 1.524 1.524)
+		(drill 0.762)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "b2c9a5e5-74f4-4fe0-81ba-263177cc4aa7")
+	)
+	(pad "5" thru_hole circle
+		(at 10.63 -4.21)
+		(size 1.524 1.524)
+		(drill 0.762)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "798cbeca-9abe-4a54-81fb-84e16116869f")
+	)
+	(pad "6" thru_hole circle
+		(at 10.63 4.19)
+		(size 1.524 1.524)
+		(drill 0.762)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "efa5d818-e8b5-4070-b8ca-dcfe32398650")
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/components/TP4056_Charging_Module_Type_C_KICAD/TP4056_Charging_Module_Type_C.step"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 180)
+		)
+	)
+)
