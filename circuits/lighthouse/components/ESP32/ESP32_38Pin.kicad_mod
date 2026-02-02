@@ -9,7 +9,10 @@
 		(layer "F.SilkS")
 		(uuid "13a472b0-85a7-440d-b3a4-a32e0e366bc6")
 		(effects
-			(font (size 1 1) (thickness 0.1))
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
 		)
 	)
 	(property "Value" "ESP32_38Pin"
@@ -18,7 +21,10 @@
 		(layer "F.Fab")
 		(uuid "f98468ef-e66a-45d6-b7ec-65dd6ed5de9b")
 		(effects
-			(font (size 1 1) (thickness 0.15))
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
 		)
 	)
 	(property "Datasheet" ""
@@ -28,7 +34,10 @@
 		(hide yes)
 		(uuid "ef0ad6a9-a99b-49b3-9603-6ad5489b4b65")
 		(effects
-			(font (size 1 1) (thickness 0.15))
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
 		)
 	)
 	(property "Description" ""
@@ -38,42 +47,82 @@
 		(hide yes)
 		(uuid "12f93469-0d99-4bba-82d6-8902c0593cfd")
 		(effects
-			(font (size 1 1) (thickness 0.15))
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
 		)
 	)
 	(attr smd)
 	(fp_line
 		(start -12.5 -2.5)
 		(end 12.5 -2.5)
-		(stroke (width 0.1) (type default))
+		(stroke
+			(width 0.1)
+			(type default)
+		)
 		(layer "F.SilkS")
 		(uuid "9e8ec878-ce67-444e-be4b-72b2411fa229")
 	)
 	(fp_line
 		(start -12.5 49.5)
 		(end -12.5 -2.5)
-		(stroke (width 0.1) (type default))
+		(stroke
+			(width 0.1)
+			(type default)
+		)
 		(layer "F.SilkS")
 		(uuid "9600d280-af06-410d-8ace-75d0c4620a27")
 	)
 	(fp_line
 		(start 12.5 -2.5)
 		(end 12.5 49.5)
-		(stroke (width 0.1) (type default))
+		(stroke
+			(width 0.1)
+			(type default)
+		)
 		(layer "F.SilkS")
 		(uuid "98b66514-cb43-4b6b-bb41-7e8195f68ca6")
 	)
 	(fp_line
 		(start 12.5 49.5)
 		(end -12.5 49.5)
-		(stroke (width 0.1) (type default))
+		(stroke
+			(width 0.1)
+			(type default)
+		)
 		(layer "F.SilkS")
 		(uuid "67ee8faa-a4d0-4fe9-b174-c743b374b101")
+	)
+	(fp_rect
+		(start -8 5.75)
+		(end 8 24.25)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "ac4286bb-6d7f-46b4-9d52-8c92c73b1df8")
+	)
+	(fp_rect
+		(start -4.5 43)
+		(end 4.5 51)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "ead5279a-e19d-4300-b8ea-217ff43d02c9")
 	)
 	(fp_circle
 		(center -12.5 1)
 		(end -12.5 1.5)
-		(stroke (width 0.1) (type default))
+		(stroke
+			(width 0.1)
+			(type default)
+		)
 		(fill no)
 		(layer "F.SilkS")
 		(uuid "b80d0df6-407d-4577-9799-7e7e6cf70207")
@@ -81,28 +130,40 @@
 	(fp_line
 		(start -13 -3)
 		(end 13 -3)
-		(stroke (width 0.05) (type default))
+		(stroke
+			(width 0.05)
+			(type default)
+		)
 		(layer "F.CrtYd")
 		(uuid "1c1e5870-37e3-4bc1-b38a-71afd4ff5896")
 	)
 	(fp_line
 		(start -13 50)
 		(end -13 -3)
-		(stroke (width 0.05) (type default))
+		(stroke
+			(width 0.05)
+			(type default)
+		)
 		(layer "F.CrtYd")
 		(uuid "bde89dfe-9060-41c2-a575-be63d8ee301c")
 	)
 	(fp_line
 		(start 13 -3)
 		(end 13 50)
-		(stroke (width 0.05) (type default))
+		(stroke
+			(width 0.05)
+			(type default)
+		)
 		(layer "F.CrtYd")
 		(uuid "2ec2c50a-c9a6-4830-9323-e46d27450775")
 	)
 	(fp_line
 		(start 13 50)
 		(end -13 50)
-		(stroke (width 0.05) (type default))
+		(stroke
+			(width 0.05)
+			(type default)
+		)
 		(layer "F.CrtYd")
 		(uuid "cbf82671-a61e-41cf-85e1-da218dcc265d")
 	)
@@ -112,7 +173,10 @@
 		(layer "F.Fab")
 		(uuid "8d9c65de-bcf4-4ba4-9fd8-5209472a8fad")
 		(effects
-			(font (size 1 1) (thickness 0.15))
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
 		)
 	)
 	(pad "1" thru_hole roundrect
@@ -458,4 +522,15 @@
 		(uuid "662d4448-6771-4b79-833d-2a9136146cf9")
 	)
 	(embedded_fonts no)
+	(model "/media/kuba/Games/Documents/VUT/bachelor/circuits/lighthouse/components/ESP32/NodeMCU-32S-USBC-38pin-Narrow.stp"
+		(offset
+			(xyz -12 0.3 4.5)
+		)
+		(scale
+			(xyz 0.987 0.94 1)
+		)
+		(rotate
+			(xyz -0 -0 90)
+		)
+	)
 )
