@@ -1422,176 +1422,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "TP4056_Charging_module:5V-3.3V_MINI_CHARGER_TYPE_C"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "CH1"
-				(at 0.635 8.89 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "~"
-				(at 0.635 6.35 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "TP4056_Charging_module:TP4056_Charging_Module_Type_C"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "5V-3.3V_MINI_CHARGER_TYPE_C_1_1"
-				(rectangle
-					(start -10.16 3.81)
-					(end 10.16 -6.35)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(pin power_in line
-					(at -12.7 1.27 0)
-					(length 2.54)
-					(name "+IN"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin power_in line
-					(at -12.7 -3.81 0)
-					(length 2.54)
-					(name "-IN"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin bidirectional line
-					(at -2.54 -8.89 90)
-					(length 2.54)
-					(name "+BAT"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "5"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin bidirectional line
-					(at 2.54 -8.89 90)
-					(length 2.54)
-					(name "-BAT"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "6"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin power_out line
-					(at 12.7 1.27 180)
-					(length 2.54)
-					(name "+OUT"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin power_out line
-					(at 12.7 -3.81 180)
-					(length 2.54)
-					(name "-OUT"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "4"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "Transistor_BJT:2N3904"
 			(pin_names
 				(offset 0)
@@ -2024,16 +1854,6 @@
 	)
 	(wire
 		(pts
-			(xy 68.58 160.02) (xy 68.58 171.45)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1b6330af-80a7-4ca4-aab2-b74a05d14991")
-	)
-	(wire
-		(pts
 			(xy 48.26 106.68) (xy 59.69 106.68)
 		)
 		(stroke
@@ -2084,17 +1904,17 @@
 	)
 	(wire
 		(pts
-			(xy 63.5 170.18) (xy 63.5 171.45)
+			(xy 60.96 160.02) (xy 60.96 165.1)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "37b1a3ba-3b86-4d7b-a7d0-4472984f5bdd")
+		(uuid "380c780f-2ef8-4e7b-9543-dc6d4450efdf")
 	)
 	(wire
 		(pts
-			(xy 78.74 149.86) (xy 85.09 149.86)
+			(xy 60.96 154.94) (xy 67.31 154.94)
 		)
 		(stroke
 			(width 0)
@@ -2144,7 +1964,7 @@
 	)
 	(wire
 		(pts
-			(xy 105.41 149.86) (xy 109.22 149.86)
+			(xy 87.63 154.94) (xy 91.44 154.94)
 		)
 		(stroke
 			(width 0)
@@ -2224,6 +2044,16 @@
 	)
 	(wire
 		(pts
+			(xy 60.96 154.94) (xy 60.96 149.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "753961b4-8fb6-46cd-87ee-845c3e1be8cc")
+	)
+	(wire
+		(pts
 			(xy 209.55 121.92) (xy 217.17 121.92)
 		)
 		(stroke
@@ -2231,6 +2061,16 @@
 			(type default)
 		)
 		(uuid "7d001d96-fd58-4cc2-9884-b37c66a343da")
+	)
+	(wire
+		(pts
+			(xy 50.8 161.29) (xy 57.15 161.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7f2acc32-2cb3-4781-91f0-4fe12fdccae1")
 	)
 	(wire
 		(pts
@@ -2244,16 +2084,6 @@
 	)
 	(wire
 		(pts
-			(xy 68.58 171.45) (xy 63.5 171.45)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "80b65ff2-3243-4450-9b8d-0d2f625b9305")
-	)
-	(wire
-		(pts
 			(xy 251.46 144.78) (xy 245.11 144.78)
 		)
 		(stroke
@@ -2261,6 +2091,16 @@
 			(type default)
 		)
 		(uuid "81fc8d07-3a8b-4d0f-a2ed-e92333ee75f8")
+	)
+	(wire
+		(pts
+			(xy 60.96 165.1) (xy 50.8 165.1)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "838dff34-7981-4b6a-aa76-56be0e6d5e36")
 	)
 	(wire
 		(pts
@@ -2274,7 +2114,7 @@
 	)
 	(wire
 		(pts
-			(xy 63.5 160.02) (xy 63.5 162.56)
+			(xy 50.8 153.67) (xy 57.15 153.67)
 		)
 		(stroke
 			(width 0)
@@ -2364,7 +2204,7 @@
 	)
 	(wire
 		(pts
-			(xy 105.41 154.94) (xy 109.22 154.94)
+			(xy 87.63 160.02) (xy 91.44 160.02)
 		)
 		(stroke
 			(width 0)
@@ -2391,6 +2231,16 @@
 			(type default)
 		)
 		(uuid "d1437bb3-d9cd-4bb7-9529-9cdbcbe849a6")
+	)
+	(wire
+		(pts
+			(xy 50.8 149.86) (xy 60.96 149.86)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d1d4ef99-5f18-47b2-bec4-005096593f2a")
 	)
 	(wire
 		(pts
@@ -2434,7 +2284,7 @@
 	)
 	(wire
 		(pts
-			(xy 78.74 154.94) (xy 85.09 154.94)
+			(xy 60.96 160.02) (xy 67.31 160.02)
 		)
 		(stroke
 			(width 0)
@@ -2486,7 +2336,7 @@
 	)
 	(global_label "5V"
 		(shape input)
-		(at 109.22 149.86 0)
+		(at 91.44 154.94 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -2496,7 +2346,7 @@
 		)
 		(uuid "0e347cd6-3d6d-470d-9779-480449939abc")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 114.5033 149.86 0)
+			(at 96.7233 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2926,7 +2776,7 @@
 	)
 	(global_label "GND"
 		(shape input)
-		(at 109.22 154.94 0)
+		(at 91.44 160.02 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -2936,7 +2786,7 @@
 		)
 		(uuid "f0b7364f-091b-45ed-b78c-49db6a6c7f89")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 116.0757 154.94 0)
+			(at 98.2957 160.02 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3192,7 +3042,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "15a7f0b5-012c-4e43-9e49-4c7a2cfada9e")
-		(property "Reference" "R7"
+		(property "Reference" "R4"
 			(at 219.71 90.17 90)
 			(effects
 				(font
@@ -3244,7 +3094,7 @@
 		(instances
 			(project ""
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "R7")
+					(reference "R4")
 					(unit 1)
 				)
 			)
@@ -3335,7 +3185,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "22c2b4bc-f1ea-4f5c-9f76-9da9da5d71d4")
-		(property "Reference" "R1"
+		(property "Reference" "R7"
 			(at 238.76 31.7499 0)
 			(effects
 				(font
@@ -3389,7 +3239,7 @@
 		(instances
 			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "R1")
+					(reference "R7")
 					(unit 1)
 				)
 			)
@@ -3397,7 +3247,7 @@
 	)
 	(symbol
 		(lib_id "DCDC_StepUp_SX1308:DCDC_StepUp_SX1308")
-		(at 95.25 149.86 0)
+		(at 77.47 154.94 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -3405,8 +3255,8 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "396b8edd-7dd9-4422-a7b2-d62a0bb70dcd")
-		(property "Reference" "U2"
-			(at 95.25 142.24 0)
+		(property "Reference" "U1"
+			(at 77.47 147.32 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3414,7 +3264,7 @@
 			)
 		)
 		(property "Value" "DCDC_StepUp_SX1308"
-			(at 95.25 144.78 0)
+			(at 77.47 149.86 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3422,7 +3272,7 @@
 			)
 		)
 		(property "Footprint" "SX1308_DCDC_boost:DCDC_StepUp_SX1308"
-			(at 95.25 149.86 0)
+			(at 77.47 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3431,7 +3281,7 @@
 			)
 		)
 		(property "Datasheet" "kicad-embed://SX1308.pdf"
-			(at 95.25 149.86 0)
+			(at 77.47 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3440,7 +3290,7 @@
 			)
 		)
 		(property "Description" "module : adjustable stepup converter module2V-24V to 2V-28V 2A"
-			(at 95.25 149.86 0)
+			(at 77.47 154.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3463,7 +3313,7 @@
 		(instances
 			(project ""
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "U2")
+					(reference "U1")
 					(unit 1)
 				)
 			)
@@ -3471,7 +3321,8 @@
 	)
 	(symbol
 		(lib_id "Device:Battery_Cell")
-		(at 63.5 167.64 0)
+		(at 57.15 158.75 0)
+		(mirror y)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -3480,7 +3331,7 @@
 		(fields_autoplaced yes)
 		(uuid "3d9c49ed-cf6c-4ee5-9800-a0d385645d0e")
 		(property "Reference" "BT1"
-			(at 67.31 164.5284 0)
+			(at 53.34 155.6384 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3490,7 +3341,7 @@
 			)
 		)
 		(property "Value" "Battery_Cell"
-			(at 67.31 167.0684 0)
+			(at 53.34 158.1784 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3500,7 +3351,7 @@
 			)
 		)
 		(property "Footprint" "Battery:BatteryHolder_MPD_BH-18650-PC"
-			(at 63.5 166.116 90)
+			(at 57.15 157.226 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3509,7 +3360,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 63.5 166.116 90)
+			(at 57.15 157.226 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3518,7 +3369,7 @@
 			)
 		)
 		(property "Description" "Single-cell battery"
-			(at 63.5 167.64 0)
+			(at 57.15 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3527,7 +3378,7 @@
 			)
 		)
 		(property "Sim.Device" "V"
-			(at 63.5 167.64 0)
+			(at 57.15 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3536,7 +3387,7 @@
 			)
 		)
 		(property "Sim.Type" "DC"
-			(at 63.5 167.64 0)
+			(at 57.15 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3545,7 +3396,7 @@
 			)
 		)
 		(property "Sim.Pins" "1=+ 2=-"
-			(at 63.5 167.64 0)
+			(at 57.15 158.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3577,7 +3428,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "46020e0f-5550-4b76-b1b5-62e238ddb41c")
-		(property "Reference" "R4"
+		(property "Reference" "R11"
 			(at 236.22 127 90)
 			(effects
 				(font
@@ -3629,7 +3480,7 @@
 		(instances
 			(project ""
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "R4")
+					(reference "R11")
 					(unit 1)
 				)
 			)
@@ -3710,86 +3561,6 @@
 		)
 	)
 	(symbol
-		(lib_id "TP4056_Charging_module:5V-3.3V_MINI_CHARGER_TYPE_C")
-		(at 66.04 151.13 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "7cec5628-79ca-4975-88d5-b0f9aa4ead45")
-		(property "Reference" "CH1"
-			(at 66.675 142.24 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "~"
-			(at 66.675 144.78 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TP4056_Charging_module:TP4056_Charging_Module_Type_C"
-			(at 66.04 151.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 66.04 151.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 66.04 151.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "e4e638c4-3a89-4daf-91d8-f1d8c3cc5810")
-		)
-		(pin "4"
-			(uuid "b14ac81d-73b5-4363-b938-a3a3ac3378af")
-		)
-		(pin "3"
-			(uuid "ff7a5c97-a381-43db-bc0d-3bb90175197a")
-		)
-		(pin "1"
-			(uuid "16f03c05-df45-4f58-9a35-ed1fcc24d64d")
-		)
-		(pin "6"
-			(uuid "1284238d-03d9-4f46-9562-52f5e80192a7")
-		)
-		(pin "5"
-			(uuid "4c32e9dd-2957-4bad-bbaa-db38138ab403")
-		)
-		(instances
-			(project ""
-				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "CH1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "ESP32:ESP32_38Pin_Symbol")
 		(at 88.9 73.66 0)
 		(unit 1)
@@ -3799,7 +3570,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "c9981c89-00a3-426d-bce6-d41753b40f3d")
-		(property "Reference" "U1"
+		(property "Reference" "U2"
 			(at 89.535 30.48 0)
 			(effects
 				(font
@@ -3959,7 +3730,7 @@
 		(instances
 			(project ""
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "U1")
+					(reference "U2")
 					(unit 1)
 				)
 			)
@@ -3974,7 +3745,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "d772e758-385f-45b9-a708-0a411075f25e")
-		(property "Reference" "R3"
+		(property "Reference" "R10"
 			(at 236.22 119.38 90)
 			(effects
 				(font
@@ -4026,7 +3797,7 @@
 		(instances
 			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "R3")
+					(reference "R10")
 					(unit 1)
 				)
 			)
@@ -4117,7 +3888,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "db9052eb-41c1-4f1b-93d3-8b2758cf6b85")
-		(property "Reference" "R5"
+		(property "Reference" "R12"
 			(at 236.22 134.62 90)
 			(effects
 				(font
@@ -4169,7 +3940,7 @@
 		(instances
 			(project ""
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "R5")
+					(reference "R12")
 					(unit 1)
 				)
 			)
@@ -4184,7 +3955,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "e9a0e5e8-ffbd-4e1c-ac3b-4a8927d7fb87")
-		(property "Reference" "R2"
+		(property "Reference" "R9"
 			(at 238.76 44.4499 0)
 			(effects
 				(font
@@ -4238,7 +4009,7 @@
 		(instances
 			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "R2")
+					(reference "R9")
 					(unit 1)
 				)
 			)
@@ -4253,7 +4024,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "f1a34e09-b436-4013-8eb1-35228d5dc972")
-		(property "Reference" "R6"
+		(property "Reference" "R13"
 			(at 236.22 142.24 90)
 			(effects
 				(font
@@ -4305,7 +4076,7 @@
 		(instances
 			(project ""
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "R6")
+					(reference "R13")
 					(unit 1)
 				)
 			)
@@ -4383,6 +4154,108 @@
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
 					(reference "D2")
 					(unit 1)
+				)
+			)
+		)
+	)
+	(sheet
+		(at 26.67 147.32)
+		(size 24.13 20.32)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "adf63908-e234-4fc5-b1bf-4049b839acc1")
+		(property "Sheetname" "Charger"
+			(at 26.67 146.6084 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "untitled.kicad_sch"
+			(at 26.67 168.2246 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "+IN" input
+			(at 26.67 149.86 180)
+			(uuid "65b8c468-cbf1-42d9-b3fd-a5c559a03530")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "-OUT" input
+			(at 50.8 165.1 0)
+			(uuid "1dcb3834-c444-43da-961b-51ca065e0682")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "+BAT" input
+			(at 50.8 153.67 0)
+			(uuid "8528cd32-53d6-43e6-8812-a7a4544e3b0b")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "-BAT" input
+			(at 50.8 161.29 0)
+			(uuid "635b8779-1227-472d-b295-37b0be042ec2")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "-IN" input
+			(at 26.67 165.1 180)
+			(uuid "a9052932-d064-43d9-bf05-969891292581")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "+OUT" input
+			(at 50.8 149.86 0)
+			(uuid "a535d8df-8926-45d1-8248-834d1bcc2bb4")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "lighthouse"
+				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
+					(page "2")
 				)
 			)
 		)

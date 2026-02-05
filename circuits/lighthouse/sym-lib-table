@@ -3,5 +3,6 @@
   (lib (name "ESP32")(type "KiCad")(uri "${KIPRJMOD}/components/ESP32/ESP32_38Pin_Symbol.kicad_sym")(options "")(descr "A devl board with ESP32 chip"))
   (lib (name "YR300")(type "KiCad")(uri "${KIPRJMOD}/components/YR300/YR300.kicad_sym")(options "")(descr "YR300 Micro UHF RFID Module"))
   (lib (name "DCDC_StepUp_SX1308")(type "KiCad")(uri "${KIPRJMOD}/components/DCDC boost/SX1308_DCDC_boost.kicad_sym")(options "")(descr ""))
-  (lib (name "TP4056_Charging_module")(type "KiCad")(uri "/media/kuba/Games/Documents/VUT/bachelor/circuits/lighthouse/components/TP4056_Charging_Module_Type_C_KICAD/TP4056_Charging_Module_Type_C.kicad_sym")(options "")(descr ""))
+  (lib (name "TP4056_Charging_module")(type "KiCad")(uri "${KIPRJMOD}/components/TP4056_Charging_Module_Type_C_KICAD/TP4056_Charging_Module_Type_C.kicad_sym")(options "")(descr ""))
+  (lib (name "FS8205A")(type "KiCad")(uri "${KIPRJMOD}/components/FS8205A/FS8205A.kicad_sym")(options "")(descr ""))
 )

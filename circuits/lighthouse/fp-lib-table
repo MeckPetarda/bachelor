@@ -4,4 +4,5 @@
   (lib (name "SX1308_DCDC_boost")(type "KiCad")(uri "${KIPRJMOD}/components/DCDC boost")(options "")(descr ""))
   (lib (name "TP4056_Charging_module")(type "KiCad")(uri "${KIPRJMOD}/components/TP4056_Charging_Module_Type_C_KICAD")(options "")(descr ""))
   (lib (name "YR300")(type "KiCad")(uri "${KIPRJMOD}/components/YR300")(options "")(descr ""))
+  (lib (name "FS8205A")(type "KiCad")(uri "${KIPRJMOD}/components/FS8205A")(options "")(descr ""))
 )
