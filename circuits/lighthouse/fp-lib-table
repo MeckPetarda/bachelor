@@ -5,4 +5,6 @@
   (lib (name "TP4056_Charging_module")(type "KiCad")(uri "${KIPRJMOD}/components/TP4056_Charging_Module_Type_C_KICAD")(options "")(descr ""))
   (lib (name "YR300")(type "KiCad")(uri "${KIPRJMOD}/components/YR300")(options "")(descr ""))
   (lib (name "FS8205A")(type "KiCad")(uri "${KIPRJMOD}/components/FS8205A")(options "")(descr ""))
+  (lib (name "SX1308")(type "KiCad")(uri "${KIPRJMOD}/components/SX1308")(options "")(descr ""))
+  (lib (name "CP2102-GMR")(type "KiCad")(uri "${KIPRJMOD}/components/CP2102-GMR/footprints.pretty")(options "")(descr ""))
 )

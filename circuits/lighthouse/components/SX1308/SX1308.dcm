@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP SX1308
+D DC-DC Converters Step-Up Adjustable 1 2V 24V 28V 2A SOT-23-6 RoHS
+K
+F https://datasheet.lcsc.com/szlcsc/Shenzhen-Suosemi-Tech-SX1308_C78162.pdf
+$ENDCMP
+#
+#End Doc Library

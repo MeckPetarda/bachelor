@@ -2644,7 +2644,7 @@
 			(uuid "fd51ec37-0188-441f-9c5e-acd546a9b11a")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "R1")
 					(unit 1)
@@ -2727,7 +2727,7 @@
 			(uuid "5f150e07-1563-41c2-8d44-ee1c05836992")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "J1")
 					(unit 1)
@@ -2797,7 +2797,7 @@
 			(uuid "f0579457-c4e6-4de5-aa0b-1334799760f8")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "C3")
 					(unit 1)
@@ -2867,7 +2867,7 @@
 			(uuid "2a7f35f5-e6a0-43e5-a99e-409808ff3731")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "R3")
 					(unit 1)
@@ -2953,7 +2953,7 @@
 			(uuid "587f92ff-a7bb-4d09-90cb-9e2755a4e9a6")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "D6")
 					(unit 1)
@@ -3112,7 +3112,7 @@
 			(uuid "a6ef0167-5d1f-471c-bb8c-734a859509a7")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "R5")
 					(unit 1)
@@ -3198,7 +3198,7 @@
 			(uuid "587f92ff-a7bb-4d09-90cb-9e2755a4e9a7")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "D5")
 					(unit 1)
@@ -3268,7 +3268,7 @@
 			(uuid "945b4d61-d8e7-4b35-86a2-d89d1642b88d")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "C1")
 					(unit 1)
@@ -3335,7 +3335,7 @@
 			(uuid "fd51ec37-0188-441f-9c5e-acd546a9b11b")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "R2")
 					(unit 1)
@@ -3405,7 +3405,7 @@
 			(uuid "f04d2d21-254e-4c28-8632-01ead56d9201")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "R6")
 					(unit 1)
@@ -3553,7 +3553,7 @@
 			(uuid "cc821123-acae-4b62-8d9c-29ab6ad78644")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "C2")
 					(unit 1)
@@ -3781,7 +3781,7 @@
 			(uuid "0398fa14-a14b-4ff2-9909-9655ec3c1cb1")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "R8")
 					(unit 1)

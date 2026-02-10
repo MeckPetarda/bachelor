@@ -5,4 +5,6 @@
   (lib (name "DCDC_StepUp_SX1308")(type "KiCad")(uri "${KIPRJMOD}/components/DCDC boost/SX1308_DCDC_boost.kicad_sym")(options "")(descr ""))
   (lib (name "TP4056_Charging_module")(type "KiCad")(uri "${KIPRJMOD}/components/TP4056_Charging_Module_Type_C_KICAD/TP4056_Charging_Module_Type_C.kicad_sym")(options "")(descr ""))
   (lib (name "FS8205A")(type "KiCad")(uri "${KIPRJMOD}/components/FS8205A/FS8205A.kicad_sym")(options "")(descr ""))
+  (lib (name "SX1308")(type "KiCad")(uri "${KIPRJMOD}/components/SX1308/SX1308.kicad_sym")(options "")(descr ""))
+  (lib (name "CP2102-GMR")(type "KiCad")(uri "${KIPRJMOD}/components/CP2102-GMR/2026-02-10_18-46-17.kicad_sym")(options "")(descr ""))
 )

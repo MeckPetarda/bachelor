@@ -608,7 +608,7 @@
     "meta": {
       "version": 1
     },
-    "net_format_name": "",
+    "net_format_name": "KiCad",
     "page_layout_descr_file": "",
     "plot_directory": "",
     "space_save_all_events": true,
@@ -629,6 +629,14 @@
     [
       "adf63908-e234-4fc5-b1bf-4049b839acc1",
       "Charger"
+    ],
+    [
+      "976e17dd-c379-42b8-98f3-965206833e2e",
+      "Step-Up DC-DC"
+    ],
+    [
+      "b8f7ab96-114b-4177-9af0-0e115f506aa3",
+      "R300"
     ]
   ],
   "text_variables": {}

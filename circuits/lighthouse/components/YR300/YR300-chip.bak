@@ -6,148 +6,6 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(property "Reference" "U3"
-			(at 5.08 5.08 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "~"
-			(at 5.08 2.54 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "YR300:YR300"
-			(at 0 0 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "kicad-embed://R300 rfid module EN-V1.5.pdf"
-			(at 0 0 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 0 0 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(symbol "YR300_1_1"
-			(rectangle
-				(start 0 0)
-				(end 15.24 -16.51)
-				(stroke
-					(width 0)
-					(type solid)
-				)
-				(fill
-					(type none)
-				)
-			)
-			(text "YR300"
-				(at 8.128 -8.382 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(pin input line
-				(at -2.54 -2.54 0)
-				(length 2.54)
-				(name "3V"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "1"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin input line
-				(at -2.54 -6.35 0)
-				(length 2.54)
-				(name "RX"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "2"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin input line
-				(at -2.54 -10.16 0)
-				(length 2.54)
-				(name "TX"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "3"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-			(pin input line
-				(at -2.54 -13.97 0)
-				(length 2.54)
-				(name "GND"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-				(number "4"
-					(effects
-						(font
-							(size 1.27 1.27)
-						)
-					)
-				)
-			)
-		)
-		(embedded_fonts no)
-	)
-	(symbol "YR300-chip"
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
 		(property "Reference" "U"
 			(at 6.35 -4.826 0)
 			(effects
@@ -192,10 +50,10 @@
 				(hide yes)
 			)
 		)
-		(symbol "YR300-chip_0_1"
+		(symbol "YR300_0_1"
 			(rectangle
-				(start 0 31.75)
-				(end 20.32 0)
+				(start 0 27.94)
+				(end 16.51 5.08)
 				(stroke
 					(width 0)
 					(type default)
@@ -205,18 +63,18 @@
 				)
 			)
 		)
-		(symbol "YR300-chip_1_1"
+		(symbol "YR300_1_1"
 			(pin input line
-				(at -2.54 29.21 0)
+				(at 0 25.4 180)
 				(length 2.54)
-				(name "GPIO4"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "16"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -225,16 +83,16 @@
 				)
 			)
 			(pin input line
-				(at -2.54 25.4 0)
+				(at 0 22.86 180)
 				(length 2.54)
-				(name "GPIO3"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "15"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -243,16 +101,16 @@
 				)
 			)
 			(pin input line
-				(at -2.54 21.59 0)
+				(at 0 20.32 180)
 				(length 2.54)
-				(name "BUZZ"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "14"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -261,16 +119,16 @@
 				)
 			)
 			(pin input line
-				(at -2.54 17.78 0)
+				(at 0 17.78 180)
 				(length 2.54)
-				(name "TX"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "13"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -279,16 +137,16 @@
 				)
 			)
 			(pin input line
-				(at -2.54 13.97 0)
+				(at 0 15.24 180)
 				(length 2.54)
-				(name "RX"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "12"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -297,16 +155,16 @@
 				)
 			)
 			(pin input line
-				(at -2.54 10.16 0)
+				(at 0 12.7 180)
 				(length 2.54)
-				(name "EN"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "11"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -315,16 +173,16 @@
 				)
 			)
 			(pin input line
-				(at -2.54 6.35 0)
+				(at 0 10.16 180)
 				(length 2.54)
-				(name "GND"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "10"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -333,16 +191,16 @@
 				)
 			)
 			(pin input line
-				(at -2.54 2.54 0)
+				(at 0 7.62 180)
 				(length 2.54)
-				(name "VCC"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "9"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -351,16 +209,16 @@
 				)
 			)
 			(pin input line
-				(at 22.86 29.21 180)
+				(at 16.51 25.4 0)
 				(length 2.54)
-				(name "Antenna"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "1"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -369,16 +227,16 @@
 				)
 			)
 			(pin input line
-				(at 22.86 25.4 180)
+				(at 16.51 22.86 0)
 				(length 2.54)
-				(name "GND"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "2"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -387,16 +245,16 @@
 				)
 			)
 			(pin input line
-				(at 22.86 21.59 180)
+				(at 16.51 20.32 0)
 				(length 2.54)
-				(name "GND"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "3"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -405,16 +263,16 @@
 				)
 			)
 			(pin input line
-				(at 22.86 17.78 180)
+				(at 16.51 17.78 0)
 				(length 2.54)
-				(name "GND"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "4"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -423,16 +281,16 @@
 				)
 			)
 			(pin input line
-				(at 22.86 13.97 180)
+				(at 16.51 15.24 0)
 				(length 2.54)
-				(name "GND"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "5"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -441,16 +299,16 @@
 				)
 			)
 			(pin input line
-				(at 22.86 10.16 180)
+				(at 16.51 12.7 0)
 				(length 2.54)
-				(name "GND"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "6"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -459,16 +317,16 @@
 				)
 			)
 			(pin input line
-				(at 22.86 6.35 180)
+				(at 16.51 10.16 0)
 				(length 2.54)
-				(name "GPIO2"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "7"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
@@ -477,16 +335,16 @@
 				)
 			)
 			(pin input line
-				(at 22.86 2.54 180)
+				(at 16.51 7.62 0)
 				(length 2.54)
-				(name "GPIO1"
+				(name ""
 					(effects
 						(font
 							(size 1.27 1.27)
 						)
 					)
 				)
-				(number "8"
+				(number ""
 					(effects
 						(font
 							(size 1.27 1.27)
