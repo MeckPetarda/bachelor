@@ -5,7 +5,7 @@
  * can communicate with each other. Created to work around mobile
  * hotspot client isolation during development.
  *
- * SSID: lighthouse-bridge (open network)
+ * SSID: lighthouse-bridge (WPA2-PSK)
  * DHCP range: 192.168.4.x (ESP-IDF default)
  */
 
@@ -20,7 +20,7 @@
 static const char *TAG = "SOFTAP_BRIDGE";
 
 #define AP_SSID     "lighthouse-bridge"
-#define AP_PASS     ""
+#define AP_PASS     "lighthouse"
 #define AP_CHANNEL  1
 #define AP_MAX_CONN 4
 
@@ -73,7 +73,8 @@ void app_main(void)
             .channel        = AP_CHANNEL,
             .password       = AP_PASS,
             .max_connection = AP_MAX_CONN,
-            .authmode       = WIFI_AUTH_OPEN,
+            .authmode       = WIFI_AUTH_WPA2_PSK,
+            .pmf_cfg        = { .required = false },
         },
     };
 
