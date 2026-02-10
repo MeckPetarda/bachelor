@@ -1,0 +1,8 @@
+# Target: ESP32
+CONFIG_IDF_TARGET="esp32"
+
+# Reduce log verbosity for cleaner output
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Disable unused features to minimize firmware size
+CONFIG_LWIP_IPV6=n
