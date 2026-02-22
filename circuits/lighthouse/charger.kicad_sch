@@ -2248,7 +2248,7 @@
 		)
 		(uuid "f805aeab-6381-4f0e-9a3f-dda062f74eb0")
 	)
-	(hierarchical_label "D-"
+	(hierarchical_label "CC2"
 		(shape input)
 		(at 36.83 67.31 180)
 		(effects
@@ -2314,7 +2314,7 @@
 		)
 		(uuid "ae7da1a2-7459-450b-bf9e-1b990ee87ea5")
 	)
-	(hierarchical_label "D+"
+	(hierarchical_label "CC1"
 		(shape input)
 		(at 36.83 58.42 180)
 		(effects
