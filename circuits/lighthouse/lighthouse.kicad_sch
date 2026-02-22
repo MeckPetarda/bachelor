@@ -3796,10 +3796,22 @@
 		)
 	)
 	(junction
+		(at 71.12 92.71)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "0b260adb-89fb-4ca6-bdd3-6589125c3227")
+	)
+	(junction
 		(at 247.65 109.22)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "0bd8cbcf-ee26-485f-b75a-493967f94e15")
+	)
+	(junction
+		(at 76.2 90.17)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "15ee75fd-6b12-47ae-b976-dc46842ea850")
 	)
 	(junction
 		(at 142.24 34.29)
@@ -3964,6 +3976,12 @@
 		(uuid "a8d9ccd6-8326-4bc3-b1b9-3d6846c7cef1")
 	)
 	(junction
+		(at 96.52 90.17)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "b1c7935b-7f45-43ed-b9db-6c1564f15d5d")
+	)
+	(junction
 		(at 262.89 48.26)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3981,13 +3999,15 @@
 		(color 0 0 0 0)
 		(uuid "fa767324-10fd-430c-bbad-a84d43155d2b")
 	)
+	(junction
+		(at 71.12 116.84)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "fc6f27b5-0a7d-4400-b352-a2740a380973")
+	)
 	(no_connect
 		(at 30.48 41.91)
 		(uuid "004f3083-1329-4863-afa1-40164b762560")
-	)
-	(no_connect
-		(at 60.96 92.71)
-		(uuid "0e272438-d491-45a2-84c4-7616dd4701bb")
 	)
 	(no_connect
 		(at 30.48 67.31)
@@ -4048,10 +4068,6 @@
 	(no_connect
 		(at 181.61 107.95)
 		(uuid "87931641-85a0-4ddf-bb77-e71d8cf5010d")
-	)
-	(no_connect
-		(at 60.96 90.17)
-		(uuid "8e8c3a7c-dd7a-443a-bfd2-775f797ac093")
 	)
 	(no_connect
 		(at 30.48 74.93)
@@ -4145,6 +4161,36 @@
 	)
 	(wire
 		(pts
+			(xy 76.2 90.17) (xy 82.55 90.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0a697fee-e033-48c4-82e5-3a3d52795759")
+	)
+	(wire
+		(pts
+			(xy 76.2 116.84) (xy 76.2 111.76)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0c1ce613-eeda-48f6-a596-d51d14bc6abf")
+	)
+	(wire
+		(pts
+			(xy 71.12 92.71) (xy 71.12 101.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0dd1ef86-db3f-44ff-a861-67fb6822c9b9")
+	)
+	(wire
+		(pts
 			(xy 251.46 41.91) (xy 247.65 41.91)
 		)
 		(stroke
@@ -4212,6 +4258,16 @@
 			(type default)
 		)
 		(uuid "157b0b33-2afd-4346-a1ce-1c9640e54f4b")
+	)
+	(wire
+		(pts
+			(xy 71.12 116.84) (xy 71.12 111.76)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "16307c56-2d02-4a12-907c-99b544c3ca0c")
 	)
 	(wire
 		(pts
@@ -4305,6 +4361,16 @@
 	)
 	(wire
 		(pts
+			(xy 90.17 92.71) (xy 96.52 92.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1fffc41e-0817-40cb-9b42-c0475009618f")
+	)
+	(wire
+		(pts
 			(xy 80.01 148.59) (xy 74.93 148.59)
 		)
 		(stroke
@@ -4352,6 +4418,16 @@
 			(type default)
 		)
 		(uuid "25e74068-d3fa-4b89-a964-af0a57471cb1")
+	)
+	(wire
+		(pts
+			(xy 71.12 116.84) (xy 76.2 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "298f5735-f7d0-4a24-9ec3-b20dd3985959")
 	)
 	(wire
 		(pts
@@ -4435,6 +4511,16 @@
 	)
 	(wire
 		(pts
+			(xy 71.12 92.71) (xy 82.55 92.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3aa72370-5c2f-448e-9e6b-294c0e731d3e")
+	)
+	(wire
+		(pts
 			(xy 133.35 34.29) (xy 142.24 34.29)
 		)
 		(stroke
@@ -4442,6 +4528,16 @@
 			(type default)
 		)
 		(uuid "3cade33d-c6a3-47af-956c-82d958471ccc")
+	)
+	(wire
+		(pts
+			(xy 76.2 90.17) (xy 76.2 101.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3db001cf-3af0-4611-8bbf-dcd8efa37af7")
 	)
 	(wire
 		(pts
@@ -4572,6 +4668,16 @@
 			(type default)
 		)
 		(uuid "4fc8b49c-aeb7-4b4d-84aa-7f25a3a25cc4")
+	)
+	(wire
+		(pts
+			(xy 60.96 90.17) (xy 76.2 90.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5259733e-c177-4327-b9ac-82c17eb76891")
 	)
 	(wire
 		(pts
@@ -5155,6 +5261,16 @@
 	)
 	(wire
 		(pts
+			(xy 100.33 90.17) (xy 96.52 90.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "989bde9e-aa86-4943-a0bd-61901195e947")
+	)
+	(wire
+		(pts
 			(xy 59.69 171.45) (xy 67.31 171.45)
 		)
 		(stroke
@@ -5435,6 +5551,16 @@
 	)
 	(wire
 		(pts
+			(xy 96.52 92.71) (xy 96.52 90.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c66aad3f-6ee1-4210-96cc-77b9a308125a")
+	)
+	(wire
+		(pts
 			(xy 199.39 99.06) (xy 199.39 90.17)
 		)
 		(stroke
@@ -5575,6 +5701,26 @@
 	)
 	(wire
 		(pts
+			(xy 60.96 92.71) (xy 71.12 92.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e1dbb40c-0a30-468b-b268-b5f935926eec")
+	)
+	(wire
+		(pts
+			(xy 96.52 90.17) (xy 90.17 90.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e4ca11f8-beee-46df-9e57-5974e0826257")
+	)
+	(wire
+		(pts
 			(xy 261.62 83.82) (xy 261.62 90.17)
 		)
 		(stroke
@@ -5662,6 +5808,16 @@
 			(type default)
 		)
 		(uuid "fd474b39-9da9-46ac-a7ea-1abbd1c0944a")
+	)
+	(wire
+		(pts
+			(xy 64.77 116.84) (xy 71.12 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fe565ea2-8d8e-4f73-a5b8-128f940e640d")
 	)
 	(global_label "MP28"
 		(shape input)
@@ -8990,6 +9146,73 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+5V")
+		(at 100.33 90.17 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "6d1a2453-1290-4a65-8a88-ab0237c02f40")
+		(property "Reference" "#PWR016"
+			(at 96.52 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 104.14 90.1699 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 100.33 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 100.33 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 100.33 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "b4a73003-f227-4c42-b81b-d29bf7a3acc4")
+		)
+		(instances
+			(project "lighthouse"
+				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
+					(reference "#PWR016")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+3.3V")
 		(at 35.56 22.86 90)
 		(unit 1)
@@ -9790,6 +10013,75 @@
 		)
 	)
 	(symbol
+		(lib_id "Switch:SW_Push")
+		(at 71.12 106.68 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "b2559ca4-ea81-4519-9e03-94b4d437006b")
+		(property "Reference" "STATUS/SETUP1"
+			(at 67.31 105.41 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "SW_Push"
+			(at 67.31 107.95 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Button_Switch_SMD:SW_Push_SPST_NO_Alps_SKRK"
+			(at 66.04 106.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 66.04 106.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Push button switch, generic, two pins"
+			(at 71.12 106.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "06d1f501-3007-4a69-8002-e137dec092f1")
+		)
+		(pin "1"
+			(uuid "7b6f85ab-2a07-4fb7-856b-c16c127b6a8c")
+		)
+		(instances
+			(project "lighthouse"
+				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
+					(reference "STATUS/SETUP1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+3.3V")
 		(at 83.82 49.53 270)
 		(unit 1)
@@ -10385,6 +10677,143 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 64.77 116.84 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "dd188396-ffb8-4716-b978-f00a1dd015e1")
+		(property "Reference" "#PWR01"
+			(at 58.42 116.84 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 60.96 116.8399 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 64.77 116.84 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 64.77 116.84 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 64.77 116.84 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "f0472a0d-c475-443d-b28c-912dc198b40b")
+		)
+		(instances
+			(project "lighthouse"
+				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
+					(reference "#PWR01")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 86.36 92.71 270)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "e3d2cc96-3d7e-4c33-b3a9-640f30a50f86")
+		(property "Reference" "R8"
+			(at 84.926 95.1405 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "10k"
+			(at 88.1079 97.1623 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder"
+			(at 86.36 94.488 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 86.36 92.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 86.36 92.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "24f00d8a-f271-4355-ba45-522b0dfccfb3")
+		)
+		(pin "2"
+			(uuid "fc210a2a-f4c8-4fea-a444-a4dd915a738e")
+		)
+		(instances
+			(project "lighthouse"
+				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
+					(reference "R8")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+5V")
 		(at 210.82 34.29 270)
 		(unit 1)
@@ -10513,6 +10942,75 @@
 			(project ""
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
 					(reference "#PWR014")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Switch:SW_Push")
+		(at 76.2 106.68 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "e78d18ec-6320-4d4f-bf1f-76f76cf82cbb")
+		(property "Reference" "SCAN_TGL1"
+			(at 78.74 105.41 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "SW_Push"
+			(at 78.74 107.95 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Button_Switch_SMD:SW_Push_SPST_NO_Alps_SKRK"
+			(at 71.12 106.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 71.12 106.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Push button switch, generic, two pins"
+			(at 76.2 106.68 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "f1edd188-796d-40aa-a7fb-3e8f704b70e1")
+		)
+		(pin "1"
+			(uuid "52c8a72e-bb6b-4559-a843-412c8b8e91ee")
+		)
+		(instances
+			(project "lighthouse"
+				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
+					(reference "SCAN_TGL1")
 					(unit 1)
 				)
 			)
@@ -10789,6 +11287,76 @@
 			(project ""
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
 					(reference "R13")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 86.36 90.17 90)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "f795d54b-2c4b-4c31-94a0-adf0e9cd6cd5")
+		(property "Reference" "R34"
+			(at 84.4753 84.9671 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "10k"
+			(at 84.4753 87.5071 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder"
+			(at 86.36 88.392 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 86.36 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 86.36 90.17 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "42153ea0-9d9f-460f-b236-0eaa7ef0a4c1")
+		)
+		(pin "2"
+			(uuid "f4a87061-0abe-4bf7-a43e-a71bd2972fb1")
+		)
+		(instances
+			(project "lighthouse"
+				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
+					(reference "R34")
 					(unit 1)
 				)
 			)
