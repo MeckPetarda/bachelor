@@ -9252,16 +9252,16 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "92a09ef0-496f-4ede-a92e-13d93a7b31df")
-		(property "Reference" "J3"
-			(at 166.37 25.4 0)
+		(property "Reference" "J1"
+			(at 166.37 27.94 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "USB_C_Receptacle_PowerOnly_6P"
-			(at 166.37 27.94 0)
+		(property "Value" "USB_C_Receptacle_6P"
+			(at 166.37 30.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9319,7 +9319,7 @@
 		(instances
 			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "J3")
+					(reference "J1")
 					(unit 1)
 				)
 			)

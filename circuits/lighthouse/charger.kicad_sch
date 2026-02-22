@@ -1940,16 +1940,6 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 83.82) (xy 81.28 86.36)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ad1f4301-7dc0-48c6-a4d5-5d702177a6e4")
-	)
-	(wire
-		(pts
 			(xy 208.28 55.88) (xy 208.28 73.66)
 		)
 		(stroke
@@ -2200,7 +2190,7 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 93.98) (xy 81.28 99.06)
+			(xy 81.28 83.82) (xy 81.28 99.06)
 		)
 		(stroke
 			(width 0)
@@ -3532,76 +3522,6 @@
 			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "Q2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 81.28 90.17 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "ff90b97e-3216-4047-9ea2-576147b64ebd")
-		(property "Reference" "R8"
-			(at 83.82 88.8999 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "2"
-			(at 83.82 91.4399 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder"
-			(at 79.502 90.17 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 81.28 90.17 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 81.28 90.17 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "4829de21-feab-497d-9f94-52d8385defc0")
-		)
-		(pin "1"
-			(uuid "0398fa14-a14b-4ff2-9909-9655ec3c1cb1")
-		)
-		(instances
-			(project "lighthouse"
-				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
-					(reference "R8")
 					(unit 1)
 				)
 			)
