@@ -2138,6 +2138,7 @@
 						(size 1.27 1.27)
 					)
 					(justify left)
+					(hide yes)
 				)
 			)
 			(property "Value" "ESP32-WROOM-32"
@@ -2147,6 +2148,7 @@
 						(size 1.27 1.27)
 					)
 					(justify left)
+					(hide yes)
 				)
 			)
 			(property "Footprint" "RF_Module:ESP32-WROOM-32"

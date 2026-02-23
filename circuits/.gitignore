@@ -1,3 +1,5 @@
 lighthouse/bom
 lighthouse/pcbway_production
 lighthouse/fp-info-cache
+
+*.FCBak
