@@ -7,4 +7,5 @@
   (lib (name "FS8205A")(type "KiCad")(uri "${KIPRJMOD}/components/FS8205A/FS8205A.kicad_sym")(options "")(descr ""))
   (lib (name "SX1308")(type "KiCad")(uri "${KIPRJMOD}/components/SX1308/SX1308.kicad_sym")(options "")(descr ""))
   (lib (name "CP2102-GMR")(type "KiCad")(uri "${KIPRJMOD}/components/CP2102-GMR/2026-02-10_18-46-17.kicad_sym")(options "")(descr ""))
+  (lib (name "SLW-1678105-6A-N-D")(type "KiCad")(uri "${KIPRJMOD}/components/SLW-1678105-6A-N-D/KiCad/SLW-1678105-6A-N-D.kicad_sym")(options "")(descr ""))
 )
