@@ -17,6 +17,9 @@
 #ifndef BATTERY_MONITOR_H
 #define BATTERY_MONITOR_H
 
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 #include "esp_err.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -25,9 +28,10 @@
 // CONFIGURATION
 // ============================================================================
 
-#define BATTERY_ADC_CHANNEL     ADC1_CHANNEL_5  // GPIO33
-#define BATTERY_ADC_ATTEN       ADC_ATTEN_DB_11 // 150-2450mV range
-#define BATTERY_ADC_WIDTH       ADC_WIDTH_BIT_12
+#define BATTERY_ADC_UNIT        ADC_UNIT_1
+#define BATTERY_ADC_CHANNEL     ADC_CHANNEL_5   // GPIO33
+#define BATTERY_ADC_ATTEN       ADC_ATTEN_DB_12 // 0-3100mV range (renamed from DB_11 in v5.x)
+#define BATTERY_ADC_BITWIDTH    ADC_BITWIDTH_12
 
 #define USB_DETECT_PIN          GPIO_NUM_32
 
@@ -126,5 +130,14 @@ bool battery_monitor_is_usb_present(void);
  * @return "usb" or "battery"
  */
 const char* battery_monitor_get_power_source(void);
+
+/**
+ * Deinitialize battery monitoring system
+ *
+ * Releases ADC unit and calibration handles. Call during shutdown if needed.
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t battery_monitor_deinit(void);
 
 #endif // BATTERY_MONITOR_H
