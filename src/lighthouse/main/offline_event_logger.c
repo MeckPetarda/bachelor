@@ -15,6 +15,8 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "nvs.h"
+#include "nvs_flash.h"
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -31,6 +33,11 @@ static const char *TAG = "OFFLINE_LOGGER";
 #define LOGGING_TASK_PRIORITY 5    // Task priority
 #define REPLAY_TASK_STACK     4096 // Stack size for replay task
 #define REPLAY_TASK_PRIORITY  4    // Lower priority than logging
+
+// NVS namespace and keys for persistent pointer storage (survives power outages)
+#define NVS_NAMESPACE_OFFLINE "offline_log"
+#define NVS_KEY_WRITE_INDEX   "write_idx"
+#define NVS_KEY_READ_INDEX    "read_idx"
 
 // ============================================================================
 // GLOBAL STATE
@@ -216,6 +223,44 @@ static uint32_t get_pending_count_internal(void)
 }
 
 // ============================================================================
+// NVS HELPERS — persistent pointer storage that survives full power outages
+// ============================================================================
+
+static nvs_handle_t s_nvs_handle = 0;
+static bool         s_nvs_open   = false;
+
+static void nvs_open_logger(void)
+{
+    esp_err_t ret = nvs_open(NVS_NAMESPACE_OFFLINE, NVS_READWRITE, &s_nvs_handle);
+    if (ret == ESP_OK)
+    {
+        s_nvs_open = true;
+    }
+    else
+    {
+        ESP_LOGW(TAG, "Failed to open NVS namespace '%s': %s", NVS_NAMESPACE_OFFLINE, esp_err_to_name(ret));
+    }
+}
+
+static void nvs_save_pointers(void)
+{
+    if (!s_nvs_open)
+        return;
+    nvs_set_u32(s_nvs_handle, NVS_KEY_WRITE_INDEX, rtc_write_index);
+    nvs_set_u32(s_nvs_handle, NVS_KEY_READ_INDEX, rtc_read_index);
+    nvs_commit(s_nvs_handle);
+}
+
+static bool nvs_load_pointers(uint32_t *write_idx, uint32_t *read_idx)
+{
+    if (!s_nvs_open)
+        return false;
+    esp_err_t r1 = nvs_get_u32(s_nvs_handle, NVS_KEY_WRITE_INDEX, write_idx);
+    esp_err_t r2 = nvs_get_u32(s_nvs_handle, NVS_KEY_READ_INDEX, read_idx);
+    return (r1 == ESP_OK && r2 == ESP_OK);
+}
+
+// ============================================================================
 // BACKGROUND TASKS
 // ============================================================================
 
@@ -260,6 +305,9 @@ static void logging_task(void *arg)
                         logger_state.stats.buffer_overflows++;
                         ESP_LOGW(TAG, "Buffer overflow! Oldest event overwritten");
                     }
+
+                    // Persist updated pointers to NVS so they survive a power outage
+                    nvs_save_pointers();
 
                     logger_state.stats.events_written++;
                     ESP_LOGD(TAG, "Event stored at index %lu (pending: %lu)", old_write_index,
@@ -342,6 +390,8 @@ static void replay_task(void *arg)
                             if (xSemaphoreTake(logger_state.storage_mutex, pdMS_TO_TICKS(1000)))
                             {
                                 rtc_read_index = (rtc_read_index + 1) % OFFLINE_MAX_EVENTS;
+                                // Persist updated read pointer so replay progress survives power loss
+                                nvs_save_pointers();
                                 xSemaphoreGive(logger_state.storage_mutex);
                             }
 
@@ -446,17 +496,34 @@ esp_err_t offline_logger_init(void)
 
     ESP_LOGI(TAG, "Events file opened: %s", OFFLINE_EVENTS_FILE_PATH);
 
-    // Initialize RTC pointers if first boot
+    // Open NVS for persistent pointer storage (survives power outages, unlike RTC memory)
+    nvs_open_logger();
+
     if (!rtc_initialized)
     {
-        rtc_write_index = 0;
-        rtc_read_index  = 0;
+        // RTC memory was lost — this could be a genuine first boot OR recovery from a
+        // full power outage. Check NVS (flash-backed) for previously saved pointers.
+        uint32_t nvs_write = 0, nvs_read = 0;
+        if (nvs_load_pointers(&nvs_write, &nvs_read))
+        {
+            rtc_write_index = nvs_write;
+            rtc_read_index  = nvs_read;
+            ESP_LOGI(TAG, "Pointers restored from NVS after power loss: write=%lu, read=%lu",
+                     rtc_write_index, rtc_read_index);
+        }
+        else
+        {
+            // Genuine first boot — no saved state in NVS
+            rtc_write_index = 0;
+            rtc_read_index  = 0;
+            ESP_LOGI(TAG, "RTC pointers initialized (first boot)");
+        }
         rtc_initialized = true;
-        ESP_LOGI(TAG, "RTC pointers initialized (first boot)");
     }
     else
     {
-        ESP_LOGI(TAG, "RTC pointers restored: write=%lu, read=%lu", rtc_write_index, rtc_read_index);
+        ESP_LOGI(TAG, "RTC pointers restored from deep sleep: write=%lu, read=%lu",
+                 rtc_write_index, rtc_read_index);
     }
 
     // Create storage mutex
@@ -693,6 +760,7 @@ esp_err_t offline_logger_clear_all(void)
     {
         rtc_write_index = 0;
         rtc_read_index  = 0;
+        nvs_save_pointers();
         xSemaphoreGive(logger_state.storage_mutex);
 
         ESP_LOGI(TAG, "All events cleared");
