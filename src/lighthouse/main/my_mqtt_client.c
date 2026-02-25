@@ -12,6 +12,7 @@
  */
 
 #include "my_mqtt_client.h"
+#include "battery_monitor.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -643,10 +644,25 @@ esp_err_t mqtt_client_publish_health_metrics(void)
     }
 
     // ========================================================================
+    // Gather Battery Metrics
+    // ========================================================================
+
+    const battery_status_t *battery     = battery_monitor_get_status();
+    const char             *power_source = battery_monitor_get_power_source();
+    const char             *health_str;
+    switch (battery->health)
+    {
+    case BATTERY_HEALTH_GOOD:     health_str = "good";     break;
+    case BATTERY_HEALTH_DEGRADED: health_str = "degraded"; break;
+    case BATTERY_HEALTH_CRITICAL: health_str = "critical"; break;
+    default:                      health_str = "unknown";  break;
+    }
+
+    // ========================================================================
     // Build Consolidated Health JSON Payload
     // ========================================================================
 
-    char payload[384];
+    char payload[512];
     int  len = snprintf(payload, sizeof(payload),
                         "{"
                         "\"uptime_sec\":%lu,"
@@ -659,11 +675,22 @@ esp_err_t mqtt_client_publish_health_metrics(void)
                         "\"power_rail_present\":%s,"
                         "\"fw_version\":\"%s\","
                         "\"last_error\":%d"
+                        "},"
+                        "\"battery\":{"
+                        "\"voltage_mv\":%u,"
+                        "\"percentage\":%u,"
+                        "\"is_charging\":false,"
+                        "\"power_source\":\"%s\","
+                        "\"health_status\":\"%s\","
+                        "\"voltage_under_load_mv\":%u"
                         "}"
                         "}",
                         uptime_sec, free_heap, min_free_heap, wifi_rssi, state_str,
                         rfid_is_responsive ? "true" : "false", rfid_power_rail_present ? "true" : "false",
-                        rfid_fw_version, rfid_last_error);
+                        rfid_fw_version, rfid_last_error,
+                        battery->voltage_mv, battery->percentage,
+                        power_source, health_str,
+                        battery->voltage_under_load_mv);
 
     if (len >= sizeof(payload))
     {

@@ -38,6 +38,8 @@
 #include <string.h>
 
 #include "hal/gpio_types.h"
+#include "battery_monitor.h"
+#include "esp_sleep.h"
 #include "my_mqtt_client.h"
 #include "offline_event_logger.h"
 #include "uart_reader.h"
@@ -469,6 +471,22 @@ static void rfid_reader_start_inventory_wrapper(void)
 {
     ESP_LOGI(TAG, "Attempting to start RFID scan...");
 
+    // Check battery level before allowing scan
+    if (battery_monitor_is_critical())
+    {
+        ESP_LOGW(TAG, "Cannot start RFID scan - battery critical (<%dmV)",
+                 BATTERY_VOLTAGE_CRITICAL);
+        // Flash scanning LED three times as error indicator
+        for (int i = 0; i < 3; i++)
+        {
+            gpio_set_level(SCANNING_LED, 1);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            gpio_set_level(SCANNING_LED, 0);
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        return;
+    }
+
     // Step 1: Power ON the reader (if not already powered)
     if (!rfid_reader_is_powered())
     {
@@ -635,6 +653,131 @@ static void process_buttons(void)
 }
 
 // ============================================================================
+// BATTERY STATUS LED TASK (Phase 3)
+// ============================================================================
+
+/**
+ * Battery status LED task
+ *
+ * Uses ACTIVITY_LED (GPIO19) to indicate battery level when not flashing
+ * for tag detection. Patterns depend on battery percentage:
+ *   - USB powered:     LED stays off (no pattern)
+ *   - Battery >= 10%:  Brief 100ms flash every 5 seconds
+ *   - Battery 5-10%:   Pulsing 500ms on / 500ms off
+ *   - Battery < 5%:    Rapid pulsing 200ms on / 200ms off
+ */
+static void battery_status_led_task(void *pvParameters)
+{
+    const uint32_t FLASH_INTERVAL_MS = 5000;
+    const uint32_t FLASH_DURATION_MS = 100;
+    uint32_t       last_flash        = 0;
+
+    while (1)
+    {
+        const battery_status_t *battery     = battery_monitor_get_status();
+        uint32_t                current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+        if (battery->is_usb_present)
+        {
+            // USB powered - do not drive LED pattern
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        // Battery powered - show level via LED pattern
+        if (battery->percentage >= 10)
+        {
+            // Brief flash every 5 seconds
+            if ((current_time - last_flash) >= FLASH_INTERVAL_MS)
+            {
+                gpio_set_level(ACTIVITY_LED, 1);
+                vTaskDelay(pdMS_TO_TICKS(FLASH_DURATION_MS));
+                gpio_set_level(ACTIVITY_LED, 0);
+                last_flash = current_time;
+            }
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        else if (battery->percentage >= 5)
+        {
+            // Slow pulse at 500ms on / 500ms off
+            gpio_set_level(ACTIVITY_LED, 1);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            gpio_set_level(ACTIVITY_LED, 0);
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+        else
+        {
+            // Rapid pulse at 200ms on / 200ms off (critical warning)
+            gpio_set_level(ACTIVITY_LED, 1);
+            vTaskDelay(pdMS_TO_TICKS(200));
+            gpio_set_level(ACTIVITY_LED, 0);
+            vTaskDelay(pdMS_TO_TICKS(200));
+        }
+    }
+}
+
+// ============================================================================
+// CRITICAL BATTERY SHUTDOWN (Phase 4)
+// ============================================================================
+
+/**
+ * Execute graceful shutdown at empty battery level (<=3.2V)
+ *
+ * Steps:
+ *   1. Flash all LEDs as visual warning
+ *   2. Stop RFID scanning if active
+ *   3. Publish offline status and disconnect MQTT
+ *   4. Flush offline event cache via logger deinit
+ *   5. Turn off all LEDs
+ *   6. Enter deep sleep to preserve remaining battery
+ *
+ * Reference: ESP32 TRM Chapter 9 Section 9.3.5 (Brownout detector)
+ * Device will restart on next power cycle (USB reconnect or battery swap).
+ */
+static void battery_critical_shutdown(void)
+{
+    ESP_LOGW(TAG, "====================================");
+    ESP_LOGW(TAG, "CRITICAL BATTERY - INITIATING SHUTDOWN");
+    ESP_LOGW(TAG, "====================================");
+
+    // Flash all LEDs as warning before shutdown
+    gpio_set_level(WIFI_STATUS_LED, 1);
+    gpio_set_level(MQTT_STATUS_LED, 1);
+    gpio_set_level(SCANNING_LED, 1);
+    gpio_set_level(ACTIVITY_LED, 1);
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    // Stop RFID if active
+    if (rfid_scanning)
+    {
+        rfid_reader_stop_inventory();
+        rfid_reader_power_off();
+        rfid_scanning = false;
+    }
+
+    // Publish offline status and disconnect MQTT (best effort)
+    mqtt_client_disconnect();
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Allow disconnect to complete
+
+    // Flush pending offline events to storage via graceful deinit
+    offline_logger_deinit();
+
+    // All LEDs off before sleep
+    gpio_set_level(WIFI_STATUS_LED, 0);
+    gpio_set_level(MQTT_STATUS_LED, 0);
+    gpio_set_level(SCANNING_LED, 0);
+    gpio_set_level(ACTIVITY_LED, 0);
+
+    ESP_LOGW(TAG, "Entering deep sleep to preserve battery");
+    ESP_LOGW(TAG, "Device will restart when USB power is reconnected");
+
+    vTaskDelay(pdMS_TO_TICKS(100)); // Allow log buffer to flush
+
+    // Enter deep sleep - device wakes only on power cycle
+    esp_deep_sleep_start();
+}
+
+// ============================================================================
 // MAIN TASK
 // ============================================================================
 
@@ -667,10 +810,32 @@ static void main_task(void *arg)
         {
             health_publish_counter = 0;
 
+            // Update battery status before publishing (captures under-load if scanning)
+            battery_monitor_update(rfid_scanning);
+
             if (mqtt_connected)
             {
                 mqtt_client_publish_health_metrics();
             }
+        }
+
+        // Stop active RFID scan if battery has dropped to critical level
+        if (rfid_scanning && battery_monitor_is_critical())
+        {
+            ESP_LOGW(TAG, "Battery critical during scan - stopping RFID");
+            rfid_reader_stop_inventory();
+            rfid_reader_power_off();
+            gpio_set_level(SCANNING_LED, 0);
+            rfid_scanning = false;
+        }
+
+        // Check for empty battery level - initiate graceful shutdown
+        const battery_status_t *battery = battery_monitor_get_status();
+        if (battery->voltage_mv > 0 &&
+            battery->voltage_mv <= BATTERY_VOLTAGE_EMPTY)
+        {
+            battery_critical_shutdown();
+            // Function never returns (enters deep sleep)
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -922,6 +1087,15 @@ void app_main(void)
 
     gpio_init();
 
+    // Initialize battery monitor after GPIO (uses ADC1 and GPIO32)
+    esp_err_t batt_ret = battery_monitor_init();
+    if (batt_ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to initialize battery monitor: %s",
+                 esp_err_to_name(batt_ret));
+        // Non-critical - continue without battery monitoring
+    }
+
     esp_err_t ret = init_wifi_provisioning();
     if (ret != ESP_OK)
         return;
@@ -941,6 +1115,9 @@ void app_main(void)
     ESP_LOGI(TAG, "  Press BUTTON1 to start/stop scanning");
     ESP_LOGI(TAG, "  Press BUTTON2 to show statistics");
     ESP_LOGI(TAG, "  RFID power control on GPIO5, sense on GPIO22\n");
+
+    // Start battery status LED task (Phase 3)
+    xTaskCreate(battery_status_led_task, "battery_led", 2048, NULL, 4, NULL);
 
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
 }
