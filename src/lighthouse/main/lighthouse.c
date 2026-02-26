@@ -37,9 +37,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hal/gpio_types.h"
 #include "battery_monitor.h"
 #include "esp_sleep.h"
+#include "hal/gpio_types.h"
 #include "my_mqtt_client.h"
 #include "offline_event_logger.h"
 #include "uart_reader.h"
@@ -259,7 +259,7 @@ static char detect_config_value_type(const char *payload)
         return 'i'; // Integer/number
     }
 
-    return '?'; // Unknown type
+    return '?';     // Unknown type
 }
 
 /**
@@ -305,8 +305,7 @@ static void on_mqtt_config_message(const char *topic, const char *payload)
 
     switch (value_type)
     {
-    case 'i':
-    {
+    case 'i': {
         int int_value;
         if (parse_config_int_value(payload, &int_value) == 0)
         {
@@ -318,8 +317,7 @@ static void on_mqtt_config_message(const char *topic, const char *payload)
         }
         break;
     }
-    case 's':
-    {
+    case 's': {
         char string_value[128];
         if (parse_config_string_value(payload, string_value, sizeof(string_value)) == 0)
         {
@@ -331,8 +329,7 @@ static void on_mqtt_config_message(const char *topic, const char *payload)
         }
         break;
     }
-    case 'b':
-    {
+    case 'b': {
         bool bool_value;
         if (parse_config_bool_value(payload, &bool_value) == 0)
         {
@@ -474,8 +471,7 @@ static void rfid_reader_start_inventory_wrapper(void)
     // Check battery level before allowing scan
     if (battery_monitor_is_critical())
     {
-        ESP_LOGW(TAG, "Cannot start RFID scan - battery critical (<%dmV)",
-                 BATTERY_VOLTAGE_CRITICAL);
+        ESP_LOGW(TAG, "Cannot start RFID scan - battery critical (<%dmV)", BATTERY_VOLTAGE_CRITICAL);
         // Flash scanning LED three times as error indicator
         for (int i = 0; i < 3; i++)
         {
@@ -674,7 +670,7 @@ static void battery_status_led_task(void *pvParameters)
 
     while (1)
     {
-        const battery_status_t *battery     = battery_monitor_get_status();
+        const battery_status_t *battery      = battery_monitor_get_status();
         uint32_t                current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
         if (battery->is_usb_present)
@@ -786,7 +782,7 @@ static void main_task(void *arg)
     ESP_LOGI(TAG, "Main task started");
 
     uint32_t       health_publish_counter  = 0;
-    const uint32_t HEALTH_PUBLISH_INTERVAL = 60000 / 10; // 60 seconds / 10ms delay = 6000 iterations
+    const uint32_t HEALTH_PUBLISH_INTERVAL = 5000 / 10; // 60 seconds / 10ms delay = 6000 iterations
 
     while (1)
     {
@@ -831,8 +827,7 @@ static void main_task(void *arg)
 
         // Check for empty battery level - initiate graceful shutdown
         const battery_status_t *battery = battery_monitor_get_status();
-        if (battery->voltage_mv > 0 &&
-            battery->voltage_mv <= BATTERY_VOLTAGE_EMPTY)
+        if (battery->voltage_mv > 0 && battery->voltage_mv <= BATTERY_VOLTAGE_EMPTY)
         {
             battery_critical_shutdown();
             // Function never returns (enters deep sleep)
@@ -1091,8 +1086,7 @@ void app_main(void)
     esp_err_t batt_ret = battery_monitor_init();
     if (batt_ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "Failed to initialize battery monitor: %s",
-                 esp_err_to_name(batt_ret));
+        ESP_LOGE(TAG, "Failed to initialize battery monitor: %s", esp_err_to_name(batt_ret));
         // Non-critical - continue without battery monitoring
     }
 
