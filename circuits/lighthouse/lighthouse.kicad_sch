@@ -3353,230 +3353,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "SLW-1678105-6A-N-D:SLW-1678105-6A-N-D"
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "S1"
-				(at 12.7 7.62 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "SLW-1678105-6A-N-D"
-				(at 12.7 5.08 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" "SLW-1678105-6A-N-D:SLW16781056AND"
-				(at -1.27 -94.92 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "https://www.sameskydevices.com/product/resource/SLW-1678105-6A-N-D.pdf"
-				(at -1.27 -194.92 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Description" "SLW-1678105-6A-N-D - 16 x 7.8 x 10.5 mm, 6 mm Raised Slide Actuator, Through Hole, Slide Switch"
-				(at 25.4 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Height" "14.5"
-				(at -1.27 -394.92 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Mouser Part Number" "179-SLW16781056AND"
-				(at -1.27 -494.92 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Same-Sky/SLW-1678105-6A-N-D?qs=IKkN%2F947nfCWfuHPg7jcWw%3D%3D"
-				(at -1.27 -594.92 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Manufacturer_Name" "Same Sky"
-				(at -1.27 -694.92 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(property "Manufacturer_Part_Number" "SLW-1678105-6A-N-D"
-				(at -1.27 -794.92 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left top)
-					(hide yes)
-				)
-			)
-			(symbol "SLW-1678105-6A-N-D_1_1"
-				(rectangle
-					(start 5.08 2.54)
-					(end 20.32 -12.7)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(pin passive line
-					(at 0 0 0)
-					(length 5.08)
-					(name "COM_1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 0 -5.08 0)
-					(length 5.08)
-					(hide yes)
-					(name "NO_2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "4"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 0 -10.16 0)
-					(length 5.08)
-					(name "COM_2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "5"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 25.4 0 180)
-					(length 5.08)
-					(name "NC_1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 25.4 -5.08 180)
-					(length 5.08)
-					(hide yes)
-					(name "NO_1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 25.4 -10.16 180)
-					(length 5.08)
-					(name "NC_2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "6"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "Switch:SW_Push"
 			(pin_numbers
 				(hide yes)
@@ -3717,6 +3493,343 @@
 						)
 					)
 					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "Switch:SW_Push_DPDT"
+			(pin_names
+				(offset 0)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "SW1"
+				(at 0 13.97 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "SW_Push_DPDT"
+				(at 0 11.43 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical"
+				(at 0 5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Momentary Switch, dual pole double throw"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "switch dual-pole double-throw spdt ON-ON"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "SW_Push_DPDT_0_0"
+				(circle
+					(center -2.032 5.08)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center -2.032 -5.08)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 2.032 2.54)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 2.032 -7.62)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "SW_Push_DPDT_0_1"
+				(polyline
+					(pts
+						(xy -1.524 5.334) (xy 2.3368 7.0612)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.524 -4.826) (xy 2.3368 -3.0988)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 7.874) (xy 0 6.096)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 3.556) (xy 0 4.572)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 1.27) (xy 0 2.286)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 -1.016) (xy 0 0)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 -2.286) (xy 0 -4.064)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 2.032 7.62)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 2.032 -2.54)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "SW_Push_DPDT_1_1"
+				(rectangle
+					(start -3.175 8.89)
+					(end 3.175 -8.89)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(pin passive line
+					(at -5.08 5.08 0)
+					(length 2.54)
+					(name "B"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 -5.08 0)
+					(length 2.54)
+					(name "B"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 7.62 180)
+					(length 2.54)
+					(name "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 2.54 180)
+					(length 2.54)
+					(name "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 -2.54 180)
+					(length 2.54)
+					(name "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 -7.62 180)
+					(length 2.54)
+					(name "C"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -4766,12 +4879,6 @@
 		(uuid "c120db5a-69cc-45a2-ade5-1337cfcdf740")
 	)
 	(junction
-		(at 120.65 90.17)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "eab3b6c6-1c6d-43a5-b297-925a6c38d6f9")
-	)
-	(junction
 		(at 259.08 92.71)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4906,6 +5013,16 @@
 			(type default)
 		)
 		(uuid "02f5d5b6-622f-487c-8186-468a43120f69")
+	)
+	(wire
+		(pts
+			(xy 210.82 34.29) (xy 210.82 36.83)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0399a2da-77e8-4bb5-87ba-ed30b1042d19")
 	)
 	(wire
 		(pts
@@ -5069,7 +5186,7 @@
 	)
 	(wire
 		(pts
-			(xy 173.99 36.83) (xy 185.42 36.83)
+			(xy 173.99 36.83) (xy 193.04 36.83)
 		)
 		(stroke
 			(width 0)
@@ -5369,16 +5486,6 @@
 	)
 	(wire
 		(pts
-			(xy 120.65 90.17) (xy 123.19 90.17)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3a8ab2e7-567e-4bd2-a3e0-7dca1b493ad2")
-	)
-	(wire
-		(pts
 			(xy 184.15 72.39) (xy 187.96 72.39)
 		)
 		(stroke
@@ -5386,6 +5493,16 @@
 			(type default)
 		)
 		(uuid "3c03708e-2218-46ab-bcb9-e9208dc7abd8")
+	)
+	(wire
+		(pts
+			(xy 210.82 24.13) (xy 210.82 26.67)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3d5bb811-7629-4592-91fa-7b3141cb1897")
 	)
 	(wire
 		(pts
@@ -5466,16 +5583,6 @@
 			(type default)
 		)
 		(uuid "49759116-58cd-4b13-ae08-43ff4b1995a0")
-	)
-	(wire
-		(pts
-			(xy 119.38 90.17) (xy 120.65 90.17)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4a9dcddb-baed-4b61-9673-3a07f3fba7fc")
 	)
 	(wire
 		(pts
@@ -5686,6 +5793,16 @@
 			(type default)
 		)
 		(uuid "62ab7253-77e8-41f0-a29c-e3682aec697b")
+	)
+	(wire
+		(pts
+			(xy 120.65 90.17) (xy 123.19 90.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "62f0f6b8-1781-4438-b94a-ae3db20a29ac")
 	)
 	(wire
 		(pts
@@ -6116,6 +6233,16 @@
 			(type default)
 		)
 		(uuid "87b0d9f8-7aac-4b18-81c0-dba86b1d56aa")
+	)
+	(wire
+		(pts
+			(xy 203.2 24.13) (xy 210.82 24.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "87cee114-d7fd-4f58-acbc-a4723b6ec66e")
 	)
 	(wire
 		(pts
@@ -6709,6 +6836,16 @@
 	)
 	(wire
 		(pts
+			(xy 203.2 34.29) (xy 210.82 34.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d69b3836-f19d-4c8f-abd3-48d5ebf472b5")
+	)
+	(wire
+		(pts
 			(xy 49.53 104.14) (xy 50.8 104.14)
 		)
 		(stroke
@@ -6959,7 +7096,7 @@
 	)
 	(wire
 		(pts
-			(xy 142.24 26.67) (xy 185.42 26.67)
+			(xy 142.24 26.67) (xy 193.04 26.67)
 		)
 		(stroke
 			(width 0)
@@ -8101,7 +8238,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LED_SMD:LED_1206_3216Metric_Pad1.42x1.75mm_HandSolder"
+		(property "Footprint" "LED_THT:LED_D3.0mm"
 			(at 52.07 161.29 0)
 			(effects
 				(font
@@ -8170,7 +8307,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "S9013"
+		(property "Value" "BC337"
 			(at 139.7 173.9899 0)
 			(effects
 				(font
@@ -8535,7 +8672,7 @@
 				)
 			)
 		)
-		(property "Value" "240"
+		(property "Value" "150"
 			(at 121.92 168.91 90)
 			(effects
 				(font
@@ -8610,7 +8747,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LED_SMD:LED_1206_3216Metric_Pad1.42x1.75mm_HandSolder"
+		(property "Footprint" "LED_THT:LED_D3.0mm"
 			(at 52.07 184.15 0)
 			(effects
 				(font
@@ -8746,7 +8883,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "SS8050"
+		(property "Value" "BC817-40"
 			(at 71.12 105.4099 0)
 			(effects
 				(font
@@ -8840,7 +8977,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "100k"
 			(at 121.92 154.9401 0)
 			(effects
 				(font
@@ -10420,7 +10557,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "SS8050"
+		(property "Value" "BC817-40"
 			(at 46.99 115.5699 0)
 			(effects
 				(font
@@ -12533,7 +12670,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LED_SMD:LED_1206_3216Metric_Pad1.42x1.75mm_HandSolder"
+		(property "Footprint" "LED_THT:LED_D3.0mm"
 			(at 52.07 176.53 0)
 			(effects
 				(font
@@ -13079,7 +13216,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "20k"
+		(property "Value" "47k"
 			(at 121.92 142.2401 0)
 			(effects
 				(font
@@ -13270,6 +13407,86 @@
 		)
 	)
 	(symbol
+		(lib_id "Switch:SW_Push_DPDT")
+		(at 198.12 31.75 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ee9733f9-da32-4b99-aab6-613bbc30ed35")
+		(property "Reference" "SW1"
+			(at 198.12 17.78 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "SW_Push_DPDT"
+			(at 198.12 20.32 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical"
+			(at 198.12 26.67 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 198.12 26.67 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Momentary Switch, dual pole double throw"
+			(at 198.12 31.75 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "75d07edf-421b-4f29-ba9d-ae54c138dba4")
+		)
+		(pin "5"
+			(uuid "b260071e-1121-4499-a20b-1b4da2e1c88e")
+		)
+		(pin "4"
+			(uuid "7590addd-27cd-4dc7-af6a-63978ee974e9")
+		)
+		(pin "2"
+			(uuid "495a973e-2720-48e3-9acb-4e50c6ee9951")
+		)
+		(pin "3"
+			(uuid "aa5f3080-915f-4f26-823c-5530b26ed5be")
+		)
+		(pin "6"
+			(uuid "2a7911b1-d2a8-4345-8b57-a38ad14618a2")
+		)
+		(instances
+			(project ""
+				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
+					(reference "SW1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R")
 		(at 67.31 184.15 90)
 		(unit 1)
@@ -13400,137 +13617,6 @@
 			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
 					(reference "R34")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "SLW-1678105-6A-N-D:SLW-1678105-6A-N-D")
-		(at 185.42 26.67 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "f919bcfb-51b8-45cc-9174-2d1b89e30a28")
-		(property "Reference" "S1"
-			(at 198.12 19.05 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "SLW-1678105-6A-N-D"
-			(at 198.12 21.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "SLW-1678105-6A-N-D:SLW16781056AND"
-			(at 184.15 121.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "https://www.sameskydevices.com/product/resource/SLW-1678105-6A-N-D.pdf"
-			(at 184.15 221.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Description" "SLW-1678105-6A-N-D - 16 x 7.8 x 10.5 mm, 6 mm Raised Slide Actuator, Through Hole, Slide Switch"
-			(at 210.82 26.67 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Height" "14.5"
-			(at 184.15 421.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Part Number" "179-SLW16781056AND"
-			(at 184.15 521.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Mouser Price/Stock" "https://www.mouser.co.uk/ProductDetail/Same-Sky/SLW-1678105-6A-N-D?qs=IKkN%2F947nfCWfuHPg7jcWw%3D%3D"
-			(at 184.15 621.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Name" "Same Sky"
-			(at 184.15 721.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(property "Manufacturer_Part_Number" "SLW-1678105-6A-N-D"
-			(at 184.15 821.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left top)
-				(hide yes)
-			)
-		)
-		(pin "6"
-			(uuid "07eda1de-c05f-4d77-96dc-f1ab3119dd7f")
-		)
-		(pin "3"
-			(uuid "b90b4bd2-c04b-42a5-9063-08094b2908a7")
-		)
-		(pin "1"
-			(uuid "8aaf0868-3ad2-4ce7-90ba-b74fe6619ca6")
-		)
-		(pin "2"
-			(uuid "3d89fa68-0005-4b9b-93e8-f94ae736d943")
-		)
-		(pin "5"
-			(uuid "d8a180bf-39b5-449c-81e7-09fe8629e1f5")
-		)
-		(pin "4"
-			(uuid "b75034a9-db5b-4aa4-95e8-9ff92d71df35")
-		)
-		(instances
-			(project ""
-				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67"
-					(reference "S1")
 					(unit 1)
 				)
 			)
@@ -13832,7 +13918,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LED_SMD:LED_1206_3216Metric_Pad1.42x1.75mm_HandSolder"
+		(property "Footprint" "LED_THT:LED_D3.0mm"
 			(at 52.07 168.91 0)
 			(effects
 				(font

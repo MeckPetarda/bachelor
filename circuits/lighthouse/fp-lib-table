@@ -8,4 +8,5 @@
   (lib (name "SX1308")(type "KiCad")(uri "${KIPRJMOD}/components/SX1308")(options "")(descr ""))
   (lib (name "CP2102-GMR")(type "KiCad")(uri "${KIPRJMOD}/components/CP2102-GMR/footprints.pretty")(options "")(descr ""))
   (lib (name "SLW-1678105-6A-N-D")(type "KiCad")(uri "/media/kuba/Games/Documents/VUT/bachelor/circuits/lighthouse/components/SLW-1678105-6A-N-D/KiCad")(options "")(descr ""))
+  (lib (name "3296W-1-103LF")(type "KiCad")(uri "/media/kuba/Games/Documents/VUT/bachelor/circuits/lighthouse/components/3296W-1-103LF")(options "")(descr ""))
 )
