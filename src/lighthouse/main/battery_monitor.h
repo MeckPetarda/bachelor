@@ -17,9 +17,9 @@
 #ifndef BATTERY_MONITOR_H
 #define BATTERY_MONITOR_H
 
-#include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
+#include "esp_adc/adc_oneshot.h"
 #include "esp_err.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -28,22 +28,22 @@
 // CONFIGURATION
 // ============================================================================
 
-#define BATTERY_ADC_UNIT        ADC_UNIT_1
-#define BATTERY_ADC_CHANNEL     ADC_CHANNEL_5   // GPIO33
-#define BATTERY_ADC_ATTEN       ADC_ATTEN_DB_12 // 0-3100mV range (renamed from DB_11 in v5.x)
-#define BATTERY_ADC_BITWIDTH    ADC_BITWIDTH_12
+#define BATTERY_ADC_UNIT     ADC_UNIT_1
+#define BATTERY_ADC_CHANNEL  ADC_CHANNEL_5   // GPIO33
+#define BATTERY_ADC_ATTEN    ADC_ATTEN_DB_12 // 0-3100mV range (renamed from DB_11 in v5.x)
+#define BATTERY_ADC_BITWIDTH ADC_BITWIDTH_12
 
-#define USB_DETECT_PIN          GPIO_NUM_32
+#define USB_DETECT_PIN GPIO_NUM_32
 
 // Voltage thresholds (millivolts)
-#define BATTERY_VOLTAGE_FULL    4200  // 100%
-#define BATTERY_VOLTAGE_NOMINAL 3700  // ~40%
-#define BATTERY_VOLTAGE_LOW     3400  // 10% - warning level
+#define BATTERY_VOLTAGE_FULL     4200 // 100%
+#define BATTERY_VOLTAGE_NOMINAL  3700 // ~40%
+#define BATTERY_VOLTAGE_LOW      3400 // 10% - warning level
 #define BATTERY_VOLTAGE_CRITICAL 3300 // 5% - block scanning
-#define BATTERY_VOLTAGE_EMPTY   3200  // 0% - shutdown
+#define BATTERY_VOLTAGE_EMPTY    3200 // 0% - shutdown
 
 // ADC sampling
-#define BATTERY_ADC_SAMPLE_COUNT 5    // Take 5 readings
+#define BATTERY_ADC_SAMPLE_COUNT    5  // Take 5 readings
 #define BATTERY_ADC_SAMPLE_DELAY_MS 10 // 10ms between samples
 
 // ============================================================================
@@ -53,23 +53,25 @@
 /**
  * Battery health status classification
  */
-typedef enum {
-    BATTERY_HEALTH_GOOD = 0,      // <0.2V drop under load
-    BATTERY_HEALTH_DEGRADED,      // 0.2-0.5V drop under load
-    BATTERY_HEALTH_CRITICAL,      // >0.5V drop under load
-    BATTERY_HEALTH_UNKNOWN        // Not yet measured
+typedef enum
+{
+    BATTERY_HEALTH_GOOD = 0, // <0.2V drop under load
+    BATTERY_HEALTH_DEGRADED, // 0.2-0.5V drop under load
+    BATTERY_HEALTH_CRITICAL, // >0.5V drop under load
+    BATTERY_HEALTH_UNKNOWN   // Not yet measured
 } battery_health_t;
 
 /**
  * Battery monitoring data
  */
-typedef struct {
-    uint16_t voltage_mv;          // Battery voltage (millivolts)
-    uint16_t voltage_under_load_mv; // Voltage during RFID scan
-    uint8_t  percentage;          // State of charge (0-100%)
-    bool     is_usb_present;      // USB power connected
-    battery_health_t health;      // Battery health status
-    uint32_t last_update_ms;      // Timestamp of last update
+typedef struct
+{
+    uint16_t         voltage_mv;            // Battery voltage (millivolts)
+    uint16_t         voltage_under_load_mv; // Voltage during RFID scan
+    uint8_t          percentage;            // State of charge (0-100%)
+    bool             is_usb_present;        // USB power connected
+    battery_health_t health;                // Battery health status
+    uint32_t         last_update_ms;        // Timestamp of last update
 } battery_status_t;
 
 // ============================================================================
@@ -106,7 +108,7 @@ esp_err_t battery_monitor_update(bool is_rfid_scanning);
  *
  * @return Pointer to battery status structure (read-only)
  */
-const battery_status_t* battery_monitor_get_status(void);
+const battery_status_t *battery_monitor_get_status(void);
 
 /**
  * Check if battery level is critical
@@ -129,7 +131,7 @@ bool battery_monitor_is_usb_present(void);
  *
  * @return "usb" or "battery"
  */
-const char* battery_monitor_get_power_source(void);
+const char *battery_monitor_get_power_source(void);
 
 /**
  * Deinitialize battery monitoring system
