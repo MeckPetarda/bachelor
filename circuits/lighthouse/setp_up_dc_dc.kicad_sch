@@ -1401,7 +1401,7 @@
 				)
 			)
 		)
-		(property "Value" "D_Schottky"
+		(property "Value" "SS24A"
 			(at 117.1575 40.64 0)
 			(effects
 				(font
@@ -1409,7 +1409,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Diode_SMD:D_2114_3652Metric_Pad1.85x3.75mm_HandSolder"
+		(property "Footprint" "Diode_SMD:D_SMA"
 			(at 116.84 44.45 0)
 			(effects
 				(font
@@ -1622,7 +1622,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "220"
+		(property "Value" "1k"
 			(at 125.73 77.4699 0)
 			(effects
 				(font
@@ -1841,7 +1841,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Inductor_THT:L_Radial_L8.0mm_W8.0mm_P5.00mm_Neosid_SD8"
+		(property "Footprint" "IDCP2218ER101M01:IDCP2218ER101M01"
 			(at 90.17 44.45 0)
 			(effects
 				(font
@@ -1902,7 +1902,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "10u"
+		(property "Value" "22u"
 			(at 72.39 63.4999 0)
 			(effects
 				(font

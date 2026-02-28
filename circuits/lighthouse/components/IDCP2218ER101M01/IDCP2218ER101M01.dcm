@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP IDCP2218ER101M01
+D 100 H Unshielded Wirewound Inductor 520 mA 700mOhm Max Nonstandard
+K
+F https://www.digikey.ph/en/products/detail/vishay-dale/IDCP2218ER101M01/24765942?msockid=3bdc366bbe0663d83c1223c0bf3662a6
+$ENDCMP
+#
+#End Doc Library
