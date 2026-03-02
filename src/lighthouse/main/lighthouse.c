@@ -58,6 +58,9 @@
 #define SCANNING_LED    GPIO_NUM_18 // RFID scanning active (ON = scanning)
 #define BUTTON1_PIN     GPIO_NUM_34 // Start/Stop RFID scanning
 #define BUTTON2_PIN     GPIO_NUM_35 // Show statistics
+#define IR_SENSOR_PIN        GPIO_NUM_26
+#define IR_SCAN_DURATION_MS  5000        // Duration of IR-triggered scan burst (ms)
+                                         // Adjustable: increase for longer detection windows
 
 #define DEBOUNCE_TIME_MS 50
 
@@ -77,6 +80,10 @@ typedef struct
 static button_state_t button_states[2] = {0};
 static bool           rfid_scanning    = false;
 static bool           mqtt_initialized = false;
+
+static volatile bool ir_trigger_pending  = false;  // Set in ISR, cleared in main loop
+static bool          ir_scan_active      = false;   // true = current scan was IR-initiated
+static uint32_t      ir_scan_end_time_ms = 0;       // Tick timestamp when burst should stop
 
 // ============================================================================
 // MQTT CONFIGURATION CALLBACK
@@ -426,6 +433,12 @@ static void on_tag_detected(const rfid_tag_event_t *event)
 // GPIO SETUP
 // ============================================================================
 
+static void IRAM_ATTR ir_sensor_isr_handler(void *arg)
+{
+    ir_trigger_pending = true;
+    // No task notification needed — main loop polls ir_trigger_pending every 10ms
+}
+
 static void gpio_init(void)
 {
     ESP_LOGI(TAG, "Initializing GPIO...");
@@ -451,6 +464,19 @@ static void gpio_init(void)
     };
     gpio_config(&button_config);
 
+    // Configure IR sensor (GPIO26 input with pull-down, rising-edge interrupt)
+    gpio_config_t ir_config = {
+        .pin_bit_mask = (1ULL << IR_SENSOR_PIN),
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_ENABLE,
+        .intr_type    = GPIO_INTR_POSEDGE,
+    };
+    gpio_config(&ir_config);
+
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(IR_SENSOR_PIN, ir_sensor_isr_handler, NULL);
+
     // Initialize LED states (all OFF at startup)
     gpio_set_level(WIFI_STATUS_LED, 0);
     gpio_set_level(MQTT_STATUS_LED, 0);
@@ -462,6 +488,7 @@ static void gpio_init(void)
     ESP_LOGI(TAG, "  MQTT Status LED: GPIO %d", MQTT_STATUS_LED);
     ESP_LOGI(TAG, "  Activity LED: GPIO %d", ACTIVITY_LED);
     ESP_LOGI(TAG, "  Scanning LED: GPIO %d", SCANNING_LED);
+    ESP_LOGI(TAG, "  IR Sensor: GPIO %d (burst duration: %d ms)", IR_SENSOR_PIN, IR_SCAN_DURATION_MS);
 }
 
 static void rfid_reader_start_inventory_wrapper(void)
@@ -561,6 +588,8 @@ static void process_buttons(void)
                     rfid_reader_stop_inventory();
                     gpio_set_level(SCANNING_LED, 0); // Turn off scanning indicator
                     rfid_scanning = false;
+                    ir_scan_active      = false;
+                    ir_scan_end_time_ms = 0;
 
                     // Power off reader to conserve power when not scanning
                     // Per YR300 datasheet: sleep mode <100µA
@@ -645,6 +674,53 @@ static void process_buttons(void)
         }
 
         state->last_stable_state = level;
+    }
+}
+
+// ============================================================================
+// IR SENSOR PROCESSING
+// ============================================================================
+
+static void process_ir_sensor(void)
+{
+    uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+    // --- Trigger check ---
+    if (ir_trigger_pending)
+    {
+        ir_trigger_pending = false;
+
+        if (!rfid_scanning)
+        {
+            // No active scan — start one
+            rfid_reader_start_inventory_wrapper();
+            ir_scan_active      = true;
+            ir_scan_end_time_ms = current_time + IR_SCAN_DURATION_MS;
+            ESP_LOGI(TAG, "IR trigger: scan started");
+        }
+        else if (ir_scan_active)
+        {
+            // IR-owned scan in progress — restart the timer only
+            ir_scan_end_time_ms = current_time + IR_SCAN_DURATION_MS;
+            ESP_LOGI(TAG, "IR trigger: burst timer restarted");
+        }
+        else
+        {
+            // Button-owned scan in progress — discard
+            ESP_LOGI(TAG, "IR trigger: ignored (button scan active)");
+        }
+    }
+
+    // --- Burst expiry check ---
+    if (ir_scan_active && ir_scan_end_time_ms != 0 && current_time >= ir_scan_end_time_ms)
+    {
+        rfid_reader_stop_inventory();
+        rfid_reader_power_off();
+        rfid_scanning       = false;
+        ir_scan_active      = false;
+        ir_scan_end_time_ms = 0;
+        gpio_set_level(SCANNING_LED, 0);
+        ESP_LOGI(TAG, "IR burst expired: scan stopped");
     }
 }
 
@@ -791,6 +867,7 @@ static void main_task(void *arg)
         wifi_provisioning_process();
 
         process_buttons();
+        process_ir_sensor();
 
         // Update WiFi status LED (check every iteration)
         bool wifi_connected = wifi_manager_is_connected();
