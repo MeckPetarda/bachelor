@@ -711,6 +711,13 @@ CONFIG_WIFI_SCAN_METHOD=0
 # end of WiFi Configuration
 
 #
+# Hardware Configuration
+#
+# default:
+CONFIG_BATTERY_SENSE_ENABLED=y
+# end of Hardware Configuration
+
+#
 # Compiler options
 #
 # default:

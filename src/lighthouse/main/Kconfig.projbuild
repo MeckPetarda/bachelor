@@ -28,4 +28,18 @@ menu "WiFi Configuration"
             1 = WIFI_ALL_CHANNEL_SCAN (scan all channels)
  
 endmenu
- 
+
+menu "Hardware Configuration"
+
+    config BATTERY_SENSE_ENABLED
+        bool "Enable battery voltage sensing"
+        default y
+        help
+            Enable ADC-based battery voltage monitoring on GPIO33 (ADC1_CH5).
+            Disable for boards powered exclusively by USB with no battery connected
+            (e.g., the USB-only development board).
+            When disabled, all battery monitor functions return safe stub values
+            and no ADC initialisation occurs.
+            Set to 'n' in sdkconfig.defaults for USB-only board configurations.
+
+endmenu

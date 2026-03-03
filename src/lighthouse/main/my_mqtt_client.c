@@ -21,6 +21,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "offline_event_logger.h"
+#include "sdkconfig.h"
 #include "settings_storage.h"
 #include "uart_reader.h"
 #include <stdio.h>
@@ -118,8 +119,8 @@ static void init_device_mac(void)
 {
     uint8_t mac[6];
     esp_efuse_mac_get_default(mac);
-    snprintf(s_device_mac, sizeof(s_device_mac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4],
-             mac[5]);
+    snprintf(s_device_mac, sizeof(s_device_mac), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3],
+             mac[4], mac[5]);
     ESP_LOGI(TAG, "Device MAC: %s", s_device_mac);
 }
 
@@ -591,7 +592,7 @@ esp_err_t mqtt_client_publish_health_metrics(void)
     uint32_t uptime_sec    = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
 
     // Get WiFi RSSI
-    int8_t   wifi_rssi     = 0;
+    int8_t           wifi_rssi = 0;
     wifi_ap_record_t ap_info;
     if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK)
     {
@@ -644,53 +645,77 @@ esp_err_t mqtt_client_publish_health_metrics(void)
     }
 
     // ========================================================================
-    // Gather Battery Metrics
+    // Build Consolidated Health JSON Payload
     // ========================================================================
 
-    const battery_status_t *battery     = battery_monitor_get_status();
+    char payload[600];
+    int  len;
+
+#if CONFIG_BATTERY_SENSE_ENABLED
+    const battery_status_t *battery      = battery_monitor_get_status();
     const char             *power_source = battery_monitor_get_power_source();
     const char             *health_str;
     switch (battery->health)
     {
-    case BATTERY_HEALTH_GOOD:     health_str = "good";     break;
-    case BATTERY_HEALTH_DEGRADED: health_str = "degraded"; break;
-    case BATTERY_HEALTH_CRITICAL: health_str = "critical"; break;
-    default:                      health_str = "unknown";  break;
+    case BATTERY_HEALTH_GOOD:
+        health_str = "good";
+        break;
+    case BATTERY_HEALTH_DEGRADED:
+        health_str = "degraded";
+        break;
+    case BATTERY_HEALTH_CRITICAL:
+        health_str = "critical";
+        break;
+    default:
+        health_str = "unknown";
+        break;
     }
 
-    // ========================================================================
-    // Build Consolidated Health JSON Payload
-    // ========================================================================
-
-    char payload[512];
-    int  len = snprintf(payload, sizeof(payload),
-                        "{"
-                        "\"uptime_sec\":%lu,"
-                        "\"free_heap_bytes\":%lu,"
-                        "\"min_free_heap_bytes\":%lu,"
-                        "\"wifi_rssi_dbm\":%d,"
-                        "\"rfid\":{"
-                        "\"state\":\"%s\","
-                        "\"is_responsive\":%s,"
-                        "\"power_rail_present\":%s,"
-                        "\"fw_version\":\"%s\","
-                        "\"last_error\":%d"
-                        "},"
-                        "\"battery\":{"
-                        "\"voltage_mv\":%u,"
-                        "\"percentage\":%u,"
-                        "\"is_charging\":false,"
-                        "\"power_source\":\"%s\","
-                        "\"health_status\":\"%s\","
-                        "\"voltage_under_load_mv\":%u"
-                        "}"
-                        "}",
-                        uptime_sec, free_heap, min_free_heap, wifi_rssi, state_str,
-                        rfid_is_responsive ? "true" : "false", rfid_power_rail_present ? "true" : "false",
-                        rfid_fw_version, rfid_last_error,
-                        battery->voltage_mv, battery->percentage,
-                        power_source, health_str,
-                        battery->voltage_under_load_mv);
+    len = snprintf(payload, sizeof(payload),
+                   "{"
+                   "\"uptime_sec\":%lu,"
+                   "\"free_heap_bytes\":%lu,"
+                   "\"min_free_heap_bytes\":%lu,"
+                   "\"wifi_rssi_dbm\":%d,"
+                   "\"rfid\":{"
+                   "\"state\":\"%s\","
+                   "\"is_responsive\":%s,"
+                   "\"power_rail_present\":%s,"
+                   "\"fw_version\":\"%s\","
+                   "\"last_error\":%d"
+                   "},"
+                   "\"battery\":{"
+                   "\"sense_enabled\":true,"
+                   "\"voltage_mv\":%u,"
+                   "\"percentage\":%u,"
+                   "\"is_charging\":false,"
+                   "\"power_source\":\"%s\","
+                   "\"health_status\":\"%s\","
+                   "\"voltage_under_load_mv\":%u"
+                   "}"
+                   "}",
+                   uptime_sec, free_heap, min_free_heap, wifi_rssi, state_str, rfid_is_responsive ? "true" : "false",
+                   rfid_power_rail_present ? "true" : "false", rfid_fw_version, rfid_last_error, battery->voltage_mv,
+                   battery->percentage, power_source, health_str, battery->voltage_under_load_mv);
+#else
+    len = snprintf(payload, sizeof(payload),
+                   "{"
+                   "\"uptime_sec\":%lu,"
+                   "\"free_heap_bytes\":%lu,"
+                   "\"min_free_heap_bytes\":%lu,"
+                   "\"wifi_rssi_dbm\":%d,"
+                   "\"rfid\":{"
+                   "\"state\":\"%s\","
+                   "\"is_responsive\":%s,"
+                   "\"power_rail_present\":%s,"
+                   "\"fw_version\":\"%s\","
+                   "\"last_error\":%d"
+                   "},"
+                   "\"battery\":{\"sense_enabled\":false}"
+                   "}",
+                   uptime_sec, free_heap, min_free_heap, wifi_rssi, state_str, rfid_is_responsive ? "true" : "false",
+                   rfid_power_rail_present ? "true" : "false", rfid_fw_version, rfid_last_error);
+#endif
 
     if (len >= sizeof(payload))
     {
@@ -702,7 +727,7 @@ esp_err_t mqtt_client_publish_health_metrics(void)
     // ========================================================================
 
     const char *health_topic = mqtt_client_get_topic("health");
-    int         msg_id       = esp_mqtt_client_publish(s_mqtt_client, health_topic, payload, 0, MQTT_QOS_HEALTH_METRICS, 0);
+    int         msg_id = esp_mqtt_client_publish(s_mqtt_client, health_topic, payload, 0, MQTT_QOS_HEALTH_METRICS, 0);
 
     if (msg_id < 0)
     {

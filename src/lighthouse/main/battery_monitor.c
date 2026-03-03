@@ -3,11 +3,13 @@
  *
  * Implements battery voltage sampling via ADC1_CH5 (GPIO33) using the
  * modern esp_adc oneshot driver (ESP-IDF v5.x). Noise is reduced through
- * multi-sample averaging with outlier rejection. USB power presence is
- * detected via GPIO32 digital input.
+ * 16-sample raw averaging before a single calibrated voltage conversion.
+ * Sampling is gated to RFID-idle periods to avoid terminal voltage sag
+ * under load. Shutdown is confirmatory: three consecutive readings below
+ * the critical threshold are required before deep sleep is entered.
  *
- * Migration note: Replaced deprecated esp_adc_cal (v4.x) with esp_adc
- * oneshot + adc_cali_scheme_curve_fitting (v5.x).
+ * All ADC code is compiled only when CONFIG_BATTERY_SENSE_ENABLED=y.
+ * When disabled, all public functions return safe stub values.
  *
  * References:
  *   - ESP32 Datasheet Section 4.9.1: ADC characteristics (Table 4-3, Table 4-4)
@@ -17,20 +19,56 @@
  */
 
 #include "battery_monitor.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#if CONFIG_BATTERY_SENSE_ENABLED
 #include "driver/gpio.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_oneshot.h"
-#include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "esp_sleep.h"
 #include "hal/gpio_types.h"
+#include "uart_reader.h"
+#endif
 
 static const char *TAG = "BATTERY_MONITOR";
 
-static battery_status_t          s_battery_status  = {0};
+static battery_status_t s_battery_status = {0};
+
+#if CONFIG_BATTERY_SENSE_ENABLED
+
 static adc_oneshot_unit_handle_t s_adc_handle      = NULL;
 static adc_cali_handle_t         s_adc_cali_handle = NULL;
+
+// Consecutive readings below BATTERY_CRITICAL_THRESHOLD_MV (Task 4)
+static int s_critical_count = 0;
+
+// ============================================================================
+// TASK 4 CONSTANTS: Confirmatory shutdown thresholds
+// ============================================================================
+
+// Shutdown arm threshold. Below this for N consecutive readings triggers shutdown.
+// Set above TP4056/DW01HA hardware cutoff (~3.0V) to catch deep discharge before
+// hardware protection activates. ±110mV divider-amplified ADC error provides
+// the rationale for the 200mV margin above the hardware floor.
+#define BATTERY_CRITICAL_THRESHOLD_MV 3400
+
+// Hysteresis cancel level. A reading above this resets the consecutive counter.
+// Must be strictly greater than BATTERY_CRITICAL_THRESHOLD_MV.
+#define BATTERY_CRITICAL_CLEAR_MV 3500
+
+// Consecutive readings required below BATTERY_CRITICAL_THRESHOLD_MV before shutdown.
+// Each reading is taken at the normal polling interval, not back-to-back.
+#define BATTERY_CRITICAL_CONSECUTIVE_COUNT 3
+
+// ============================================================================
+// TASK 3 CONSTANTS: Load-aware idle sampling gate
+// ============================================================================
+
+#define BATTERY_IDLE_WAIT_TIMEOUT_MS 2000 // max wait for RFID to go idle
+#define BATTERY_IDLE_SETTLE_DELAY_MS 50   // settle time after reader goes idle
 
 // ============================================================================
 // INITIALIZATION
@@ -129,7 +167,7 @@ esp_err_t battery_monitor_init(void)
     s_battery_status.last_update_ms = 0;
 
     ESP_LOGI(TAG, "Battery monitor initialized");
-    ESP_LOGI(TAG, "  Battery ADC: GPIO33 (ADC1_CH5, 12dB attenuation)");
+    ESP_LOGI(TAG, "  Battery ADC: GPIO33 (ADC1_CH5, 12dB attenuation, %d-sample average)", BATTERY_ADC_SAMPLE_COUNT);
     ESP_LOGI(TAG, "  USB detect: GPIO32 (digital input)");
     ESP_LOGI(TAG, "  Voltage divider: 100k/120k (ratio 0.545)");
 
@@ -137,25 +175,27 @@ esp_err_t battery_monitor_init(void)
 }
 
 // ============================================================================
-// ADC SAMPLING
+// TASK 2: ADC SAMPLING — 16-sample raw average before voltage conversion
 // ============================================================================
 
 /**
- * Sample ADC with averaging and outlier rejection
+ * Sample ADC with raw-level averaging
  *
- * Takes BATTERY_ADC_SAMPLE_COUNT readings, sorts them, discards the highest
- * and lowest, then averages the remaining middle samples.
+ * Takes BATTERY_ADC_SAMPLE_COUNT raw readings, sums them at raw count level,
+ * computes the average raw value, then performs a single calibrated voltage
+ * conversion. Averaging at raw level avoids accumulated rounding error that
+ * would occur from converting each sample individually.
  *
  * Calibrated path: adc_cali_raw_to_voltage() (±60mV per Table 4-4)
  * Fallback path:   linear scaling voltage_mv = raw * 3100 / 4095
  *
- * Reference: ESP32 Datasheet Table 4-3 (DNL/INL guidance)
+ * Reference: ESP32 Datasheet Table 4-3 (DNL improvement via oversampling)
  *
  * @return Averaged ADC voltage at GPIO33 in millivolts
  */
 static uint32_t battery_sample_adc_voltage(void)
 {
-    uint32_t readings[BATTERY_ADC_SAMPLE_COUNT];
+    uint32_t raw_sum = 0;
     int      raw_value;
 
     for (int i = 0; i < BATTERY_ADC_SAMPLE_COUNT; i++)
@@ -164,49 +204,28 @@ static uint32_t battery_sample_adc_voltage(void)
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "ADC read failed: %s", esp_err_to_name(ret));
-            readings[i] = 0;
+            raw_value = 0;
         }
-        else if (s_adc_cali_handle != NULL)
-        {
-            // Calibrated conversion (preferred)
-            int voltage_mv;
-            ret         = adc_cali_raw_to_voltage(s_adc_cali_handle, raw_value, &voltage_mv);
-            readings[i] = (ret == ESP_OK) ? (uint32_t)voltage_mv : (uint32_t)((raw_value * 3100) / 4095);
-        }
-        else
-        {
-            // Linear fallback: ADC_ATTEN_DB_12 → 0-3100mV, 12-bit → 0-4095
-            readings[i] = (uint32_t)((raw_value * 3100) / 4095);
-        }
-
-        if (i < BATTERY_ADC_SAMPLE_COUNT - 1)
-        {
-            vTaskDelay(pdMS_TO_TICKS(BATTERY_ADC_SAMPLE_DELAY_MS));
-        }
+        raw_sum += (uint32_t)raw_value;
     }
 
-    // Bubble sort to identify min/max for outlier rejection
-    for (int i = 0; i < BATTERY_ADC_SAMPLE_COUNT - 1; i++)
+    uint32_t raw_avg = raw_sum / BATTERY_ADC_SAMPLE_COUNT;
+
+    // Single calibrated conversion on the averaged raw value
+    uint32_t voltage_mv;
+    if (s_adc_cali_handle != NULL)
     {
-        for (int j = 0; j < BATTERY_ADC_SAMPLE_COUNT - i - 1; j++)
-        {
-            if (readings[j] > readings[j + 1])
-            {
-                uint32_t temp   = readings[j];
-                readings[j]     = readings[j + 1];
-                readings[j + 1] = temp;
-            }
-        }
+        int       cal_mv;
+        esp_err_t ret = adc_cali_raw_to_voltage(s_adc_cali_handle, (int)raw_avg, &cal_mv);
+        voltage_mv    = (ret == ESP_OK) ? (uint32_t)cal_mv : (raw_avg * 3100) / 4095;
     }
-
-    // Average middle samples (discard min and max)
-    uint32_t sum = 0;
-    for (int i = 1; i < BATTERY_ADC_SAMPLE_COUNT - 1; i++)
+    else
     {
-        sum += readings[i];
+        // Linear fallback: ADC_ATTEN_DB_12 → 0-3100mV, 12-bit → 0-4095
+        voltage_mv = (raw_avg * 3100) / 4095;
     }
 
-    return sum / (BATTERY_ADC_SAMPLE_COUNT - 2);
+    return voltage_mv;
 }
 
 // ============================================================================
@@ -292,11 +311,39 @@ static battery_health_t battery_estimate_health(uint16_t no_load_mv, uint16_t un
 }
 
 // ============================================================================
-// MAIN UPDATE FUNCTION
+// MAIN UPDATE FUNCTION (Tasks 2, 3, 4 integrated)
 // ============================================================================
 
 esp_err_t battery_monitor_update(bool is_rfid_scanning)
 {
+    // ========================================================================
+    // TASK 3: Load-aware idle sampling gate
+    //
+    // Battery terminal voltage collapses under combined ESP32 WiFi + RFID load
+    // (confirmed scope measurement: 3.5V resting → 2.7-3.0V under load per
+    // DEVLOG_2026_02_25 §3). Gate sampling to RFID-idle periods only.
+    // ========================================================================
+
+    uint32_t waited_ms = 0;
+    while (rfid_reader_is_inventory_active() && waited_ms < BATTERY_IDLE_WAIT_TIMEOUT_MS)
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        waited_ms += 10;
+    }
+
+    if (rfid_reader_is_inventory_active())
+    {
+        ESP_LOGW(TAG, "Battery sample skipped - RFID reader still active after %d ms", BATTERY_IDLE_WAIT_TIMEOUT_MS);
+        return ESP_OK;
+    }
+
+    // Settle delay: allows WiFi beaconing transients to clear (typically 100ms beacon period)
+    vTaskDelay(pdMS_TO_TICKS(BATTERY_IDLE_SETTLE_DELAY_MS));
+
+    // ========================================================================
+    // TASK 2: Sample voltage with 16-sample raw average
+    // ========================================================================
+
     // Sample voltage at ADC input (1.75-2.29V after divider)
     uint32_t adc_voltage_mv = battery_sample_adc_voltage();
 
@@ -323,6 +370,44 @@ esp_err_t battery_monitor_update(bool is_rfid_scanning)
     ESP_LOGI(TAG, "Battery: %umV (%u%%), USB: %s, Health: %d", battery_voltage_mv, s_battery_status.percentage,
              usb_present ? "present" : "absent", (int)s_battery_status.health);
 
+    // ========================================================================
+    // TASK 4: Confirmatory shutdown with hysteresis
+    //
+    // A single ADC reading below the critical threshold is insufficient grounds
+    // for an irreversible deep-sleep action given ±110mV effective error at
+    // cell level (±60mV ADC × 220/120 divider ratio). Three consecutive
+    // readings are required. A reading above BATTERY_CRITICAL_CLEAR_MV resets
+    // the counter (hysteresis band prevents chattering near the threshold).
+    // ========================================================================
+
+    if (battery_voltage_mv < BATTERY_CRITICAL_THRESHOLD_MV)
+    {
+        s_critical_count++;
+        ESP_LOGW(TAG, "Battery critical reading %d/%d: %d mV", s_critical_count, BATTERY_CRITICAL_CONSECUTIVE_COUNT,
+                 battery_voltage_mv);
+
+        if (s_critical_count >= BATTERY_CRITICAL_CONSECUTIVE_COUNT)
+        {
+            ESP_LOGE(TAG,
+                     "Battery critical shutdown triggered: %d consecutive readings "
+                     "below %d mV (last: %d mV)",
+                     BATTERY_CRITICAL_CONSECUTIVE_COUNT, BATTERY_CRITICAL_THRESHOLD_MV, battery_voltage_mv);
+            // Allow log buffer to flush before entering deep sleep
+            vTaskDelay(pdMS_TO_TICKS(100));
+            esp_deep_sleep_start();
+        }
+    }
+    else if (battery_voltage_mv > BATTERY_CRITICAL_CLEAR_MV)
+    {
+        if (s_critical_count > 0)
+        {
+            ESP_LOGI(TAG, "Battery critical counter reset (%d mV above clear threshold)", battery_voltage_mv);
+        }
+        s_critical_count = 0;
+    }
+    // Readings between BATTERY_CRITICAL_THRESHOLD_MV and BATTERY_CRITICAL_CLEAR_MV
+    // do not increment or reset the counter (hysteresis dead-band).
+
     return ESP_OK;
 }
 
@@ -335,9 +420,18 @@ const battery_status_t *battery_monitor_get_status(void)
     return &s_battery_status;
 }
 
+battery_state_t battery_monitor_get_state(void)
+{
+    if (s_critical_count >= BATTERY_CRITICAL_CONSECUTIVE_COUNT)
+        return BATTERY_STATE_CRITICAL;
+    if (s_battery_status.voltage_mv > 0 && s_battery_status.voltage_mv < BATTERY_VOLTAGE_LOW)
+        return BATTERY_STATE_LOW;
+    return BATTERY_STATE_NORMAL;
+}
+
 bool battery_monitor_is_critical(void)
 {
-    return s_battery_status.voltage_mv > 0 && s_battery_status.voltage_mv < BATTERY_VOLTAGE_CRITICAL;
+    return s_critical_count >= BATTERY_CRITICAL_CONSECUTIVE_COUNT;
 }
 
 bool battery_monitor_is_usb_present(void)
@@ -372,3 +466,56 @@ esp_err_t battery_monitor_deinit(void)
 
     return ESP_OK;
 }
+
+#else  // CONFIG_BATTERY_SENSE_ENABLED=n — stub implementations
+
+// ============================================================================
+// STUB IMPLEMENTATIONS (CONFIG_BATTERY_SENSE_ENABLED=n)
+//
+// All public functions compile and return safe values.
+// No ADC initialisation, GPIO config, or sampling occurs.
+// ============================================================================
+
+esp_err_t battery_monitor_init(void)
+{
+    ESP_LOGI(TAG, "Battery sense disabled (CONFIG_BATTERY_SENSE_ENABLED=n) — init skipped");
+    return ESP_OK;
+}
+
+esp_err_t battery_monitor_update(bool is_rfid_scanning)
+{
+    (void)is_rfid_scanning;
+    return ESP_OK;
+}
+
+const battery_status_t *battery_monitor_get_status(void)
+{
+    return &s_battery_status; // zero-initialised
+}
+
+battery_state_t battery_monitor_get_state(void)
+{
+    return BATTERY_STATE_SENSE_DISABLED;
+}
+
+bool battery_monitor_is_critical(void)
+{
+    return false;
+}
+
+bool battery_monitor_is_usb_present(void)
+{
+    return false;
+}
+
+const char *battery_monitor_get_power_source(void)
+{
+    return "battery";
+}
+
+esp_err_t battery_monitor_deinit(void)
+{
+    return ESP_OK;
+}
+
+#endif // CONFIG_BATTERY_SENSE_ENABLED
