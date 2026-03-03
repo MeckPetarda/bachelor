@@ -591,30 +591,14 @@ esp_err_t rfid_reader_power_on(void)
 
     ESP_LOGI(TAG, "Powering ON RFID reader (GPIO%d HIGH)...", RFID_POWER_CONTROL_PIN);
 
-    // Set transistor base HIGH to enable reader power
+    // Assert reader power rail — returns immediately; caller is responsible for
+    // confirming the rail via GPIO22 poll before issuing any commands.
     gpio_set_level(RFID_POWER_CONTROL_PIN, 1);
 
-    // Wait for reader stabilization
-    // Per YR300 datasheet: reader needs time to power up
-    vTaskDelay(pdMS_TO_TICKS(RFID_POWER_STABILIZATION_MS));
-
-    // Verify power rail is present
-    bool power_present = gpio_get_level(RFID_POWER_SENSE_PIN);
-    if (power_present)
-    {
-        ESP_LOGI(TAG, "✓ Reader powered ON - power rail confirmed");
-
-        // Update state machine
-        xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
-        rfid_state.state                     = RFID_STATE_STARTUP_PENDING;
-        rfid_state.health.power_rail_present = true;
-        xSemaphoreGive(rfid_state.mutex);
-    }
-    else
-    {
-        ESP_LOGW(TAG, "⚠ Reader power control set HIGH but power rail not detected");
-        ESP_LOGW(TAG, "  Check hardware: transistor, sense circuit, power supply");
-    }
+    // Update state machine
+    xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
+    rfid_state.state = RFID_STATE_STARTUP_PENDING;
+    xSemaphoreGive(rfid_state.mutex);
 
     return ESP_OK;
 }
@@ -851,10 +835,14 @@ esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t int
         return ESP_ERR_INVALID_STATE;
     }
 
-    // Check if reader is responsive before starting inventory
-    if (rfid_state.state != RFID_STATE_RESPONSIVE)
+    // Require the power rail to be up; reject if reader is off, uninitialized,
+    // or known-unresponsive.  STARTUP_PENDING (IR poll-to-ready path) and
+    // SCANNING/RESPONSIVE are all valid entry states.
+    if (rfid_state.state == RFID_STATE_POWERED_OFF ||
+        rfid_state.state == RFID_STATE_UNINITIALIZED ||
+        rfid_state.state == RFID_STATE_UNRESPONSIVE)
     {
-        ESP_LOGE(TAG, "Cannot start inventory - reader state is %d (not RESPONSIVE)", rfid_state.state);
+        ESP_LOGE(TAG, "Cannot start inventory - reader state is %d (not ready)", rfid_state.state);
         return ESP_ERR_INVALID_STATE;
     }
 
@@ -882,6 +870,11 @@ esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t int
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
     rfid_state.inventory_active       = true;
     rfid_state.stats.inventory_active = true;
+    // IR poll-to-ready path: rail confirmed but no handshake yet → SCANNING
+    if (rfid_state.state == RFID_STATE_STARTUP_PENDING)
+    {
+        rfid_state.state = RFID_STATE_SCANNING;
+    }
     xSemaphoreGive(rfid_state.mutex);
 
     ESP_LOGI(TAG, "Polling-based inventory started (interval=%lu ms)", interval_ms);

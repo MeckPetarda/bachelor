@@ -39,6 +39,7 @@
 
 #include "battery_monitor.h"
 #include "esp_sleep.h"
+#include "esp_timer.h"
 #include "hal/gpio_types.h"
 #include "my_mqtt_client.h"
 #include "offline_event_logger.h"
@@ -680,6 +681,64 @@ static void process_buttons(void)
 // IR SENSOR PROCESSING
 // ============================================================================
 
+/**
+ * Poll-to-ready power-on sequence for the IR trigger path.
+ *
+ * Calls rfid_reader_power_on() (which now returns immediately after asserting
+ * GPIO5) then spins on the GPIO22 power-rail sense pin until it goes HIGH or a
+ * 2000 ms timeout elapses.  On confirmation, starts inventory immediately
+ * without a handshake — the actual reader boot time is logged at INFO level so
+ * it can be used later to replace the loop with a single fixed delay.
+ *
+ * Per ESP32 TRM Section 17.3: esp_timer_get_time() returns a 64-bit
+ * microsecond counter suitable for elapsed-time measurement in polling loops.
+ *
+ * @return true  if inventory was started successfully
+ * @return false if the rail timed out or inventory start failed (reader
+ *               powered off before returning)
+ */
+static bool ir_trigger_start_scan(void)
+{
+    const int64_t POLL_TIMEOUT_US = 2000LL * 1000; // 2000 ms
+
+    // Step 1: Assert GPIO5 — returns immediately, no blocking delay.
+    rfid_reader_power_on();
+
+    // Step 2: Bounded poll on GPIO22 power-rail sense (ESP32 DS Section 4.8.1).
+    int64_t start_us = esp_timer_get_time();
+    while (true)
+    {
+        if (gpio_get_level(RFID_POWER_SENSE_PIN))
+        {
+            int64_t elapsed_ms = (esp_timer_get_time() - start_us) / 1000;
+            ESP_LOGI(TAG, "IR trigger: power rail HIGH after %lld ms", elapsed_ms);
+            break;
+        }
+
+        int64_t elapsed_us = esp_timer_get_time() - start_us;
+        if (elapsed_us > POLL_TIMEOUT_US)
+        {
+            ESP_LOGE(TAG, "IR trigger: power rail timeout after %lld ms — aborting scan",
+                     elapsed_us / 1000);
+            rfid_reader_power_off();
+            return false;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1)); // Yield to avoid starving other tasks
+    }
+
+    // Step 3: Rail confirmed — start inventory immediately, no handshake.
+    esp_err_t ret = rfid_reader_start_inventory(on_tag_detected, 0);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "IR trigger: failed to start inventory: %s", esp_err_to_name(ret));
+        rfid_reader_power_off();
+        return false;
+    }
+
+    return true;
+}
+
 static void process_ir_sensor(void)
 {
     uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
@@ -691,11 +750,15 @@ static void process_ir_sensor(void)
 
         if (!rfid_scanning)
         {
-            // No active scan — start one
-            rfid_reader_start_inventory_wrapper();
-            ir_scan_active      = true;
-            ir_scan_end_time_ms = current_time + IR_SCAN_DURATION_MS;
-            ESP_LOGI(TAG, "IR trigger: scan started");
+            // No active scan — start one via poll-to-ready (no handshake on hot path)
+            if (ir_trigger_start_scan())
+            {
+                gpio_set_level(SCANNING_LED, 1);
+                rfid_scanning       = true;
+                ir_scan_active      = true;
+                ir_scan_end_time_ms = current_time + IR_SCAN_DURATION_MS;
+                ESP_LOGI(TAG, "IR trigger: scan started");
+            }
         }
         else if (ir_scan_active)
         {
@@ -714,6 +777,9 @@ static void process_ir_sensor(void)
     if (ir_scan_active && ir_scan_end_time_ms != 0 && current_time >= ir_scan_end_time_ms)
     {
         rfid_reader_stop_inventory();
+        // Post-scan handshake: confirm reader state and log firmware version
+        // before cutting power (non-blocking relative to any new scan trigger).
+        rfid_reader_handshake(NULL, NULL);
         rfid_reader_power_off();
         rfid_scanning       = false;
         ir_scan_active      = false;

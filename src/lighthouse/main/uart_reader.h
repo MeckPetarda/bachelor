@@ -74,7 +74,8 @@ typedef enum
     RFID_STATE_UNINITIALIZED,   // Not initialized yet
     RFID_STATE_POWERED_OFF,     // Powered off or disconnected
     RFID_STATE_STARTUP_PENDING, // Powering up, handshake pending
-    RFID_STATE_RESPONSIVE,      // Communication verified, ready to use
+    RFID_STATE_SCANNING,        // Rail confirmed, inventory running, no handshake yet
+    RFID_STATE_RESPONSIVE,      // Communication verified by handshake (periodic health check only)
     RFID_STATE_UNRESPONSIVE     // Communication failed
 } rfid_reader_state_t;
 
