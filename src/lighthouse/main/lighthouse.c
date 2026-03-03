@@ -52,15 +52,14 @@
 
 // NOTE: GPIO5 was moved to RFID reader power control (uart_reader.c)
 // WiFi status LED relocated to GPIO4 per tasks/reader_power_task.md
-#define WIFI_STATUS_LED GPIO_NUM_5  // WiFi connection status (ON = connected)
-#define MQTT_STATUS_LED GPIO_NUM_23 // MQTT broker status (ON = connected)
-#define ACTIVITY_LED    GPIO_NUM_19 // Tag detection activity (flashes on detection)
-#define SCANNING_LED    GPIO_NUM_18 // RFID scanning active (ON = scanning)
-#define BUTTON1_PIN     GPIO_NUM_34 // Start/Stop RFID scanning
-#define BUTTON2_PIN     GPIO_NUM_35 // Show statistics
-#define IR_SENSOR_PIN        GPIO_NUM_26
-#define IR_SCAN_DURATION_MS  5000        // Duration of IR-triggered scan burst (ms)
-                                         // Adjustable: increase for longer detection windows
+#define WIFI_STATUS_LED     GPIO_NUM_5  // WiFi connection status (ON = connected)
+#define MQTT_STATUS_LED     GPIO_NUM_23 // MQTT broker status (ON = connected)
+#define ACTIVITY_LED        GPIO_NUM_19 // Tag detection activity (flashes on detection)
+#define SCANNING_LED        GPIO_NUM_18 // RFID scanning active (ON = scanning)
+#define BUTTON1_PIN         GPIO_NUM_34 // Start/Stop RFID scanning
+#define BUTTON2_PIN         GPIO_NUM_35 // Show statistics
+#define IR_SENSOR_PIN       GPIO_NUM_25
+#define IR_SCAN_DURATION_MS 5000        // Duration of IR-triggered scan burst (ms)
 
 #define DEBOUNCE_TIME_MS 50
 
@@ -81,9 +80,9 @@ static button_state_t button_states[2] = {0};
 static bool           rfid_scanning    = false;
 static bool           mqtt_initialized = false;
 
-static volatile bool ir_trigger_pending  = false;  // Set in ISR, cleared in main loop
-static bool          ir_scan_active      = false;   // true = current scan was IR-initiated
-static uint32_t      ir_scan_end_time_ms = 0;       // Tick timestamp when burst should stop
+static volatile bool ir_trigger_pending  = false; // Set in ISR, cleared in main loop
+static bool          ir_scan_active      = false; // true = current scan was IR-initiated
+static uint32_t      ir_scan_end_time_ms = 0;     // Tick timestamp when burst should stop
 
 // ============================================================================
 // MQTT CONFIGURATION CALLBACK
@@ -587,7 +586,7 @@ static void process_buttons(void)
                     ESP_LOGI(TAG, "Stopping RFID scan");
                     rfid_reader_stop_inventory();
                     gpio_set_level(SCANNING_LED, 0); // Turn off scanning indicator
-                    rfid_scanning = false;
+                    rfid_scanning       = false;
                     ir_scan_active      = false;
                     ir_scan_end_time_ms = 0;
 
@@ -702,7 +701,7 @@ static void process_ir_sensor(void)
         {
             // IR-owned scan in progress — restart the timer only
             ir_scan_end_time_ms = current_time + IR_SCAN_DURATION_MS;
-            ESP_LOGI(TAG, "IR trigger: burst timer restarted");
+            // ESP_LOGI(TAG, "IR trigger: burst timer restarted");
         }
         else
         {
