@@ -9,6 +9,7 @@
  *   - 0x72: Get firmware version
  *   - 0x76: Set output power (NEW)
  *   - 0x78: Set frequency region (NEW)
+ *   - 0x7A: Set beeper mode (NEW)
  *   - 0x8B: Single inventory (polling-based tag detection)
  *   - 0x89: Real-time inventory (deprecated - not used)
  *
@@ -18,6 +19,7 @@
  *   - Section 2.1.3: Get Firmware (page 8)
  *   - Section 2.1.7: Set Output Power (page 12)
  *   - Section 2.1.9: Set Frequency Region (page 13)
+ *   - Section 2.1.11: Set Beeper Mode (page 14-15)
  *   - Section 2.2.6: Single Inventory (command 0x8B)
  *
  * Hardware Reference: ESP32 Technical Reference Manual
@@ -60,6 +62,18 @@
 #define RFID_FREQ_902MHZ 0x07
 #define RFID_FREQ_915MHZ 0x21
 #define RFID_FREQ_928MHZ 0x3B
+
+// ============================================================================
+// BEEPER MODES (Protocol V2.2, Section 2.1.11, page 14-15)
+// ============================================================================
+
+// Command byte for set beeper mode (cmd_name_set_beeper_mode)
+#define R300_CMD_SET_BEEPER_MODE   0x7A
+
+// Mode values persisted to internal flash on success (Section 2.1.11)
+#define R300_BEEPER_MODE_QUIET     0x00 // Silent — no beep on any event
+#define R300_BEEPER_MODE_PER_ROUND 0x01 // Beep once per inventory round
+#define R300_BEEPER_MODE_PER_TAG   0x02 // Beep per tag (degrades anti-collision — do not use)
 
 // ============================================================================
 // DATA STRUCTURES
@@ -234,6 +248,21 @@ esp_err_t rfid_reader_get_health(rfid_health_t *health);
  * @return ESP_OK on success, ESP_ERR_TIMEOUT if no response
  */
 esp_err_t rfid_reader_get_firmware(uint8_t *major, uint8_t *minor);
+
+/**
+ * Set reader buzzer mode
+ *
+ * Configures when the module beeps. The value is stored to internal flash
+ * and persists across power cycles (Protocol V2.2, Section 2.1.11, page 14-15).
+ *
+ * Use R300_BEEPER_MODE_QUIET (0x00) at startup to suppress buzzing during
+ * normal inventory operation. R300_BEEPER_MODE_PER_TAG (0x02) degrades
+ * anti-collision performance and must not be used.
+ *
+ * @param mode R300_BEEPER_MODE_QUIET, R300_BEEPER_MODE_PER_ROUND, or R300_BEEPER_MODE_PER_TAG
+ * @return ESP_OK on success, ESP_ERR_TIMEOUT if no valid response received
+ */
+esp_err_t rfid_reader_set_beeper_mode(uint8_t mode);
 
 /**
  * Set RF output power

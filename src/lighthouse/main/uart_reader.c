@@ -515,7 +515,16 @@ esp_err_t rfid_reader_init(void)
     // Perform initial handshake to verify reader is responsive
     ESP_LOGI(TAG, "Performing startup handshake...");
     vTaskDelay(pdMS_TO_TICKS(POWER_ON_GRACE_PERIOD_MS));
-    rfid_reader_handshake(NULL, NULL);
+    esp_err_t hs_ret = rfid_reader_handshake(NULL, NULL);
+
+    if (hs_ret == ESP_OK)
+    {
+        esp_err_t beeper_ret = rfid_reader_set_beeper_mode(R300_BEEPER_MODE_QUIET);
+        if (beeper_ret != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Failed to set beeper mode (non-fatal): %s", esp_err_to_name(beeper_ret));
+        }
+    }
 
     return ESP_OK;
 }
@@ -674,6 +683,38 @@ esp_err_t rfid_reader_get_firmware(uint8_t *major, uint8_t *minor)
     }
 
     ESP_LOGW(TAG, "No firmware response (len=%d)", len);
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t rfid_reader_set_beeper_mode(uint8_t mode)
+{
+    if (!rfid_state.initialized)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Flush RX buffer before sending command
+    uart_flush(RFID_UART_PORT);
+
+    // Send set beeper mode command with 1-byte payload
+    esp_err_t ret = send_command(R300_CMD_SET_BEEPER_MODE, &mode, 1);
+    if (ret != ESP_OK)
+    {
+        return ret;
+    }
+
+    // Wait for response with 1-second timeout
+    // Expected: [Head][Len][Address][0x7A][Check]
+    uint8_t rx_buf[32];
+    int     len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+    if (len >= 4 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_SET_BEEPER_MODE)
+    {
+        ESP_LOGI(TAG, "Beeper mode set to 0x%02X (persisted to flash)", mode);
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG, "No beeper mode response (len=%d)", len);
     return ESP_ERR_TIMEOUT;
 }
 
