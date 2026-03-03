@@ -838,8 +838,7 @@ esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t int
     // Require the power rail to be up; reject if reader is off, uninitialized,
     // or known-unresponsive.  STARTUP_PENDING (IR poll-to-ready path) and
     // SCANNING/RESPONSIVE are all valid entry states.
-    if (rfid_state.state == RFID_STATE_POWERED_OFF ||
-        rfid_state.state == RFID_STATE_UNINITIALIZED ||
+    if (rfid_state.state == RFID_STATE_POWERED_OFF || rfid_state.state == RFID_STATE_UNINITIALIZED ||
         rfid_state.state == RFID_STATE_UNRESPONSIVE)
     {
         ESP_LOGE(TAG, "Cannot start inventory - reader state is %d (not ready)", rfid_state.state);
