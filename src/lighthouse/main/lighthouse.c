@@ -718,8 +718,7 @@ static bool ir_trigger_start_scan(void)
         int64_t elapsed_us = esp_timer_get_time() - start_us;
         if (elapsed_us > POLL_TIMEOUT_US)
         {
-            ESP_LOGE(TAG, "IR trigger: power rail timeout after %lld ms — aborting scan",
-                     elapsed_us / 1000);
+            ESP_LOGE(TAG, "IR trigger: power rail timeout after %lld ms — aborting scan", elapsed_us / 1000);
             rfid_reader_power_off();
             return false;
         }
@@ -777,9 +776,6 @@ static void process_ir_sensor(void)
     if (ir_scan_active && ir_scan_end_time_ms != 0 && current_time >= ir_scan_end_time_ms)
     {
         rfid_reader_stop_inventory();
-        // Post-scan handshake: confirm reader state and log firmware version
-        // before cutting power (non-blocking relative to any new scan trigger).
-        rfid_reader_handshake(NULL, NULL);
         rfid_reader_power_off();
         rfid_scanning       = false;
         ir_scan_active      = false;

@@ -34,8 +34,8 @@ static const char *TAG = "RFID";
 #define R300_CMD_INVENTORY_SINGLE 0x8B
 #define R300_CMD_STOP_INVENTORY   0x70
 
-#define DEFAULT_READ_INTERVAL_MS 250
-#define MIN_READ_INTERVAL_MS     50
+#define DEFAULT_READ_INTERVAL_MS 10
+#define MIN_READ_INTERVAL_MS     10
 #define HANDSHAKE_TIMEOUT_MS     1000
 #define POWER_ON_GRACE_PERIOD_MS 500
 #define HEALTH_CHECK_INTERVAL_MS 60000
@@ -469,8 +469,8 @@ esp_err_t rfid_reader_init(void)
     gpio_config_t pwr_sense_config = {
         .pin_bit_mask = (1ULL << RFID_POWER_SENSE_PIN),
         .mode         = GPIO_MODE_INPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_ENABLE, // Safe default when unpowered
+        .pull_up_en   = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE, // Safe default when unpowered
         .intr_type    = GPIO_INTR_DISABLE,
     };
     ret = gpio_config(&pwr_sense_config);
@@ -512,6 +512,9 @@ esp_err_t rfid_reader_init(void)
     ESP_LOGI(TAG, "RFID reader initialized (UART%d, TX=%d, RX=%d, Baud=%d)", RFID_UART_PORT, RFID_UART_TX_PIN,
              RFID_UART_RX_PIN, RFID_UART_BAUD);
 
+    rfid_reader_power_on();
+    vTaskDelay(pdMS_TO_TICKS(100));
+
     // Perform initial handshake to verify reader is responsive
     ESP_LOGI(TAG, "Performing startup handshake...");
     vTaskDelay(pdMS_TO_TICKS(POWER_ON_GRACE_PERIOD_MS));
@@ -519,12 +522,25 @@ esp_err_t rfid_reader_init(void)
 
     if (hs_ret == ESP_OK)
     {
+
+        ESP_LOGI(TAG, "Correctly performed version handshake");
         esp_err_t beeper_ret = rfid_reader_set_beeper_mode(R300_BEEPER_MODE_QUIET);
         if (beeper_ret != ESP_OK)
         {
             ESP_LOGW(TAG, "Failed to set beeper mode (non-fatal): %s", esp_err_to_name(beeper_ret));
         }
+        else
+        {
+            ESP_LOGI(TAG, "Correctly set beeper mode");
+        }
     }
+    else
+    {
+        ESP_LOGW(TAG, "Failed to perform handshake: %s", esp_err_to_name(hs_ret));
+    }
+
+    rfid_reader_power_off();
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     return ESP_OK;
 }
@@ -725,8 +741,17 @@ esp_err_t rfid_reader_handshake(uint8_t *major, uint8_t *minor)
         return ESP_ERR_INVALID_STATE;
     }
 
-    // Check power rail status first (GPIO22 - migrated from GPIO2 strapping pin)
-    bool power_present = gpio_get_level(RFID_POWER_SENSE_PIN);
+    bool is_powered = rfid_reader_is_powered();
+
+    if (!is_powered)
+    {
+        ESP_LOGI(TAG, "Reader unpowered, powering on to perform handshake");
+        rfid_reader_power_on();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    // Check power rail status (GPIO22 - active low)
+    bool power_present = !gpio_get_level(RFID_POWER_SENSE_PIN);
 
     // Update health metrics with power status
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
@@ -746,14 +771,6 @@ esp_err_t rfid_reader_handshake(uint8_t *major, uint8_t *minor)
         xSemaphoreGive(rfid_state.mutex);
 
         return ESP_ERR_INVALID_STATE;
-    }
-
-    bool is_powered = rfid_reader_is_powered();
-
-    if (!is_powered)
-    {
-        ESP_LOGI(TAG, "Reader unpowered, powering on to perform handshake");
-        rfid_reader_power_on();
     }
 
     // Power is present - attempt handshake

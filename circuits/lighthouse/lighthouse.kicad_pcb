@@ -205,7 +205,6 @@
 	(net 86 "unconnected-(IO13-Pad1)")
 	(net 87 "/R300/5V")
 	(net 88 "Net-(JP2-B)")
-	(net 89 "Net-(JP3-A)")
 	(footprint "Resistor_SMD:R_1206_3216Metric_Pad1.30x1.75mm_HandSolder"
 		(layer "F.Cu")
 		(uuid "0144f0f6-c8c2-40d2-89bd-a2fc946213fe")
@@ -358,7 +357,7 @@
 			(at 0 -3.4 90)
 			(layer "F.SilkS")
 			(hide yes)
-			(uuid "cd566556-3cfe-459d-ae76-49b8bbd006a8")
+			(uuid "b824b9b7-441f-45e5-9354-a88f667731a7")
 			(effects
 				(font
 					(size 1 1)
@@ -369,7 +368,7 @@
 		(property "Value" "TP4056-42-ESOP8"
 			(at -0.11 -10.57 0)
 			(layer "F.Fab")
-			(uuid "f1bc21ff-127c-4565-b5e2-39794cd51736")
+			(uuid "39468f4c-c52b-498b-87ed-eca025decd1f")
 			(effects
 				(font
 					(size 1 1)
@@ -381,7 +380,7 @@
 			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "16d4020d-e8fb-483f-827f-d36228c05995")
+			(uuid "46733c43-1103-4743-964b-d7f3dd709a77")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -393,7 +392,7 @@
 			(at 0 0 90)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "487097e8-914c-4f33-bed3-517fd1e03918")
+			(uuid "11e0b3ee-2346-46ff-9fb0-816cffcf5788")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1419,7 +1418,7 @@
 		(embedded_fonts no)
 		(model "${KIPRJMOD}/components/36911000000--3DModel-STEP-510211.STEP"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 0 -0.5)
 			)
 			(scale
 				(xyz 1 1 1)
@@ -5580,6 +5579,16 @@
 		(sheetfile "lighthouse.kicad_sch")
 		(attr smd)
 		(fp_line
+			(start -2.286 -1.016)
+			(end 2.286 1.016)
+			(stroke
+				(width 0.1)
+				(type default)
+			)
+			(layer "F.SilkS")
+			(uuid "b227d626-3af7-4fb0-a2ac-473910f2a82c")
+		)
+		(fp_line
 			(start -0.727064 -0.91)
 			(end 0.727064 -0.91)
 			(stroke
@@ -5598,6 +5607,16 @@
 			)
 			(layer "F.SilkS")
 			(uuid "a2a9280b-9372-4c62-8071-f7cca7da8345")
+		)
+		(fp_line
+			(start 2.286 -1.016)
+			(end -2.286 1.016)
+			(stroke
+				(width 0.1)
+				(type default)
+			)
+			(layer "F.SilkS")
+			(uuid "a27945fb-53e6-43cb-97a1-a08fce105006")
 		)
 		(fp_rect
 			(start -2.45 -1.13)
@@ -5651,17 +5670,6 @@
 			(uuid "df3b35d3-e988-499f-88b0-76d0bac1e95c")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_1206_3216Metric.step"
-			(offset
-				(xyz 0 0 0)
-			)
-			(scale
-				(xyz 1 1 1)
-			)
-			(rotate
-				(xyz 0 0 0)
-			)
-		)
 	)
 	(footprint "Capacitor_SMD:C_1206_3216Metric_Pad1.33x1.80mm_HandSolder"
 		(layer "F.Cu")
@@ -8559,13 +8567,13 @@
 		(embedded_fonts no)
 		(model "${KICAD9_3DMODEL_DIR}/LED_THT.3dshapes/LED_D3.0mm.step"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 0 -3)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz -0 -0 -0)
 			)
 		)
 	)
@@ -11239,13 +11247,13 @@
 		(embedded_fonts no)
 		(model "${KICAD9_3DMODEL_DIR}/LED_THT.3dshapes/LED_D3.0mm.step"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 0 -3)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz -0 -0 -0)
 			)
 		)
 	)
@@ -11608,13 +11616,13 @@
 		(embedded_fonts no)
 		(model "${KICAD9_3DMODEL_DIR}/Battery.3dshapes/BatteryHolder_MPD_BH-18650-PC2.step"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 0 -0.2)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz -0 -0 -0)
 			)
 		)
 	)
@@ -15988,7 +15996,7 @@
 		(property "Reference" "H3"
 			(at 0 -4.15 0)
 			(layer "F.SilkS")
-			(uuid "3e781574-b080-4545-96a5-139699d6196c")
+			(uuid "51b189f0-9773-487a-9bc9-4193f99cd329")
 			(effects
 				(font
 					(size 1 1)
@@ -15999,7 +16007,7 @@
 		(property "Value" "MountingHole"
 			(at 0 4.15 0)
 			(layer "F.Fab")
-			(uuid "4293c25b-a6f3-49a5-a5e7-9ae18cd4b839")
+			(uuid "fa5e428e-6126-4112-bb0a-af730750cefd")
 			(effects
 				(font
 					(size 1 1)
@@ -16011,7 +16019,7 @@
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "bef66bbd-3768-497a-a270-4db7c88f5d5d")
+			(uuid "61e9accf-a5bd-4a35-9da7-3385c0688c9f")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -16023,7 +16031,7 @@
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "188cf01e-0403-4df8-a16c-2ed34c483bc8")
+			(uuid "f66b1b2a-46f9-48b7-8032-0525c0078ac4")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17260,6 +17268,16 @@
 		(sheetfile "lighthouse.kicad_sch")
 		(attr smd)
 		(fp_line
+			(start 2.286 -1.016)
+			(end -2.286 1.016)
+			(stroke
+				(width 0.1)
+				(type default)
+			)
+			(layer "F.SilkS")
+			(uuid "76b889a0-a023-49cf-bf10-ec9e0033f6f6")
+		)
+		(fp_line
 			(start -0.727064 0.91)
 			(end 0.727064 0.91)
 			(stroke
@@ -17278,6 +17296,16 @@
 			)
 			(layer "F.SilkS")
 			(uuid "206d9d74-9452-44ed-b239-c6efcd047bc9")
+		)
+		(fp_line
+			(start -2.286 -1.016)
+			(end 2.286 1.016)
+			(stroke
+				(width 0.1)
+				(type default)
+			)
+			(layer "F.SilkS")
+			(uuid "ed00ba9d-824b-414d-8369-beb599d4d9be")
 		)
 		(fp_rect
 			(start -2.45 -1.13)
@@ -17331,17 +17359,6 @@
 			(uuid "06d939b2-ecba-4926-84fa-404305ff537e")
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_1206_3216Metric.step"
-			(offset
-				(xyz 0 0 0)
-			)
-			(scale
-				(xyz 1 1 1)
-			)
-			(rotate
-				(xyz 0 0 0)
-			)
-		)
 	)
 	(footprint "MountingHole:MountingHole_3.2mm_M3"
 		(layer "F.Cu")
@@ -17352,7 +17369,7 @@
 		(property "Reference" "H4"
 			(at 0 -4.15 0)
 			(layer "F.SilkS")
-			(uuid "3fd71761-baf4-4d1e-a652-100445c278a7")
+			(uuid "cc66619c-f2f4-41d0-b269-9daede88d892")
 			(effects
 				(font
 					(size 1 1)
@@ -17363,7 +17380,7 @@
 		(property "Value" "MountingHole"
 			(at 0 4.15 0)
 			(layer "F.Fab")
-			(uuid "3a92a666-77a6-4828-8d3f-7618109ebb15")
+			(uuid "870ff057-dcf6-4848-bf44-ac19cbd8d27d")
 			(effects
 				(font
 					(size 1 1)
@@ -17375,7 +17392,7 @@
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "e15600ca-56e5-4ef4-8a46-5cb707000bf4")
+			(uuid "9313e1b7-af68-4864-9c53-af404841d158")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -17387,7 +17404,7 @@
 			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "eadc39e8-5e77-4bae-8aa5-411d4f0906e8")
+			(uuid "f2de36b3-6606-46f8-a297-f930d959b5a2")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -18933,7 +18950,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "e102e09b-9575-4445-8e5a-a839a92423af")
 		)
 		(pad "39" smd rect
 			(at -2.205 -0.91)
@@ -18942,7 +18959,7 @@
 			(net 11 "GND")
 			(pinfunction "GND")
 			(pintype "passive")
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "c47b4edd-3642-4efe-85d7-570cac3bff56")
 		)
 		(pad "39" thru_hole circle
 			(at -2.205 -0.1475)
@@ -18955,7 +18972,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "ed9bd93b-bb92-4726-8ec6-f2098bbc4bb7")
 		)
 		(pad "39" smd rect
 			(at -2.205 0.615)
@@ -18964,7 +18981,7 @@
 			(net 11 "GND")
 			(pinfunction "GND")
 			(pintype "passive")
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "9b9882bc-7286-4206-bbf9-3ef098d3ad54")
 		)
 		(pad "39" thru_hole circle
 			(at -1.4425 -2.435)
@@ -18977,7 +18994,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "facfc2df-82fb-49f1-bfeb-eb3dddaaea7e")
 		)
 		(pad "39" thru_hole circle
 			(at -1.4425 -0.91)
@@ -18990,7 +19007,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "299add65-f50d-496c-a9ef-6e1e19f0483e")
 		)
 		(pad "39" thru_hole circle
 			(at -1.4425 0.615)
@@ -19003,7 +19020,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "8b01a141-3b39-4acc-a8a3-788845fb6db8")
 		)
 		(pad "39" smd rect
 			(at -0.68 -2.435)
@@ -19012,7 +19029,7 @@
 			(net 11 "GND")
 			(pinfunction "GND")
 			(pintype "passive")
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "8e1dc43b-b468-4bbd-9aa1-44c1de0e01d5")
 		)
 		(pad "39" thru_hole circle
 			(at -0.68 -1.6725)
@@ -19025,7 +19042,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "7542d4df-036b-4f89-8f8f-a6172d72c8b8")
 		)
 		(pad "39" smd rect
 			(at -0.68 -0.91)
@@ -19034,7 +19051,7 @@
 			(net 11 "GND")
 			(pinfunction "GND")
 			(pintype "passive")
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "3cf08b6e-96ad-4ea2-80e5-739201eebc69")
 		)
 		(pad "39" smd rect
 			(at -0.68 -0.91)
@@ -19045,7 +19062,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "d30adc9d-016c-48b0-a3f7-5c068fb1bf04")
 		)
 		(pad "39" thru_hole circle
 			(at -0.68 -0.1475)
@@ -19058,7 +19075,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "daca3849-07d1-4948-ba3e-726be3652f7a")
 		)
 		(pad "39" smd rect
 			(at -0.68 0.615)
@@ -19067,7 +19084,7 @@
 			(net 11 "GND")
 			(pinfunction "GND")
 			(pintype "passive")
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "edd5db94-9f6d-4fb5-9713-7cb2975ead11")
 		)
 		(pad "39" thru_hole circle
 			(at 0.0825 -2.435)
@@ -19080,7 +19097,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "2e5a2f41-1ff0-44df-b159-e0bdb01f2369")
 		)
 		(pad "39" thru_hole circle
 			(at 0.0825 -0.91)
@@ -19093,7 +19110,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "7a7cb4c7-a2d0-4644-b2b3-59230fb8d433")
 		)
 		(pad "39" thru_hole circle
 			(at 0.0825 0.615)
@@ -19106,7 +19123,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "fe6cf142-1234-47fa-98c7-3bf8a4621bc4")
 		)
 		(pad "39" smd rect
 			(at 0.845 -2.435)
@@ -19115,7 +19132,7 @@
 			(net 11 "GND")
 			(pinfunction "GND")
 			(pintype "passive")
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "842c6ec6-0bdb-4c3a-9988-6af766f80dca")
 		)
 		(pad "39" thru_hole circle
 			(at 0.845 -1.6725)
@@ -19128,7 +19145,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "03e886b1-4246-4736-8378-024862cafd2d")
 		)
 		(pad "39" smd rect
 			(at 0.845 -0.91)
@@ -19137,7 +19154,7 @@
 			(net 11 "GND")
 			(pinfunction "GND")
 			(pintype "passive")
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "641ac6a8-19b9-4b18-b197-338e1d21d8df")
 		)
 		(pad "39" thru_hole circle
 			(at 0.845 -0.1475)
@@ -19150,7 +19167,7 @@
 			(pinfunction "GND")
 			(pintype "passive")
 			(zone_connect 2)
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "3ee90522-95e5-4b1e-9059-843cab70ff86")
 		)
 		(pad "39" smd rect
 			(at 0.845 0.615)
@@ -19159,7 +19176,7 @@
 			(net 11 "GND")
 			(pinfunction "GND")
 			(pintype "passive")
-			(uuid "5e98bb77-57fe-4058-ab11-f204bd7ed6a8")
+			(uuid "07227b37-0b2d-4c6e-bf51-36bc77371c23")
 		)
 		(zone
 			(net 0)
@@ -20278,7 +20295,7 @@
 		(embedded_fonts no)
 		(model "/media/kuba/Games/Documents/VUT/bachelor/circuits/lighthouse/components/YR300/YR300.step"
 			(offset
-				(xyz 0 -13 0)
+				(xyz 0 -13 -1.7)
 			)
 			(scale
 				(xyz 1 1 1)
@@ -24889,7 +24906,7 @@
 		(embedded_fonts no)
 		(model "${KIPRJMOD}/components/36911000000--3DModel-STEP-510211.STEP"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 0 -0.5)
 			)
 			(scale
 				(xyz 1 1 1)
@@ -25217,13 +25234,13 @@
 		(embedded_fonts no)
 		(model "${KICAD9_3DMODEL_DIR}/LED_THT.3dshapes/LED_D3.0mm.step"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 0 -3)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz -0 -0 -0)
 			)
 		)
 	)
@@ -25495,7 +25512,7 @@
 		(embedded_fonts no)
 		(model "/media/kuba/Games/Documents/VUT/bachelor/circuits/lighthouse/components/LIB_3296W-1-103LF/3296W-1-103LF.stp"
 			(offset
-				(xyz 2.25 2 11)
+				(xyz 2.25 2 10)
 			)
 			(scale
 				(xyz 1 1 1)
@@ -26044,7 +26061,7 @@
 			(at -1.338403 -2.5 180)
 			(layer "F.SilkS")
 			(hide yes)
-			(uuid "de451b9b-08f6-4f43-94c8-20697dff5fa1")
+			(uuid "c618513d-1be6-48ce-8625-125550df64c0")
 			(effects
 				(font
 					(size 1 1)
@@ -26055,7 +26072,7 @@
 		(property "Value" "BC337"
 			(at 1.161597 1.25 90)
 			(layer "F.Fab")
-			(uuid "b933e8cd-5a7a-4c20-8ff0-06dc24e597bc")
+			(uuid "b9423476-befc-4e77-a4cc-16d80d0828c3")
 			(effects
 				(font
 					(size 1 1)
@@ -26068,7 +26085,7 @@
 			(unlocked yes)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "bf7f31b8-5869-4a53-80b8-158e53f1ce52")
+			(uuid "63916d29-575c-4436-9e1d-42b9da0f3ce9")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -26081,7 +26098,7 @@
 			(unlocked yes)
 			(layer "F.Fab")
 			(hide yes)
-			(uuid "ee72b5db-5e26-451d-9daf-0fd6d7dcad93")
+			(uuid "6de8f96c-ad73-46ea-9cbb-ebba46619f9e")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -26263,7 +26280,7 @@
 			(drill 0.55)
 			(layers "*.Cu" "*.Mask")
 			(remove_unused_layers no)
-			(net 89 "Net-(JP3-A)")
+			(net 68 "RFID_PW_SENSE")
 			(pinfunction "C")
 			(pintype "passive")
 			(uuid "4e3aaeba-5b32-4403-9be9-e36a11f599cc")
@@ -26495,13 +26512,13 @@
 		(embedded_fonts no)
 		(model "${KICAD9_3DMODEL_DIR}/LED_THT.3dshapes/LED_D3.0mm.step"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 0 -3)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz -0 -0 -0)
 			)
 		)
 	)
@@ -27665,9 +27682,9 @@
 		(descr "SMD Solder Jumper, 1x1.5mm, rounded Pads, 0.3mm gap, bridged with 2 copper strips")
 		(tags "net tie solder jumper bridged")
 		(property "Reference" "JP3"
-			(at 0 1.8 0)
+			(at 0 -1.7 0)
 			(layer "B.SilkS")
-			(uuid "8bf23901-822e-4fe9-a66b-3a291c46d31b")
+			(uuid "a74fd27b-529c-4e85-a8b5-229165500e25")
 			(effects
 				(font
 					(size 1 1)
@@ -27679,7 +27696,7 @@
 		(property "Value" "SolderJumper_2_Bridged"
 			(at 0 -1.9 0)
 			(layer "B.Fab")
-			(uuid "e5ebbb2e-1e78-42a8-81f4-156a18907fe4")
+			(uuid "4cc59e86-c123-42e9-8277-afa45dfcaa56")
 			(effects
 				(font
 					(size 1 1)
@@ -27693,7 +27710,7 @@
 			(unlocked yes)
 			(layer "B.Fab")
 			(hide yes)
-			(uuid "d6dc986f-eb9e-4c1d-83d4-1d7308e1d32d")
+			(uuid "ffcad582-514a-4f47-9ddf-c02dd8c10a70")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27707,7 +27724,7 @@
 			(unlocked yes)
 			(layer "B.Fab")
 			(hide yes)
-			(uuid "64a0705f-1027-4de7-95ec-90c4875d2fe7")
+			(uuid "2abb0ae8-ee77-4cc5-aaf6-2b27379e7d77")
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27886,7 +27903,7 @@
 			(at -0.65 0)
 			(size 1 0.5)
 			(layers "B.Cu" "B.Mask")
-			(net 89 "Net-(JP3-A)")
+			(net 68 "RFID_PW_SENSE")
 			(pinfunction "A")
 			(pintype "passive")
 			(zone_connect 2)
@@ -32214,6 +32231,14 @@
 		(uuid "b15bf893-713c-46c1-b2f9-c7c426344eb6")
 	)
 	(segment
+		(start 92.28 93.2)
+		(end 92.25 93.23)
+		(width 0.2)
+		(layer "B.Cu")
+		(net 68)
+		(uuid "378686f9-fd46-456a-94b2-eaeeac321b87")
+	)
+	(segment
 		(start 78.25 81)
 		(end 85 87.75)
 		(width 0.2)
@@ -32236,6 +32261,14 @@
 		(layer "B.Cu")
 		(net 68)
 		(uuid "bece9956-e4f1-4f44-919d-1063c094a8e0")
+	)
+	(segment
+		(start 95.7 93.2)
+		(end 92.28 93.2)
+		(width 1)
+		(layer "B.Cu")
+		(net 68)
+		(uuid "d9b10703-28b3-437b-b56d-574583ef5564")
 	)
 	(segment
 		(start 75.04 81)
@@ -33884,22 +33917,6 @@
 		(layer "B.Cu")
 		(net 88)
 		(uuid "fddd0553-2cda-406f-afe3-bcdba54a4fe2")
-	)
-	(segment
-		(start 92.28 93.2)
-		(end 92.25 93.23)
-		(width 0.2)
-		(layer "B.Cu")
-		(net 89)
-		(uuid "378686f9-fd46-456a-94b2-eaeeac321b87")
-	)
-	(segment
-		(start 95.7 93.2)
-		(end 92.28 93.2)
-		(width 1)
-		(layer "B.Cu")
-		(net 89)
-		(uuid "d9b10703-28b3-437b-b56d-574583ef5564")
 	)
 	(zone
 		(net 11)
