@@ -666,7 +666,7 @@ static void process_buttons(void)
         {
             if (!combo_state.active)
             {
-                ESP_LOGI(TAG, "Initializing combo guesture");
+                ESP_LOGI(TAG, "Initializing combo gesture");
 
                 // Rising edge of combo — initialise
                 if (rfid_scanning)
@@ -690,28 +690,28 @@ static void process_buttons(void)
 
             if (elapsed >= 2500 && combo_state.leds_lit < 1)
             {
-                ESP_LOGI(TAG, "Combo guesture 1/4");
+                ESP_LOGI(TAG, "Combo gesture 1/4");
                 gpio_set_level(LED1_PIN, 1);
                 vTaskDelay(pdMS_TO_TICKS(200));
                 combo_state.leds_lit = 1;
             }
             else if (elapsed >= 5000 && combo_state.leds_lit < 2)
             {
-                ESP_LOGI(TAG, "Combo guesture 2/4");
+                ESP_LOGI(TAG, "Combo gesture 2/4");
                 gpio_set_level(LED2_PIN, 1);
                 vTaskDelay(pdMS_TO_TICKS(200));
                 combo_state.leds_lit = 2;
             }
             else if (elapsed >= 7500 && combo_state.leds_lit < 3)
             {
-                ESP_LOGI(TAG, "Combo guesture 3/4");
+                ESP_LOGI(TAG, "Combo gesture 3/4");
                 gpio_set_level(SCANNING_LED, 1);
                 vTaskDelay(pdMS_TO_TICKS(200));
                 combo_state.leds_lit = 3;
             }
             else if (elapsed >= 10000 && combo_state.leds_lit < 4)
             {
-                ESP_LOGI(TAG, "Combo guesture 4/4");
+                ESP_LOGI(TAG, "Combo gesture 4/4");
                 gpio_set_level(ACTIVITY_LED, 1);
                 vTaskDelay(pdMS_TO_TICKS(200));
                 combo_state.leds_lit = 4;
