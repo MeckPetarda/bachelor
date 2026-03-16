@@ -1,12 +1,12 @@
 # Task: Disable Reader Buzzer on Startup
 
-**Files to modify:** `uart_reader.h`, `uart_reader.c`
+**Files to modify:** `rfid_reader.h`, `rfid_reader.c`
 
 **Protocol Reference:** R300 UHF RFID Serial Interface Protocol V2.2, Section 2.1.11 (`cmd_name_set_beeper_mode`, page 14-15)
 
 ---
 
-## Step 1 — Add command constant (`uart_reader.h`)
+## Step 1 — Add command constant (`rfid_reader.h`)
 
 Add `R300_CMD_SET_BEEPER_MODE` alongside the existing command defines. Also define the mode values for clarity:
 
@@ -21,7 +21,7 @@ Declare the public function with a doc comment referencing Protocol V2.2, Sectio
 
 ---
 
-## Step 2 — Implement `rfid_reader_set_beeper_mode()` (`uart_reader.c`)
+## Step 2 — Implement `rfid_reader_set_beeper_mode()` (`rfid_reader.c`)
 
 Follow the same pattern as `rfid_reader_get_firmware()`:
 
@@ -36,7 +36,7 @@ Follow the same pattern as `rfid_reader_get_firmware()`:
 
 ---
 
-## Step 3 — Call during initialization (`uart_reader.c`)
+## Step 3 — Call during initialization (`rfid_reader.c`)
 
 In `rfid_reader_init()`, after `rfid_reader_handshake()` succeeds, call:
 

@@ -27,7 +27,7 @@
 #define OFFLINE_EVENT_LOGGER_H
 
 #include "esp_err.h"
-#include "uart_reader.h"
+#include "rfid_reader.h"
 #include <stdbool.h>
 #include <stdint.h>
 

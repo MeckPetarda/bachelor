@@ -1,5 +1,5 @@
 /**
- * uart_reader.h - R300/Y300 UHF RFID Reader Interface
+ * rfid_reader.h - R300/Y300 UHF RFID Reader Interface
  *
  * Implements R300 protocol V2.2 for attendance detection system.
  * Version: 1.2 - Added power and frequency configuration
@@ -27,8 +27,8 @@
  *   - UART2 on GPIO16/17 (safe pins, no conflicts)
  */
 
-#ifndef UART_READER_H
-#define UART_READER_H
+#ifndef RFID_READER_H
+#define RFID_READER_H
 
 #include "esp_err.h"
 #include <stdbool.h>
@@ -340,4 +340,4 @@ esp_err_t rfid_reader_get_stats(rfid_stats_t *stats);
  */
 void rfid_reader_clear_stats(void);
 
-#endif // UART_READER_H
+#endif // RFID_READER_H

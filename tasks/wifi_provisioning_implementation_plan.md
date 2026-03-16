@@ -1392,7 +1392,7 @@ I (XXX) WIFI_PROV: State transition: UNCONFIGURED → CONNECTING
 I (XXX) WIFI_PROV: Attempting WiFi connection...
 I (XXX) WIFI_PROV: WiFi connected! IP: 192.168.X.X
 I (XXX) WIFI_PROV: State transition: CONNECTING → CONNECTED
-I (XXX) UART_READER: Initializing RFID reader
+I (XXX) RFID_READER: Initializing RFID reader
 I (XXX) MAIN: System ready!
 ```
 

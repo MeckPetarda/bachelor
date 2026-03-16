@@ -1,11 +1,11 @@
 /**
- * uart_reader.c - R300/Y300 UHF RFID Reader Implementation
+ * rfid_reader.c - R300/Y300 UHF RFID Reader Implementation
  *
  * Implements R300 protocol V2.2 for polling-based tag detection
  * Version: 1.3 - Changed to command-based polling with configurable interval
  */
 
-#include "uart_reader.h"
+#include "rfid_reader.h"
 
 #include <string.h>
 

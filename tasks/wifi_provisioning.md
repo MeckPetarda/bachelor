@@ -4,7 +4,7 @@
 
 This plan describes the step-by-step implementation of a WiFi provisioning system for the ESP32 lighthouse attendance tracker. The system is designed to **build incrementally on existing firmware** without disrupting current RFID functionality. Each component integrates with established code patterns (button debouncing, GPIO state management, task-based architecture).
 
-**Key Principle:** Additions are modular and isolated. Existing code in `my_project.c` and `uart_reader.c` remains untouched; new functionality is added through separate modules that integrate at clean boundaries.
+**Key Principle:** Additions are modular and isolated. Existing code in `my_project.c` and `rfid_reader.c` remains untouched; new functionality is added through separate modules that integrate at clean boundaries.
 
 ---
 
@@ -54,7 +54,7 @@ This plan describes the step-by-step implementation of a WiFi provisioning syste
    - Processes buttons and PIR
    - **Integration point:** Call WiFi status check function here (minimal overhead)
 
-4. **RFID reader in `uart_reader.c`**
+4. **RFID reader in `rfid_reader.c`**
    - Runs independently in background task
    - **Integration point:** No modification needed; can coexist with WiFi provisioning
 

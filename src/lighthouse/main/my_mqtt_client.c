@@ -21,9 +21,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "offline_event_logger.h"
+#include "rfid_reader.h"
 #include "sdkconfig.h"
 #include "settings_storage.h"
-#include "uart_reader.h"
 #include <stdio.h>
 #include <string.h>
 

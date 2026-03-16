@@ -30,7 +30,7 @@
 #include "esp_adc/adc_oneshot.h"
 #include "esp_sleep.h"
 #include "hal/gpio_types.h"
-#include "uart_reader.h"
+#include "rfid_reader.h"
 #endif
 
 static const char *TAG = "BATTERY_MONITOR";

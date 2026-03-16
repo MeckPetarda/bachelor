@@ -19,13 +19,13 @@ The battery monitor is producing erratic voltage readings and triggering false-p
 - `src/lighthouse/main/Kconfig.projbuild` — add `CONFIG_BATTERY_SENSE_ENABLED`
 - `src/lighthouse/main/my_mqtt_client.c` — update health payload for disabled state
 
-**Do not modify** `src/lighthouse/main/uart_reader.c` or `uart_reader.h` beyond what is described in Task 3. The RFID module's internal state is accessed via its existing public API only.
+**Do not modify** `src/lighthouse/main/rfid_reader.c` or `rfid_reader.h` beyond what is described in Task 3. The RFID module's internal state is accessed via its existing public API only.
 
 ---
 
 ## Existing Code Orientation
 
-### RFID Task State (uart_reader.c / uart_reader.h)
+### RFID Task State (rfid_reader.c / rfid_reader.h)
 
 The RFID module tracks inventory state in a static struct:
 
@@ -149,7 +149,7 @@ In `mqtt_client_publish_health_metrics()`, the battery JSON section must be cond
 
 **Problem:** Readings taken during active RFID inventory rounds capture real terminal voltage sag under load. The RFID active period is 18.8 ms within a 30–50 ms cycle. This sag does not represent SoC.
 
-**Mechanism:** Use `rfid_reader_is_inventory_active()` (already exported in `uart_reader.h`) to gate sampling. Do not introduce an EventGroup or shared global — polling the existing function is sufficient.
+**Mechanism:** Use `rfid_reader_is_inventory_active()` (already exported in `rfid_reader.h`) to gate sampling. Do not introduce an EventGroup or shared global — polling the existing function is sufficient.
 
 **New constants in `battery_monitor.c`:**
 ```c

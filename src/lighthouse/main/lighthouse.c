@@ -7,11 +7,11 @@
  *
  * GPIO Pin Assignments:
  *   - GPIO4:  LED1 — WiFi+MQTT combined indicator (green)
+ *   - GPIO21: LED2 — IR mode / AP provisioning indicator (green)
+ *   - GPIO26: LED3 — Active scan indicator (red)
+ *   - GPIO25: LED4 — Tag activity / battery (yellow)
  *   - GPIO5:  RFID reader power control (S9013 transistor base)
- *   - GPIO18: LED3 — Active scan indicator (red)
- *   - GPIO19: LED4 — Tag activity / battery (yellow)
  *   - GPIO22: RFID power rail sense
- *   - GPIO23: LED2 — IR mode / AP provisioning indicator (green)
  *   - GPIO34: Button 1 — Scan mode control (input-only, external pull-up)
  *   - GPIO35: Button 2 — Status msg / WiFi setup (input-only, external pull-up)
  *
@@ -46,7 +46,7 @@
 #include "hal/gpio_types.h"
 #include "my_mqtt_client.h"
 #include "offline_event_logger.h"
-#include "uart_reader.h"
+#include "rfid_reader.h"
 #include "wifi_manager.h"
 #include "wifi_provisioning.h"
 

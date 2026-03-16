@@ -6,7 +6,7 @@ The current IR trigger path has three sequential blocking operations before `sta
 
 | Step | Location | Delay |
 |---|---|---|
-| `RFID_POWER_STABILIZATION_MS` fixed delay | `rfid_reader_power_on()` in `uart_reader.c` | ~500ms |
+| `RFID_POWER_STABILIZATION_MS` fixed delay | `rfid_reader_power_on()` in `rfid_reader.c` | ~500ms |
 | `POWER_ON_GRACE_PERIOD_MS` fixed delay | IR trigger handler in `lighthouse.c` | ~500ms |
 | Handshake (`get_firmware_version` 0x72) | IR trigger handler in `lighthouse.c` | up to ~1000ms |
 
@@ -24,7 +24,7 @@ The true reader hardware boot time is currently unknown — the existing delays 
 
 ## Changes Required
 
-### 1. `uart_reader.c` — Split `rfid_reader_power_on()`
+### 1. `rfid_reader.c` — Split `rfid_reader_power_on()`
 
 The existing `rfid_reader_power_on()` blocks for `RFID_POWER_STABILIZATION_MS` after asserting GPIO5. This delay must be removed from the function body and ownership handed to the caller.
 
@@ -32,7 +32,7 @@ Remove the `vTaskDelay(pdMS_TO_TICKS(RFID_POWER_STABILIZATION_MS))` call from `r
 
 The `RFID_POWER_STABILIZATION_MS` constant can be retained as a reference value but should no longer be used in the power-on function itself.
 
-### 2. `uart_reader.h` — Expose new state
+### 2. `rfid_reader.h` — Expose new state
 
 Add `RFID_STATE_SCANNING` to the `rfid_reader_state_t` enum. This state represents the reader being active but not yet verified by a post-boot handshake. It is distinct from `RFID_STATE_RESPONSIVE`, which is reserved exclusively for states confirmed by a successful handshake (periodic health check path).
 
@@ -73,8 +73,8 @@ The `rfid_reader_handshake()` function itself requires no changes.
 
 | File | Change |
 |---|---|
-| `uart_reader.c` | Remove blocking delay from `rfid_reader_power_on()` |
-| `uart_reader.h` | Add `RFID_STATE_SCANNING` to state enum |
+| `rfid_reader.c` | Remove blocking delay from `rfid_reader_power_on()` |
+| `rfid_reader.h` | Add `RFID_STATE_SCANNING` to state enum |
 | `lighthouse.c` | Replace IR trigger scan-start sequence with poll-to-ready loop; remove handshake from trigger path |
 
 ---

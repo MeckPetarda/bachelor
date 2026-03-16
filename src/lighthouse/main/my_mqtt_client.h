@@ -20,7 +20,7 @@
 #define MQTT_CLIENT_H
 
 #include "esp_err.h"
-#include "uart_reader.h"
+#include "rfid_reader.h"
 #include <mqtt_client.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -55,8 +55,8 @@
  *
  * MAC format: "AA:BB:CC:DD:EE:FF" (17 characters + null terminator)
  */
-#define MQTT_TOPIC_BASE    "attendance/lighthouse/"
-#define MQTT_MAC_STR_LEN   18  // "AA:BB:CC:DD:EE:FF" + null terminator
+#define MQTT_TOPIC_BASE  "attendance/lighthouse/"
+#define MQTT_MAC_STR_LEN 18 // "AA:BB:CC:DD:EE:FF" + null terminator
 
 /**
  * Quality of Service Levels
