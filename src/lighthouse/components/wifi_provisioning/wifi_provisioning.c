@@ -1212,7 +1212,6 @@ esp_err_t wifi_provisioning_submit_credentials(const char *ssid, const char *pas
     prov_state.credentials_pending = true;
 
     ESP_LOGI(TAG, "Credentials submitted for SSID: %s", ssid);
-    ESP_LOGI(TAG, "Credentials submitted for SSID: %s", password);
 
     return ESP_OK;
 }
