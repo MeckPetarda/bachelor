@@ -41,6 +41,7 @@
 
 #include "battery_monitor.h"
 #include "esp_sleep.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "hal/gpio_types.h"
 #include "my_mqtt_client.h"
@@ -86,6 +87,15 @@ typedef struct
 static button_state_t button_states[2] = {0};
 static bool           rfid_scanning    = false;
 static bool           mqtt_initialized = false;
+
+// Dual-button cache purge gesture state
+static struct {
+    bool     active;           // Both buttons currently held
+    uint32_t combo_start_time; // Tick time (ms) when combo was first detected
+    uint8_t  leds_lit;         // Countdown LEDs currently on (0–3)
+} combo_state = {0};
+
+static bool combo_gesture_active = false;
 
 static volatile bool ir_trigger_pending  = false; // Set in ISR, cleared in main loop
 static bool          ir_scan_active      = false; // true = current scan was IR-initiated
@@ -646,6 +656,126 @@ static void process_buttons(void)
 {
     uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
+    // ---- Dual-button combo detection (cache purge gesture) ----
+    {
+        uint32_t b1 = gpio_get_level(BUTTON1_PIN);
+        uint32_t b2 = gpio_get_level(BUTTON2_PIN);
+
+        if (b1 == 0 && b2 == 0)
+        {
+            if (!combo_state.active)
+            {
+                // Rising edge of combo — initialise
+                if (rfid_scanning)
+                {
+                    rfid_reader_stop_inventory();
+                    rfid_reader_power_off();
+                    rfid_scanning = false;
+                }
+                combo_gesture_active       = true;
+                combo_state.active         = true;
+                combo_state.combo_start_time = current_time;
+                combo_state.leds_lit       = 0;
+                gpio_set_level(LED1_PIN, 0);
+                gpio_set_level(LED2_PIN, 0);
+                gpio_set_level(ACTIVITY_LED, 0);
+                gpio_set_level(SCANNING_LED, 0);
+            }
+
+            // Update countdown LEDs
+            uint32_t elapsed = current_time - combo_state.combo_start_time;
+
+            if (elapsed >= 2500 && combo_state.leds_lit < 1)
+            {
+                gpio_set_level(LED1_PIN, 1);
+                combo_state.leds_lit = 1;
+            }
+            if (elapsed >= 5000 && combo_state.leds_lit < 2)
+            {
+                gpio_set_level(LED2_PIN, 1);
+                combo_state.leds_lit = 2;
+            }
+            if (elapsed >= 7500 && combo_state.leds_lit < 3)
+            {
+                gpio_set_level(ACTIVITY_LED, 1);
+                combo_state.leds_lit = 3;
+            }
+
+            if (elapsed >= 10000)
+            {
+                esp_err_t ret = offline_logger_clear_all();
+                if (ret == ESP_OK)
+                {
+                    // Confirmation flash sequence then restart
+                    gpio_set_level(LED1_PIN, 0);
+                    gpio_set_level(LED2_PIN, 0);
+                    gpio_set_level(ACTIVITY_LED, 0);
+                    gpio_set_level(SCANNING_LED, 0);
+
+                    gpio_set_level(LED1_PIN, 1);
+                    vTaskDelay(pdMS_TO_TICKS(200));
+                    gpio_set_level(LED1_PIN, 0);
+                    vTaskDelay(pdMS_TO_TICKS(200));
+
+                    gpio_set_level(LED2_PIN, 1);
+                    vTaskDelay(pdMS_TO_TICKS(200));
+                    gpio_set_level(LED2_PIN, 0);
+                    vTaskDelay(pdMS_TO_TICKS(200));
+
+                    gpio_set_level(ACTIVITY_LED, 1);
+                    vTaskDelay(pdMS_TO_TICKS(200));
+                    gpio_set_level(ACTIVITY_LED, 0);
+                    vTaskDelay(pdMS_TO_TICKS(200));
+
+                    gpio_set_level(SCANNING_LED, 1);
+                    vTaskDelay(pdMS_TO_TICKS(200));
+                    gpio_set_level(SCANNING_LED, 0);
+                    vTaskDelay(pdMS_TO_TICKS(200));
+
+                    esp_restart();
+                }
+                else
+                {
+                    // Error flash — all four LEDs together three times
+                    for (int i = 0; i < 3; i++)
+                    {
+                        gpio_set_level(LED1_PIN, 1);
+                        gpio_set_level(LED2_PIN, 1);
+                        gpio_set_level(ACTIVITY_LED, 1);
+                        gpio_set_level(SCANNING_LED, 1);
+                        vTaskDelay(pdMS_TO_TICKS(200));
+                        gpio_set_level(LED1_PIN, 0);
+                        gpio_set_level(LED2_PIN, 0);
+                        gpio_set_level(ACTIVITY_LED, 0);
+                        gpio_set_level(SCANNING_LED, 0);
+                        vTaskDelay(pdMS_TO_TICKS(200));
+                    }
+                    combo_state.active   = false;
+                    combo_gesture_active = false;
+                    combo_state.leds_lit = 0;
+                    gpio_set_level(LED1_PIN, 0);
+                    gpio_set_level(LED2_PIN, 0);
+                    gpio_set_level(ACTIVITY_LED, 0);
+                    gpio_set_level(SCANNING_LED, 0);
+                }
+            }
+        }
+        else
+        {
+            if (combo_state.active)
+            {
+                // Gesture cancelled — restore clean state
+                combo_state.active   = false;
+                combo_gesture_active = false;
+                combo_state.leds_lit = 0;
+                gpio_set_level(LED1_PIN, 0);
+                gpio_set_level(LED2_PIN, 0);
+                gpio_set_level(ACTIVITY_LED, 0);
+                gpio_set_level(SCANNING_LED, 0);
+            }
+        }
+    }
+
     // BUTTON1: Scan mode control
     // IR mode:     short press = no-op; 3 s hold = enter manual mode
     // Manual mode: short press = toggle RFID; 3 s hold = enter IR mode
@@ -653,65 +783,72 @@ static void process_buttons(void)
         uint32_t        level = gpio_get_level(BUTTON1_PIN);
         button_state_t *state = &button_states[0];
 
-        // Detect press start (falling edge)
-        if (level == 0 && state->last_stable_state == 1)
+        if (combo_state.active)
         {
-            if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS)
-            {
-                state->last_press_time = current_time;
-                state->press_count &= 0x7F; // clear hold-triggered flag
-            }
+            state->last_stable_state = level;
         }
-
-        // Detect 3 s hold (while held)
-        if (level == 0 && state->last_stable_state == 0)
+        else
         {
-            uint32_t press_duration = current_time - state->last_press_time;
-            if (press_duration >= HOLD_3S_MS && !(state->press_count & 0x80))
+            // Detect press start (falling edge)
+            if (level == 0 && state->last_stable_state == 1)
             {
-                state->press_count |= 0x80; // mark hold triggered (fire once)
-                if (scan_mode == SCAN_MODE_IR)
+                if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS)
                 {
-                    enter_manual_mode();
-                }
-                else
-                {
-                    enter_ir_mode();
+                    state->last_press_time = current_time;
+                    state->press_count &= 0x7F; // clear hold-triggered flag
                 }
             }
-        }
 
-        // Detect release (rising edge) — handle short press
-        if (level == 1 && state->last_stable_state == 0)
-        {
-            uint32_t press_duration = current_time - state->last_press_time;
-            if (press_duration < HOLD_3S_MS && !(state->press_count & 0x80) && press_duration >= DEBOUNCE_TIME_MS)
+            // Detect 3 s hold (while held)
+            if (level == 0 && state->last_stable_state == 0)
             {
-                // Short press
-                if (scan_mode == SCAN_MODE_MANUAL)
+                uint32_t press_duration = current_time - state->last_press_time;
+                if (press_duration >= HOLD_3S_MS && !(state->press_count & 0x80))
                 {
-                    // Toggle RFID on/off
-                    if (!rfid_scanning)
+                    state->press_count |= 0x80; // mark hold triggered (fire once)
+                    if (scan_mode == SCAN_MODE_IR)
                     {
-                        rfid_reader_start_inventory_wrapper();
+                        enter_manual_mode();
                     }
                     else
                     {
-                        ESP_LOGI(TAG, "Stopping RFID scan (manual mode)");
-                        rfid_reader_stop_inventory();
-                        gpio_set_level(SCANNING_LED, 0);
-                        rfid_scanning       = false;
-                        ir_scan_active      = false;
-                        ir_scan_end_time_ms = 0;
-                        rfid_reader_power_off();
+                        enter_ir_mode();
                     }
                 }
-                // In IR mode: short press is a no-op (ignored)
             }
-            state->press_count = 0;
-        }
 
-        state->last_stable_state = level;
+            // Detect release (rising edge) — handle short press
+            if (level == 1 && state->last_stable_state == 0)
+            {
+                uint32_t press_duration = current_time - state->last_press_time;
+                if (press_duration < HOLD_3S_MS && !(state->press_count & 0x80) && press_duration >= DEBOUNCE_TIME_MS)
+                {
+                    // Short press
+                    if (scan_mode == SCAN_MODE_MANUAL)
+                    {
+                        // Toggle RFID on/off
+                        if (!rfid_scanning)
+                        {
+                            rfid_reader_start_inventory_wrapper();
+                        }
+                        else
+                        {
+                            ESP_LOGI(TAG, "Stopping RFID scan (manual mode)");
+                            rfid_reader_stop_inventory();
+                            gpio_set_level(SCANNING_LED, 0);
+                            rfid_scanning       = false;
+                            ir_scan_active      = false;
+                            ir_scan_end_time_ms = 0;
+                            rfid_reader_power_off();
+                        }
+                    }
+                    // In IR mode: short press is a no-op (ignored)
+                }
+                state->press_count = 0;
+            }
+
+            state->last_stable_state = level;
+        }
     }
 
     // BUTTON2: Show statistics or enter setup mode (5s hold)
@@ -719,74 +856,81 @@ static void process_buttons(void)
         uint32_t        level = gpio_get_level(BUTTON2_PIN);
         button_state_t *state = &button_states[1];
 
-        // Detect button press start (transition from released to pressed)
-        if (level == 0 && state->last_stable_state == 1)
+        if (combo_state.active)
         {
-            if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS)
-            {
-                // Record press start time
-                state->last_press_time = current_time;
-                // Clear setup triggered flag (high bit of press_count)
-                state->press_count &= 0x7F;
-            }
+            state->last_stable_state = level;
         }
-
-        // Track press duration while button held (level == 0 continuously)
-        if (level == 0 && state->last_stable_state == 0)
+        else
         {
-            uint32_t press_duration = current_time - state->last_press_time;
-
-            // Check for 5-second hold (only trigger once using high bit flag)
-            if (press_duration >= 5000 && !(state->press_count & 0x80))
+            // Detect button press start (transition from released to pressed)
+            if (level == 0 && state->last_stable_state == 1)
             {
-                // 5s threshold crossed - enter setup mode
-                ESP_LOGI(TAG, "BUTTON2 held for 5+ seconds - entering WiFi setup mode");
-                state->press_count |= 0x80; // Mark that we've triggered setup
-
-                // This function reboots the device - code below won't execute
-                wifi_provisioning_setup_button_pressed();
-            }
-        }
-
-        // Handle button release (transition from pressed to released)
-        if (level == 1 && state->last_stable_state == 0)
-        {
-            uint32_t press_duration = current_time - state->last_press_time;
-
-            // Only handle short press if we didn't trigger setup and debounce passed
-            if (press_duration < 5000 && !(state->press_count & 0x80) && press_duration >= DEBOUNCE_TIME_MS)
-            {
-                state->press_count++;
-
-                // Get and display statistics
-                rfid_stats_t stats;
-                if (rfid_reader_get_stats(&stats) == ESP_OK)
+                if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS)
                 {
-                    ESP_LOGI(TAG, "═══════ RFID Statistics ═══════");
-                    ESP_LOGI(TAG, "  Tags detected: %lu", stats.tags_detected);
-                    ESP_LOGI(TAG, "  Total reads: %lu", stats.total_reads);
-                    ESP_LOGI(TAG, "  Errors: %lu", stats.errors);
-                    ESP_LOGI(TAG, "  Scanning: %s", stats.inventory_active ? "YES" : "NO");
-                    ESP_LOGI(TAG, "════════════════════════════════\n");
-                }
-
-                // Publish health metrics via MQTT
-                if (mqtt_client_is_connected())
-                {
-                    ESP_LOGI(TAG, "Publishing health metrics to MQTT...");
-                    mqtt_client_publish_health_metrics();
-                }
-                else
-                {
-                    ESP_LOGW(TAG, "MQTT not connected - skipping health metrics publish");
+                    // Record press start time
+                    state->last_press_time = current_time;
+                    // Clear setup triggered flag (high bit of press_count)
+                    state->press_count &= 0x7F;
                 }
             }
 
-            // Reset press count for next press cycle (keep low bits for potential debug)
-            state->press_count = 0;
-        }
+            // Track press duration while button held (level == 0 continuously)
+            if (level == 0 && state->last_stable_state == 0)
+            {
+                uint32_t press_duration = current_time - state->last_press_time;
 
-        state->last_stable_state = level;
+                // Check for 5-second hold (only trigger once using high bit flag)
+                if (press_duration >= 5000 && !(state->press_count & 0x80))
+                {
+                    // 5s threshold crossed - enter setup mode
+                    ESP_LOGI(TAG, "BUTTON2 held for 5+ seconds - entering WiFi setup mode");
+                    state->press_count |= 0x80; // Mark that we've triggered setup
+
+                    // This function reboots the device - code below won't execute
+                    wifi_provisioning_setup_button_pressed();
+                }
+            }
+
+            // Handle button release (transition from pressed to released)
+            if (level == 1 && state->last_stable_state == 0)
+            {
+                uint32_t press_duration = current_time - state->last_press_time;
+
+                // Only handle short press if we didn't trigger setup and debounce passed
+                if (press_duration < 5000 && !(state->press_count & 0x80) && press_duration >= DEBOUNCE_TIME_MS)
+                {
+                    state->press_count++;
+
+                    // Get and display statistics
+                    rfid_stats_t stats;
+                    if (rfid_reader_get_stats(&stats) == ESP_OK)
+                    {
+                        ESP_LOGI(TAG, "═══════ RFID Statistics ═══════");
+                        ESP_LOGI(TAG, "  Tags detected: %lu", stats.tags_detected);
+                        ESP_LOGI(TAG, "  Total reads: %lu", stats.total_reads);
+                        ESP_LOGI(TAG, "  Errors: %lu", stats.errors);
+                        ESP_LOGI(TAG, "  Scanning: %s", stats.inventory_active ? "YES" : "NO");
+                        ESP_LOGI(TAG, "════════════════════════════════\n");
+                    }
+
+                    // Publish health metrics via MQTT
+                    if (mqtt_client_is_connected())
+                    {
+                        ESP_LOGI(TAG, "Publishing health metrics to MQTT...");
+                        mqtt_client_publish_health_metrics();
+                    }
+                    else
+                    {
+                        ESP_LOGW(TAG, "MQTT not connected - skipping health metrics publish");
+                    }
+                }
+
+                // Reset press count for next press cycle (keep low bits for potential debug)
+                state->press_count = 0;
+            }
+
+            state->last_stable_state = level;
+        }
     }
 }
 
@@ -853,6 +997,11 @@ static bool ir_trigger_start_scan(void)
 
 static void process_ir_sensor(void)
 {
+    if (combo_gesture_active)
+    {
+        return;
+    }
+
     uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
     // --- Trigger check ---
