@@ -89,7 +89,8 @@ static bool           rfid_scanning    = false;
 static bool           mqtt_initialized = false;
 
 // Dual-button cache purge gesture state
-static struct {
+static struct
+{
     bool     active;           // Both buttons currently held
     uint32_t combo_start_time; // Tick time (ms) when combo was first detected
     uint8_t  leds_lit;         // Countdown LEDs currently on (0–3)
@@ -665,6 +666,8 @@ static void process_buttons(void)
         {
             if (!combo_state.active)
             {
+                ESP_LOGI(TAG, "Initializing combo guesture");
+
                 // Rising edge of combo — initialise
                 if (rfid_scanning)
                 {
@@ -672,10 +675,10 @@ static void process_buttons(void)
                     rfid_reader_power_off();
                     rfid_scanning = false;
                 }
-                combo_gesture_active       = true;
-                combo_state.active         = true;
+                combo_gesture_active         = true;
+                combo_state.active           = true;
                 combo_state.combo_start_time = current_time;
-                combo_state.leds_lit       = 0;
+                combo_state.leds_lit         = 0;
                 gpio_set_level(LED1_PIN, 0);
                 gpio_set_level(LED2_PIN, 0);
                 gpio_set_level(ACTIVITY_LED, 0);
@@ -687,21 +690,33 @@ static void process_buttons(void)
 
             if (elapsed >= 2500 && combo_state.leds_lit < 1)
             {
+                ESP_LOGI(TAG, "Combo guesture 1/4");
                 gpio_set_level(LED1_PIN, 1);
+                vTaskDelay(pdMS_TO_TICKS(200));
                 combo_state.leds_lit = 1;
             }
-            if (elapsed >= 5000 && combo_state.leds_lit < 2)
+            else if (elapsed >= 5000 && combo_state.leds_lit < 2)
             {
+                ESP_LOGI(TAG, "Combo guesture 2/4");
                 gpio_set_level(LED2_PIN, 1);
+                vTaskDelay(pdMS_TO_TICKS(200));
                 combo_state.leds_lit = 2;
             }
-            if (elapsed >= 7500 && combo_state.leds_lit < 3)
+            else if (elapsed >= 7500 && combo_state.leds_lit < 3)
             {
-                gpio_set_level(ACTIVITY_LED, 1);
+                ESP_LOGI(TAG, "Combo guesture 3/4");
+                gpio_set_level(SCANNING_LED, 1);
+                vTaskDelay(pdMS_TO_TICKS(200));
                 combo_state.leds_lit = 3;
             }
-
-            if (elapsed >= 10000)
+            else if (elapsed >= 10000 && combo_state.leds_lit < 4)
+            {
+                ESP_LOGI(TAG, "Combo guesture 4/4");
+                gpio_set_level(ACTIVITY_LED, 1);
+                vTaskDelay(pdMS_TO_TICKS(200));
+                combo_state.leds_lit = 4;
+            }
+            else if (elapsed >= 11000)
             {
                 esp_err_t ret = offline_logger_clear_all();
                 if (ret == ESP_OK)
@@ -759,6 +774,8 @@ static void process_buttons(void)
                     gpio_set_level(SCANNING_LED, 0);
                 }
             }
+
+            return;
         }
         else
         {
@@ -772,6 +789,8 @@ static void process_buttons(void)
                 gpio_set_level(LED2_PIN, 0);
                 gpio_set_level(ACTIVITY_LED, 0);
                 gpio_set_level(SCANNING_LED, 0);
+
+                return;
             }
         }
     }
@@ -1199,6 +1218,12 @@ static void main_task(void *arg)
 
         process_buttons();
         process_ir_sensor();
+
+        if (combo_state.active)
+        {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            continue;
+        }
 
         bool wifi_connected = wifi_manager_is_connected();
         bool mqtt_connected = mqtt_initialized && mqtt_client_is_connected();
