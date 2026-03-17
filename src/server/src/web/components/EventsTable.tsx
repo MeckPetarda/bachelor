@@ -89,6 +89,9 @@ export const EventsTable: Component<Props> = (props) => {
                     <Show when={event.source === 'offline_sync'}>
                       <span class="badge badge-warning">Offline</span>
                     </Show>
+                    <Show when={event.source === 'realtime'}>
+                      <span class="badge badge-success">Live</span>
+                    </Show>
                   </td>
                 </tr>
               )}

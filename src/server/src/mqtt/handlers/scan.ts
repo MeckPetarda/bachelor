@@ -1,10 +1,10 @@
 import { getDatabase, schema } from "../../database/client";
-import { createLogger } from "../../utils/logger";
+import { createLogger, LogLevel } from "../../utils/logger";
 import { eq } from "drizzle-orm";
 import { extractMacAddress } from "../topics";
 import { broadcastScan } from "../../api/websocket";
 
-const logger = createLogger("Scan Handler");
+const logger = createLogger("Scan Handler", LogLevel.DEBUG);
 
 /**
  * Scan message payload structure from lighthouse
@@ -19,7 +19,7 @@ export interface ScanPayload {
   detectionConfidence?: number;
   timestampMs: number;
   timestamp?: string; // ISO 8601 format
-  backfill?: boolean; // Indicates if this scan was synced from offline storage
+  offline?: boolean; // Indicates if this scan was synced from offline storage
 }
 
 /**
@@ -102,6 +102,8 @@ export async function handleScanMessage(
     return;
   }
 
+  logger.debug("scanData", scanData)
+
   // Validate payload
   if (!validatePayload(scanData)) {
     logger.warn(`Invalid scan payload from ${macAddress}:`, scanData);
@@ -114,7 +116,7 @@ export async function handleScanMessage(
     // Look up lighthouse by deviceId (MAC address)
     const db = getDatabase();
     const lighthouses = await db
-      .select({ id: schema.lighthouses.id })
+      .select({ id: schema.lighthouses.id, name: schema.lighthouses.name })
       .from(schema.lighthouses)
       .where(eq(schema.lighthouses.deviceId, macAddress))
       .limit(1);
@@ -126,6 +128,7 @@ export async function handleScanMessage(
     }
 
     const lighthouseId = lighthouses[0].id;
+    const lighthouseName = lighthouses[0].name;
 
     // Determine timestamp - prefer ISO string if provided, fall back to timestampMs
     let scanTimestamp: Date;
@@ -136,7 +139,7 @@ export async function handleScanMessage(
     }
 
     // Determine source based on backfill flag
-    const source = scanData.backfill === true ? 'offline_sync' : 'realtime';
+    const source = scanData.offline === true ? 'offline_sync' : 'realtime';
 
     // Insert into raw_scans table
     const insertResult = await db
@@ -175,7 +178,7 @@ export async function handleScanMessage(
       source,
     };
     setImmediate(() => {
-      broadcastScan(eventData);
+      broadcastScan(eventData, lighthouseName);
     });
 
     // Legacy event emitter support
