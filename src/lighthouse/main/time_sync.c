@@ -45,7 +45,7 @@ static const char *TAG = "TIME_SYNC";
 // MODULE STATE
 // ============================================================================
 
-static time_quality_t    s_quality        = TIME_QUALITY_NONE;
+static time_quality_t     s_quality          = TIME_QUALITY_NONE;
 static EventGroupHandle_t s_sync_event_group = NULL;
 
 // ============================================================================
@@ -96,9 +96,9 @@ static bool nvs_load_time(int64_t *out_unix_s, int64_t *out_uptime_ms)
     if (nvs_get_i64(handle, NVS_KEY_LAST_UNIX_S, &unix_s) == ESP_OK &&
         nvs_get_i64(handle, NVS_KEY_LAST_UPTIME_MS, &uptime_ms) == ESP_OK)
     {
-        *out_unix_s     = unix_s;
-        *out_uptime_ms  = uptime_ms;
-        found_both      = true;
+        *out_unix_s    = unix_s;
+        *out_uptime_ms = uptime_ms;
+        found_both     = true;
     }
 
     nvs_close(handle);
@@ -136,7 +136,7 @@ static void sntp_sync_notification_cb(struct timeval *tv)
     }
 
     // Log the synced time in human-readable form
-    time_t    t   = (time_t)unix_s;
+    time_t     t  = (time_t)unix_s;
     struct tm *tm = localtime(&t);
     char       buf[32];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", tm);
@@ -214,8 +214,9 @@ esp_err_t time_sync_init(const char *ntp_server_ip)
 
     ESP_LOGI(TAG, "SNTP client started (server=%s, mode=POLL)", ntp_server_ip);
     ESP_LOGI(TAG, "Initial time quality: %s",
-             s_quality == TIME_QUALITY_SYNCED    ? "SYNCED"    :
-             s_quality == TIME_QUALITY_ESTIMATED ? "ESTIMATED" : "NONE");
+             s_quality == TIME_QUALITY_SYNCED      ? "SYNCED"
+             : s_quality == TIME_QUALITY_ESTIMATED ? "ESTIMATED"
+                                                   : "NONE");
 
     return ESP_OK;
 }
@@ -245,12 +246,11 @@ void time_sync_wait_for_sync(uint32_t timeout_ms)
 
     ESP_LOGI(TAG, "Waiting up to %lu ms for SNTP sync...", timeout_ms);
 
-    TickType_t timeout_ticks = (timeout_ms == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
-    EventBits_t bits = xEventGroupWaitBits(s_sync_event_group,
-                                           SYNC_DONE_BIT,
-                                           pdFALSE, // Don't clear on exit
-                                           pdFALSE, // Wait for any bit
-                                           timeout_ticks);
+    TickType_t  timeout_ticks = (timeout_ms == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
+    EventBits_t bits          = xEventGroupWaitBits(s_sync_event_group, SYNC_DONE_BIT,
+                                                    pdFALSE, // Don't clear on exit
+                                                    pdFALSE, // Wait for any bit
+                                                    timeout_ticks);
 
     if (bits & SYNC_DONE_BIT)
     {

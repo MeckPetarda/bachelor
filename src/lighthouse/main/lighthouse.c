@@ -629,8 +629,9 @@ esp_err_t init_time_sync(const char *broker_ip)
 
     time_quality_t quality = time_sync_get_quality();
     ESP_LOGI(TAG, "Time sync complete. Quality: %s",
-             quality == TIME_QUALITY_SYNCED    ? "SYNCED"    :
-             quality == TIME_QUALITY_ESTIMATED ? "ESTIMATED" : "NONE");
+             quality == TIME_QUALITY_SYNCED      ? "SYNCED"
+             : quality == TIME_QUALITY_ESTIMATED ? "ESTIMATED"
+                                                 : "NONE");
 
     return ESP_OK;
 }

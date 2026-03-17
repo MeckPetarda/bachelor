@@ -7,7 +7,6 @@
  */
 
 #include "offline_event_logger.h"
-#include "time_sync.h"
 #include "esp_crc.h"
 #include "esp_littlefs.h"
 #include "esp_log.h"
@@ -18,6 +17,7 @@
 #include "freertos/task.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "time_sync.h"
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -99,7 +99,7 @@ static void rfid_event_to_offline_event(const rfid_tag_event_t *rfid_event, offl
     if (quality == TIME_QUALITY_SYNCED)
     {
         // Wall-clock time is available: store Unix seconds
-        int64_t ts_ms = time_sync_get_timestamp_ms();
+        int64_t ts_ms                  = time_sync_get_timestamp_ms();
         offline_event->rtc_timestamp_s = (uint32_t)(ts_ms / 1000);
     }
     else
@@ -393,7 +393,7 @@ static void replay_task(void *arg)
                     // Call replay callback with stored time metadata
                     if (logger_state.replay_callback)
                     {
-                        uint64_t       replay_time   = esp_timer_get_time() / 1000;
+                        uint64_t       replay_time    = esp_timer_get_time() / 1000;
                         time_quality_t stored_quality = (time_quality_t)offline_event.reserved[0];
                         ret = logger_state.replay_callback(&rfid_event, offline_event.timestamp_ms, replay_time,
                                                            offline_event.rtc_timestamp_s, stored_quality);
@@ -525,8 +525,8 @@ esp_err_t offline_logger_init(void)
         {
             rtc_write_index = nvs_write;
             rtc_read_index  = nvs_read;
-            ESP_LOGI(TAG, "Pointers restored from NVS after power loss: write=%lu, read=%lu",
-                     rtc_write_index, rtc_read_index);
+            ESP_LOGI(TAG, "Pointers restored from NVS after power loss: write=%lu, read=%lu", rtc_write_index,
+                     rtc_read_index);
         }
         else
         {
@@ -539,8 +539,7 @@ esp_err_t offline_logger_init(void)
     }
     else
     {
-        ESP_LOGI(TAG, "RTC pointers restored from deep sleep: write=%lu, read=%lu",
-                 rtc_write_index, rtc_read_index);
+        ESP_LOGI(TAG, "RTC pointers restored from deep sleep: write=%lu, read=%lu", rtc_write_index, rtc_read_index);
     }
 
     // Create storage mutex

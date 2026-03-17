@@ -13,7 +13,6 @@
 
 #include "my_mqtt_client.h"
 #include "battery_monitor.h"
-#include "time_sync.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -25,6 +24,7 @@
 #include "rfid_reader.h"
 #include "sdkconfig.h"
 #include "settings_storage.h"
+#include "time_sync.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
@@ -141,11 +141,10 @@ static void init_device_mac(void)
  * @return ESP_OK if published successfully
  */
 static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t offline_timestamp,
-                                      uint64_t replay_timestamp, uint32_t rtc_timestamp_s,
-                                      time_quality_t time_quality)
+                                      uint64_t replay_timestamp, uint32_t rtc_timestamp_s, time_quality_t time_quality)
 {
-    ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms, rtc_s=%lu, quality=%d)",
-             event->epc[0], event->epc[1], offline_timestamp, rtc_timestamp_s, (int)time_quality);
+    ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms, rtc_s=%lu, quality=%d)", event->epc[0],
+             event->epc[1], offline_timestamp, rtc_timestamp_s, (int)time_quality);
 
     if (s_mqtt_client == NULL || !mqtt_client_is_connected())
     {
@@ -177,18 +176,18 @@ static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t of
     char payload[512];
     int  len = snprintf(payload, sizeof(payload),
                         "{"
-                        "\"epc\":\"%s\","
-                        "\"timestampMs\":%lld,"
-                        "\"rssiDbm\":%d,"
-                        "\"antennaId\":%u,"
-                        "\"frequency\":%u,"
-                        "\"deviceId\":\"%s\","
-                        "\"offline\":true,"
-                        "\"replayTime\":%llu,"
-                        "\"timeBasis\":\"%s\""
-                        "}",
-                        epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency,
-                        s_device_mac, replay_time_ms, time_basis);
+                         "\"epc\":\"%s\","
+                         "\"timestampMs\":%lld,"
+                         "\"rssiDbm\":%d,"
+                         "\"antennaId\":%u,"
+                         "\"frequency\":%u,"
+                         "\"deviceId\":\"%s\","
+                         "\"offline\":true,"
+                         "\"replayTime\":%llu,"
+                         "\"timeBasis\":\"%s\""
+                         "}",
+                        epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac,
+                        replay_time_ms, time_basis);
 
     if (len >= (int)sizeof(payload))
     {
@@ -196,8 +195,7 @@ static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t of
     }
 
     const char *scans_topic = mqtt_client_get_topic("scans");
-    int         msg_id      = esp_mqtt_client_publish(s_mqtt_client, scans_topic, payload, 0,
-                                                      MQTT_QOS_TAG_EVENTS, 0);
+    int         msg_id      = esp_mqtt_client_publish(s_mqtt_client, scans_topic, payload, 0, MQTT_QOS_TAG_EVENTS, 0);
     if (msg_id < 0)
     {
         ESP_LOGE(TAG, "Failed to publish offline replay event");
@@ -205,8 +203,8 @@ static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t of
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "Replayed offline event: %s timeBasis=%s ts=%lld (msg_id=%d)",
-             epc_hex, time_basis, timestamp_ms, msg_id);
+    ESP_LOGI(TAG, "Replayed offline event: %s timeBasis=%s ts=%lld (msg_id=%d)", epc_hex, time_basis, timestamp_ms,
+             msg_id);
     return ESP_OK;
 }
 
@@ -428,6 +426,7 @@ esp_err_t mqtt_client_init(void)
     snprintf(lwt_topic, sizeof(lwt_topic), "%s%s/status", MQTT_TOPIC_BASE, s_device_mac);
 
     esp_mqtt_client_config_t mqtt_cfg = {
+
         // Broker configuration (from NVS)
         .broker.address.uri = broker_uri,
 
@@ -438,7 +437,7 @@ esp_err_t mqtt_client_init(void)
 
         // Session configuration
         .session.protocol_ver = MQTT_PROTOCOL_V_3_1_1,
-        .session.keepalive    = 60, // Keep-alive interval (seconds)
+        .session.keepalive    = 15, // Keep-alive interval (seconds)
 
         // Last Will & Testament - published when device disconnects unexpectedly
         .session.last_will =
@@ -453,6 +452,8 @@ esp_err_t mqtt_client_init(void)
         // Network configuration
         .network.reconnect_timeout_ms        = 4000, // Wait 4s before retry
         .network.refresh_connection_after_ms = 0,    // 0 = disabled
+        .network.timeout_ms                  = 5000
+
     };
 
     ESP_LOGI(TAG, "  ✓ MQTT configuration created");
@@ -599,18 +600,18 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
         uint64_t replay_time = (uint64_t)(esp_timer_get_time() / 1000);
         len                  = snprintf(payload, sizeof(payload),
                                         "{"
-                                        "\"epc\":\"%s\","
-                                        "\"timestampMs\":%lld,"
-                                        "\"rssiDbm\":%d,"
-                                        "\"antennaId\":%u,"
-                                        "\"frequency\":%u,"
-                                        "\"deviceId\":\"%s\","
-                                        "\"offline\":true,"
-                                        "\"replayTime\":%llu,"
-                                        "\"timeBasis\":\"%s\""
-                                        "}",
-                                        epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency,
-                                        s_device_mac, replay_time, time_basis);
+                                                         "\"epc\":\"%s\","
+                                                         "\"timestampMs\":%lld,"
+                                                         "\"rssiDbm\":%d,"
+                                                         "\"antennaId\":%u,"
+                                                         "\"frequency\":%u,"
+                                                         "\"deviceId\":\"%s\","
+                                                         "\"offline\":true,"
+                                                         "\"replayTime\":%llu,"
+                                                         "\"timeBasis\":\"%s\""
+                                                         "}",
+                                        epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac, replay_time,
+                                        time_basis);
     }
     else
     {
@@ -626,8 +627,7 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
                        "\"offline\":false,"
                        "\"timeBasis\":\"%s\""
                        "}",
-                       epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac,
-                       time_basis);
+                       epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac, time_basis);
     }
 
     if (len >= sizeof(payload))
@@ -640,18 +640,24 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
     // ========================================================================
 
     const char *scans_topic = mqtt_client_get_topic("scans");
-    int         msg_id      = esp_mqtt_client_publish(s_mqtt_client, scans_topic, payload,
+    int         msg_id      = esp_mqtt_client_enqueue(s_mqtt_client, scans_topic, payload,
                                                       0,                   // Use default length
                                                       MQTT_QOS_TAG_EVENTS, // QoS 2
-                                                      0);                  // Don't retain
+                                                      0,                   // Don't retain
+                                                      true);               // Store in outbox
 
-    if (msg_id < 0)
+    if (msg_id == -2)
     {
-        ESP_LOGE(TAG, "Failed to publish tag event");
+        ESP_LOGW(TAG, "MQTT outbox full - cannot enqueue tag event");
         s_stats.publish_errors++;
         return ESP_FAIL;
     }
-
+    else if (msg_id < 0)
+    {
+        ESP_LOGE(TAG, "Failed to enqueue tag event");
+        s_stats.publish_errors++;
+        return ESP_FAIL;
+    }
     ESP_LOGI(TAG, "Published tag event: %s (msg_id=%d)", epc_hex, msg_id);
 
     return ESP_OK;
