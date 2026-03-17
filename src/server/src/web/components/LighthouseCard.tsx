@@ -69,6 +69,14 @@ export const LighthouseCard: Component<Props> = (props) => {
                   Unresponsive
                 </span>
               </Show>
+              <Show when={health()!.rfidIsResponsive}>
+                <span
+                  class="badge badge-success"
+                  style={{ "margin-left": "0.5rem" }}
+                >
+                  Responsive
+                </span>
+              </Show>
             </span>
           </div>
         </div>
@@ -83,11 +91,11 @@ export const LighthouseCard: Component<Props> = (props) => {
 
 function placementBadgeClass(placement: string): string {
   switch (placement) {
-    case 'INSIDE':
-      return 'badge-success';
-    case 'OUTSIDE':
-      return 'badge-warning';
+    case "INSIDE":
+      return "badge-success";
+    case "OUTSIDE":
+      return "badge-warning";
     default:
-      return 'badge-neutral';
+      return "badge-neutral";
   }
 }

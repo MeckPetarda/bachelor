@@ -649,8 +649,6 @@ esp_err_t rfid_reader_power_off(void)
     // Update state machine
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
     rfid_state.state                     = RFID_STATE_POWERED_OFF;
-    rfid_state.health.power_rail_present = false;
-    rfid_state.health.is_responsive      = false;
     xSemaphoreGive(rfid_state.mutex);
 
     ESP_LOGI(TAG, "✓ Reader powered OFF (sleep mode <100µA)");
