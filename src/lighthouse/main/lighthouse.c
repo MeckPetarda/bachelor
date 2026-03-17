@@ -56,7 +56,8 @@ static const char *TAG = "MAIN";
 // STATE TRACKING
 // ============================================================================
 
-static bool mqtt_initialized = false;
+static bool     mqtt_initialized        = false;
+static uint32_t s_activity_led_off_time = 0; // Timestamp (ms) to turn off activity LED
 
 // ============================================================================
 // MQTT CONFIGURATION CALLBACK
@@ -377,8 +378,10 @@ static void on_mqtt_config_message(const char *topic, const char *payload)
  */
 static void on_tag_detected(const rfid_tag_event_t *event)
 {
-    // Flash activity LED via io_controller
-    io_flash_activity_led();
+    // Turn on activity LED — LED-off is handled by the main loop
+    // Do NOT call vTaskDelay here — this callback runs in the UART RX task
+    io_activity_led_on();
+    s_activity_led_off_time = xTaskGetTickCount() * portTICK_PERIOD_MS + 50;
 
     // Convert RSSI to dBm (per R300 protocol: value 31-98 = -99 to -31 dBm)
     int rssi_dbm = event->rssi - 129;
@@ -404,32 +407,32 @@ static void on_tag_detected(const rfid_tag_event_t *event)
     ESP_LOGI(TAG, "  Time: %lu ms", event->timestamp_ms);
     ESP_LOGI(TAG, "══════════════════════════════════\n");
 
-    // Publish tag event to MQTT broker (if connected)
+    // Always store to offline cache first (non-blocking queue write)
+    esp_err_t store_ret = offline_logger_store_event(event);
+    if (store_ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "  ✗ Failed to store event offline");
+    }
+
+    // Additionally enqueue to MQTT if connected (non-blocking via enqueue)
     if (mqtt_initialized && mqtt_client_is_connected())
     {
         esp_err_t ret = mqtt_client_publish_tag_event(event, false);
         if (ret == ESP_OK)
         {
-            ESP_LOGI(TAG, "  ✓ Tag event published to MQTT broker");
+            ESP_LOGI(TAG, "  ✓ Tag event enqueued to MQTT (cached offline: %s)",
+                     store_ret == ESP_OK ? "yes" : "no");
         }
         else
         {
-            ESP_LOGW(TAG, "  ✗ Failed to publish tag event to MQTT");
+            ESP_LOGW(TAG, "  ✗ Failed to enqueue tag event to MQTT (cached offline: %s)",
+                     store_ret == ESP_OK ? "yes" : "no");
         }
     }
     else
     {
-        ESP_LOGW(TAG, "  ⚠ MQTT not connected - storing event offline");
-        // Store in offline logger for later transmission
-        esp_err_t ret = offline_logger_store_event(event);
-        if (ret == ESP_OK)
-        {
-            ESP_LOGI(TAG, "  ✓ Tag event stored offline (%lu pending)", offline_logger_get_pending_count());
-        }
-        else
-        {
-            ESP_LOGE(TAG, "  ✗ Failed to store event offline");
-        }
+        ESP_LOGW(TAG, "  ⚠ MQTT not connected - event cached offline (%lu pending)",
+                 offline_logger_get_pending_count());
     }
 }
 
@@ -527,6 +530,17 @@ static void main_task(void *arg)
 
         io_process_buttons();
         io_process_ir_sensor();
+
+        // Turn off activity LED after tag flash duration
+        if (s_activity_led_off_time != 0)
+        {
+            uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
+            if (now >= s_activity_led_off_time)
+            {
+                io_activity_led_off();
+                s_activity_led_off_time = 0;
+            }
+        }
 
         if (io_is_combo_active())
         {

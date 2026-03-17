@@ -819,6 +819,16 @@ void io_flash_activity_led(void)
     gpio_set_level(ACTIVITY_LED, 0);
 }
 
+void io_activity_led_on(void)
+{
+    gpio_set_level(ACTIVITY_LED, 1);
+}
+
+void io_activity_led_off(void)
+{
+    gpio_set_level(ACTIVITY_LED, 0);
+}
+
 // ============================================================================
 // STATE GETTERS / SETTERS
 // ============================================================================

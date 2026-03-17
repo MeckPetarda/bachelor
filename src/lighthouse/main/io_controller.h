@@ -46,6 +46,17 @@ void io_start_battery_led_task(void);
  */
 void io_flash_activity_led(void);
 
+/**
+ * Turn the activity LED on immediately. Non-blocking.
+ * Pair with io_activity_led_off() to complete the flash.
+ */
+void io_activity_led_on(void);
+
+/**
+ * Turn the activity LED off immediately. Non-blocking.
+ */
+void io_activity_led_off(void);
+
 // =========================================================================
 // State Getters / Setters
 // =========================================================================
