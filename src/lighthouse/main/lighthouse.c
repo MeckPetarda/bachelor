@@ -420,8 +420,7 @@ static void on_tag_detected(const rfid_tag_event_t *event)
         esp_err_t ret = mqtt_client_publish_tag_event(event, false);
         if (ret == ESP_OK)
         {
-            ESP_LOGI(TAG, "  ✓ Tag event enqueued to MQTT (cached offline: %s)",
-                     store_ret == ESP_OK ? "yes" : "no");
+            ESP_LOGI(TAG, "  ✓ Tag event enqueued to MQTT (cached offline: %s)", store_ret == ESP_OK ? "yes" : "no");
         }
         else
         {

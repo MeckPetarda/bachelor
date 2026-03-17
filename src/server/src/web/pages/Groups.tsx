@@ -1,19 +1,21 @@
-import { type Component, For, Show, createSignal, onMount } from 'solid-js';
-import { GroupCard } from '../components/GroupCard';
-import { GroupModal } from '../components/GroupModal';
+import { type Component, For, Show, createSignal, onMount } from "solid-js";
+import { GroupCard } from "../components/GroupCard";
+import { GroupModal } from "../components/GroupModal";
 import {
   groupsState,
   fetchAll,
   createGroup,
   updateGroup,
   removeGroup,
-} from '../stores/groups';
-import type { Group } from '../types';
-import styles from './Groups.module.css';
+} from "../stores/groups";
+import type { Group } from "../types";
+import styles from "./Groups.module.css";
 
 export const Groups: Component = () => {
   const [showModal, setShowModal] = createSignal(false);
-  const [editingGroup, setEditingGroup] = createSignal<Group | undefined>(undefined);
+  const [editingGroup, setEditingGroup] = createSignal<Group | undefined>(
+    undefined,
+  );
 
   onMount(() => {
     fetchAll();
@@ -34,7 +36,10 @@ export const Groups: Component = () => {
     setEditingGroup(undefined);
   };
 
-  const handleSubmit = async (data: { label: string; description?: string }) => {
+  const handleSubmit = async (data: {
+    label: string;
+    description?: string;
+  }) => {
     const group = editingGroup();
     if (group) {
       await updateGroup(group.id, data);
@@ -64,7 +69,8 @@ export const Groups: Component = () => {
           when={groupsState.groups.length > 0}
           fallback={
             <div class={styles.empty}>
-              No groups yet. Create a group to pair lighthouses for direction detection.
+              No groups yet. Create a group to pair lighthouses for direction
+              detection.
             </div>
           }
         >

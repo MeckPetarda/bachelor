@@ -4,12 +4,7 @@ import { getDatabase, schema, isHealthy } from "../database/client";
 import { getMqttBrokerStats } from "../mqtt/broker";
 import { getConfig } from "../config";
 import { createLogger } from "../utils/logger";
-import {
-  requestLogger,
-  errorHandler,
-  jwtAuth,
-  createJWT,
-} from "./middleware";
+import { requestLogger, errorHandler, jwtAuth, createJWT } from "./middleware";
 import {
   getPendingDeviceStates,
   getLighthouseState,
@@ -63,10 +58,7 @@ app.post("/api/v1/auth/login", async (c) => {
   const body = await c.req.json<{ username: string; password: string }>();
 
   if (!body.username || !body.password) {
-    return c.json(
-      { error: "Missing username or password", status: 400 },
-      400
-    );
+    return c.json({ error: "Missing username or password", status: 400 }, 400);
   }
 
   const db = getDatabase();
@@ -100,7 +92,9 @@ app.post("/api/v1/auth/login", async (c) => {
   // Verify password using Bun's native password hashing
   const isValid = await Bun.password.verify(body.password, user.passwordHash);
   if (!isValid) {
-    logger.warn(`Login attempt failed: invalid password for '${body.username}'`);
+    logger.warn(
+      `Login attempt failed: invalid password for '${body.username}'`,
+    );
     return c.json({ error: "Invalid credentials", status: 401 }, 401);
   }
 
@@ -112,7 +106,7 @@ app.post("/api/v1/auth/login", async (c) => {
       role: user.role,
     },
     config.jwt.secret,
-    config.jwt.expiresIn
+    config.jwt.expiresIn,
   );
 
   // Update last login timestamp
@@ -176,7 +170,7 @@ protectedRoutes.post("/lighthouses", async (c) => {
   if (!body.id || !body.name || !body.deviceId) {
     return c.json(
       { error: "Missing required fields: id, name, deviceId", status: 400 },
-      400
+      400,
     );
   }
 
@@ -192,7 +186,7 @@ protectedRoutes.post("/lighthouses", async (c) => {
   if (existing.length > 0) {
     return c.json(
       { error: "Lighthouse with this ID already exists", status: 409 },
-      409
+      409,
     );
   }
 
@@ -205,7 +199,7 @@ protectedRoutes.post("/lighthouses", async (c) => {
   if (existingByDevice.length > 0) {
     return c.json(
       { error: "Lighthouse with this device ID already exists", status: 409 },
-      409
+      409,
     );
   }
 
@@ -308,10 +302,12 @@ protectedRoutes.patch("/lighthouses/:id", async (c) => {
     const memberCount = await db
       .select({ count: count() })
       .from(schema.lighthouses)
-      .where(and(
-        eq(schema.lighthouses.groupId, body.groupId),
-        sql`${schema.lighthouses.id} != ${id}`
-      ));
+      .where(
+        and(
+          eq(schema.lighthouses.groupId, body.groupId),
+          sql`${schema.lighthouses.id} != ${id}`,
+        ),
+      );
 
     if (memberCount[0] && memberCount[0].count >= 2) {
       return c.json({ error: "Group already has 2 members", status: 400 }, 400);
@@ -326,7 +322,8 @@ protectedRoutes.patch("/lighthouses/:id", async (c) => {
   if (body.name !== undefined) updateData.name = body.name;
   if (body.placement !== undefined) updateData.placement = body.placement;
   if (body.comment !== undefined) updateData.comment = body.comment;
-  if (body.firmwareVersion !== undefined) updateData.firmwareVersion = body.firmwareVersion;
+  if (body.firmwareVersion !== undefined)
+    updateData.firmwareVersion = body.firmwareVersion;
   if (body.isActive !== undefined) updateData.isActive = body.isActive;
   if (body.config !== undefined) updateData.config = body.config;
   if (body.groupId !== undefined) updateData.groupId = body.groupId;
@@ -359,13 +356,15 @@ app.get("/api/v1/devices/pending", async (c) => {
     isConnected: state.isConnected,
     firstSeenAt: state.firstSeenAt.toISOString(),
     lastHealthAt: state.lastHealthAt?.toISOString() ?? null,
-    health: state.latestHealth ? {
-      uptimeSec: state.latestHealth.uptimeSec,
-      freeHeapBytes: state.latestHealth.freeHeapBytes,
-      wifiRssiDbm: state.latestHealth.wifiRssiDbm,
-      rfidState: state.latestHealth.rfid.state,
-      rfidIsResponsive: state.latestHealth.rfid.isResponsive,
-    } : null,
+    health: state.latestHealth
+      ? {
+          uptimeSec: state.latestHealth.uptimeSec,
+          freeHeapBytes: state.latestHealth.freeHeapBytes,
+          wifiRssiDbm: state.latestHealth.wifiRssiDbm,
+          rfidState: state.latestHealth.rfid.state,
+          rfidIsResponsive: state.latestHealth.rfid.isResponsive,
+        }
+      : null,
   }));
 
   return c.json({
@@ -383,7 +382,10 @@ app.post("/api/v1/devices/pending/:deviceId/claim", async (c) => {
 
   // Check if device is in pending state
   if (!isPendingDevice(deviceId)) {
-    return c.json({ error: "Device not found in pending devices", status: 404 }, 404);
+    return c.json(
+      { error: "Device not found in pending devices", status: 404 },
+      404,
+    );
   }
 
   const body = await c.req.json<{
@@ -398,8 +400,14 @@ app.post("/api/v1/devices/pending/:deviceId/claim", async (c) => {
     return c.json({ error: "Missing required field: name", status: 400 }, 400);
   }
 
-  if (!body.placement || !["STANDALONE", "INSIDE", "OUTSIDE"].includes(body.placement)) {
-    return c.json({ error: "Missing or invalid required field: placement", status: 400 }, 400);
+  if (
+    !body.placement ||
+    !["STANDALONE", "INSIDE", "OUTSIDE"].includes(body.placement)
+  ) {
+    return c.json(
+      { error: "Missing or invalid required field: placement", status: 400 },
+      400,
+    );
   }
 
   const db = getDatabase();
@@ -412,7 +420,10 @@ app.post("/api/v1/devices/pending/:deviceId/claim", async (c) => {
     .limit(1);
 
   if (existingByName.length > 0) {
-    return c.json({ error: "A lighthouse with this name already exists", status: 400 }, 400);
+    return c.json(
+      { error: "A lighthouse with this name already exists", status: 400 },
+      400,
+    );
   }
 
   // Check if device ID already exists in database
@@ -470,7 +481,7 @@ app.post("/api/v1/devices/pending/:deviceId/claim", async (c) => {
 
   logger.info(`Device ${deviceId} claimed as lighthouse '${body.name}'`);
 
-  return c.json({ data: result[0] }, 201);
+  return c.json(result[0], 201);
 });
 
 /**
@@ -528,7 +539,11 @@ app.post("/api/v1/groups", async (c) => {
     description?: string;
   }>();
 
-  if (!body.label || typeof body.label !== "string" || body.label.trim() === "") {
+  if (
+    !body.label ||
+    typeof body.label !== "string" ||
+    body.label.trim() === ""
+  ) {
     return c.json({ error: "Missing required field: label", status: 400 }, 400);
   }
 
@@ -552,8 +567,8 @@ app.post("/api/v1/groups", async (c) => {
 
   logger.info(`Group '${body.label}' created`);
 
-  return c.json({
-    data: {
+  return c.json(
+    {
       id: createdGroup.id,
       label: createdGroup.label,
       description: createdGroup.description,
@@ -561,7 +576,8 @@ app.post("/api/v1/groups", async (c) => {
       createdAt: createdGroup.createdAt.toISOString(),
       updatedAt: createdGroup.updatedAt.toISOString(),
     },
-  }, 201);
+    201,
+  );
 });
 
 /**
@@ -751,7 +767,10 @@ app.get("/api/v1/lighthouses/all", async (c) => {
 
   // Get all groups for mapping
   const groups = await db
-    .select({ id: schema.lighthouseGroups.id, label: schema.lighthouseGroups.label })
+    .select({
+      id: schema.lighthouseGroups.id,
+      label: schema.lighthouseGroups.label,
+    })
     .from(schema.lighthouseGroups);
 
   const groupMap = new Map(groups.map((g) => [g.id, g]));
@@ -771,17 +790,21 @@ app.get("/api/v1/lighthouses/all", async (c) => {
       isActive: lh.isActive,
       createdAt: lh.createdAt.toISOString(),
       group: group ? { id: group.id, label: group.label } : null,
-      runtime: runtimeState ? {
-        isConnected: runtimeState.isConnected,
-        lastHealthAt: runtimeState.lastHealthAt?.toISOString() ?? null,
-        health: runtimeState.latestHealth ? {
-          uptimeSec: runtimeState.latestHealth.uptimeSec,
-          freeHeapBytes: runtimeState.latestHealth.freeHeapBytes,
-          wifiRssiDbm: runtimeState.latestHealth.wifiRssiDbm,
-          rfidState: runtimeState.latestHealth.rfid.state,
-          rfidIsResponsive: runtimeState.latestHealth.rfid.isResponsive,
-        } : null,
-      } : null,
+      runtime: runtimeState
+        ? {
+            isConnected: runtimeState.isConnected,
+            lastHealthAt: runtimeState.lastHealthAt?.toISOString() ?? null,
+            health: runtimeState.latestHealth
+              ? {
+                  uptimeSec: runtimeState.latestHealth.uptimeSec,
+                  freeHeapBytes: runtimeState.latestHealth.freeHeapBytes,
+                  wifiRssiDbm: runtimeState.latestHealth.wifiRssiDbm,
+                  rfidState: runtimeState.latestHealth.rfid.state,
+                  rfidIsResponsive: runtimeState.latestHealth.rfid.isResponsive,
+                }
+              : null,
+          }
+        : null,
     };
   });
 
@@ -841,10 +864,12 @@ app.patch("/api/v1/lighthouses/:id/update", async (c) => {
     const memberCount = await db
       .select({ count: count() })
       .from(schema.lighthouses)
-      .where(and(
-        eq(schema.lighthouses.groupId, body.groupId),
-        sql`${schema.lighthouses.id} != ${id}`
-      ));
+      .where(
+        and(
+          eq(schema.lighthouses.groupId, body.groupId),
+          sql`${schema.lighthouses.id} != ${id}`,
+        ),
+      );
 
     if (memberCount[0] && memberCount[0].count >= 2) {
       return c.json({ error: "Group already has 2 members", status: 400 }, 400);
@@ -859,7 +884,8 @@ app.patch("/api/v1/lighthouses/:id/update", async (c) => {
   if (body.name !== undefined) updateData.name = body.name;
   if (body.placement !== undefined) updateData.placement = body.placement;
   if (body.comment !== undefined) updateData.comment = body.comment;
-  if (body.firmwareVersion !== undefined) updateData.firmwareVersion = body.firmwareVersion;
+  if (body.firmwareVersion !== undefined)
+    updateData.firmwareVersion = body.firmwareVersion;
   if (body.isActive !== undefined) updateData.isActive = body.isActive;
   if (body.config !== undefined) updateData.config = body.config;
   if (body.groupId !== undefined) updateData.groupId = body.groupId;
@@ -922,7 +948,10 @@ app.get("/api/v1/scans", async (c) => {
     conditions.push(ilike(schema.rawScans.epc, `%${epcParam}%`));
   }
 
-  if (sourceParam && (sourceParam === "realtime" || sourceParam === "offline_sync")) {
+  if (
+    sourceParam &&
+    (sourceParam === "realtime" || sourceParam === "offline_sync")
+  ) {
     conditions.push(eq(schema.rawScans.source, sourceParam));
   }
 
@@ -961,7 +990,10 @@ app.get("/api/v1/scans", async (c) => {
       receivedAt: schema.rawScans.receivedAt,
     })
     .from(schema.rawScans)
-    .leftJoin(schema.lighthouses, eq(schema.rawScans.lighthouseId, schema.lighthouses.id))
+    .leftJoin(
+      schema.lighthouses,
+      eq(schema.rawScans.lighthouseId, schema.lighthouses.id),
+    )
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(schema.rawScans.timestamp))
     .limit(limit)

@@ -524,7 +524,7 @@ esp_err_t rfid_reader_init(void)
     {
 
         ESP_LOGI(TAG, "Correctly performed version handshake");
-        esp_err_t beeper_ret = rfid_reader_set_beeper_mode(R300_BEEPER_MODE_PER_TAG);
+        esp_err_t beeper_ret = rfid_reader_set_beeper_mode(R300_BEEPER_MODE_QUIET);
         if (beeper_ret != ESP_OK)
         {
             ESP_LOGW(TAG, "Failed to set beeper mode (non-fatal): %s", esp_err_to_name(beeper_ret));
@@ -648,7 +648,7 @@ esp_err_t rfid_reader_power_off(void)
 
     // Update state machine
     xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
-    rfid_state.state                     = RFID_STATE_POWERED_OFF;
+    rfid_state.state = RFID_STATE_POWERED_OFF;
     xSemaphoreGive(rfid_state.mutex);
 
     ESP_LOGI(TAG, "✓ Reader powered OFF (sleep mode <100µA)");

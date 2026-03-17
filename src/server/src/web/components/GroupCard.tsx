@@ -9,6 +9,9 @@ interface Props {
 }
 
 export const GroupCard: Component<Props> = (props) => {
+
+  console.log(props.group.members)
+
   return (
     <div class={styles.card}>
       <div class={styles.header}>
@@ -28,9 +31,9 @@ export const GroupCard: Component<Props> = (props) => {
       </Show>
 
       <div class={styles.members}>
-        <span class={styles.membersLabel}>Members ({props.group.members.length}/2):</span>
+        <span class={styles.membersLabel}>Members ({props.group.members?.length || 0}/2):</span>
         <Show
-          when={props.group.members.length > 0}
+          when={props.group.members !== undefined && props.group.members.length > 0}
           fallback={<span class={styles.noMembers}>No members assigned</span>}
         >
           <div class={styles.memberList}>
