@@ -20,6 +20,8 @@ export interface ScanPayload {
   timestampMs: number;
   timestamp?: string; // ISO 8601 format
   offline?: boolean; // Indicates if this scan was synced from offline storage
+  replayTime?: number; // Unix ms when the offline event was replayed
+  timeBasis?: "synced" | "estimated" | "relative"; // Time quality from firmware
 }
 
 /**
@@ -130,12 +132,24 @@ export async function handleScanMessage(
     const lighthouseId = lighthouses[0].id;
     const lighthouseName = lighthouses[0].name;
 
-    // Determine timestamp - prefer ISO string if provided, fall back to timestampMs
+    // Determine timestamp based on timeBasis field.
+    // - "synced": timestampMs is a real Unix timestamp → use it directly.
+    // - "estimated" / "relative": timestampMs is boot-relative → fall back to
+    //   server receipt time so the database never stores epoch-relative junk.
+    // - undefined (legacy firmware, no timeBasis field): treat as "synced" for
+    //   backward compatibility during the rollout period.
+    const basis = scanData.timeBasis ?? "synced";
     let scanTimestamp: Date;
-    if (scanData.timestamp) {
-      scanTimestamp = new Date(scanData.timestamp);
+    if (basis === "synced") {
+      // Prefer explicit ISO string when provided, otherwise use Unix ms value.
+      if (scanData.timestamp) {
+        scanTimestamp = new Date(scanData.timestamp);
+      } else {
+        scanTimestamp = new Date(Number(scanData.timestampMs));
+      }
     } else {
-      scanTimestamp = new Date(Number(scanData.timestampMs));
+      // Boot-relative timestamp — use server receipt time as the best estimate.
+      scanTimestamp = new Date();
     }
 
     // Determine source based on backfill flag
@@ -157,6 +171,7 @@ export async function handleScanMessage(
         timestamp: scanTimestamp,
         processed: false,
         source,
+        timeBasis: basis,
       })
       .returning({ id: schema.rawScans.id });
 

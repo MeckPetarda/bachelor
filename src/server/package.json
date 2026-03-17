@@ -12,7 +12,8 @@
     "test:mqtt": "bun test tests/mqtt-broker.test.ts",
     "test:api": "bun test tests/api-routes.test.ts",
     "test:retention": "bun test tests/retention-cleanup.test.ts",
-    "test:dashboard": "bun test tests/dashboard-api.test.ts"
+    "test:dashboard": "bun test tests/dashboard-api.test.ts",
+    "test:time-basis": "bun test tests/time-basis.test.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.5",

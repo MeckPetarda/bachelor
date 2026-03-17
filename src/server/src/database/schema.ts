@@ -22,6 +22,8 @@ export const userType = pgEnum('user_type', ["STANDALONE", "INSIDE", "OUTSIDE"])
 
 export const scanSource = pgEnum('scan_source', ['realtime', 'offline_sync'])
 
+export const timeBasis = pgEnum('time_basis', ['synced', 'estimated', 'relative'])
+
 export const lighthouseGroups = pgTable(
   'lighthouse_groups',
   {
@@ -76,6 +78,7 @@ export const rawScans = pgTable(
     receivedAt: timestamp({ withTimezone: true }).defaultNow(),
     processed: boolean().default(false),
     source: scanSource().notNull().default('realtime'),
+    timeBasis: timeBasis().notNull().default('synced'),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ([

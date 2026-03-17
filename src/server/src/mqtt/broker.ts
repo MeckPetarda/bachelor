@@ -113,8 +113,9 @@ export function startMqttBroker(): Aedes {
     logger.error("Server error:", error.message);
   });
 
-  // Start listening
-  server.listen(port, () => {
+  // Start listening on all IPv4 interfaces (avoid IPv6 binding failures
+  // in environments where IPv6 is not available).
+  server.listen(port, "0.0.0.0", () => {
     logger.info(`MQTT broker is listening on port ${port}`);
   });
 
