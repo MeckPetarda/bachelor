@@ -13,6 +13,7 @@
 
 #include "my_mqtt_client.h"
 #include "battery_monitor.h"
+#include "time_sync.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -26,6 +27,7 @@
 #include "settings_storage.h"
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 
 // ============================================================================
 // CONSTANTS & STATE
@@ -128,21 +130,84 @@ static void init_device_mac(void)
  * Offline event replay callback
  *
  * Called by the offline logger for each event during replay.
- * Publishes the event with offline=true flag.
+ * Uses the stored rtc_timestamp_s and time_quality to reconstruct
+ * the correct timeBasis and timestampMs for the MQTT payload.
  *
- * @param event RFID tag event to replay
- * @param offline_timestamp Original detection timestamp
- * @param replay_timestamp Current replay timestamp
+ * @param event            RFID tag event to replay
+ * @param offline_timestamp Boot-relative ms at original detection
+ * @param replay_timestamp  Current boot-relative ms
+ * @param rtc_timestamp_s   Unix seconds at detection time (0 if unknown)
+ * @param time_quality      Time quality at recording time
  * @return ESP_OK if published successfully
  */
 static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t offline_timestamp,
-                                      uint64_t replay_timestamp)
+                                      uint64_t replay_timestamp, uint32_t rtc_timestamp_s,
+                                      time_quality_t time_quality)
 {
-    ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms)", event->epc[0], event->epc[1],
-             offline_timestamp);
+    ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms, rtc_s=%lu, quality=%d)",
+             event->epc[0], event->epc[1], offline_timestamp, rtc_timestamp_s, (int)time_quality);
 
-    // Publish with offline flag set to true
-    return mqtt_client_publish_tag_event(event, true);
+    if (s_mqtt_client == NULL || !mqtt_client_is_connected())
+    {
+        return ESP_FAIL;
+    }
+
+    char epc_hex[65];
+    epc_to_hex_string(event->epc, event->epc_len, epc_hex);
+    int rssi_dbm = rssi_to_dbm(event->rssi);
+
+    // Determine timeBasis and timestampMs from stored quality
+    const char *time_basis;
+    int64_t     timestamp_ms;
+
+    if (time_quality == TIME_QUALITY_SYNCED && rtc_timestamp_s > 0)
+    {
+        timestamp_ms = (int64_t)rtc_timestamp_s * 1000;
+        time_basis   = "synced";
+    }
+    else
+    {
+        // Use boot-relative ms (the original detection offset)
+        timestamp_ms = (int64_t)offline_timestamp;
+        time_basis   = (time_quality == TIME_QUALITY_ESTIMATED) ? "estimated" : "relative";
+    }
+
+    uint64_t replay_time_ms = (uint64_t)(esp_timer_get_time() / 1000);
+
+    char payload[512];
+    int  len = snprintf(payload, sizeof(payload),
+                        "{"
+                        "\"epc\":\"%s\","
+                        "\"timestampMs\":%lld,"
+                        "\"rssiDbm\":%d,"
+                        "\"antennaId\":%u,"
+                        "\"frequency\":%u,"
+                        "\"deviceId\":\"%s\","
+                        "\"offline\":true,"
+                        "\"replayTime\":%llu,"
+                        "\"timeBasis\":\"%s\""
+                        "}",
+                        epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency,
+                        s_device_mac, replay_time_ms, time_basis);
+
+    if (len >= (int)sizeof(payload))
+    {
+        ESP_LOGW(TAG, "Offline replay payload truncated");
+    }
+
+    const char *scans_topic = mqtt_client_get_topic("scans");
+    int         msg_id      = esp_mqtt_client_publish(s_mqtt_client, scans_topic, payload, 0,
+                                                      MQTT_QOS_TAG_EVENTS, 0);
+    if (msg_id < 0)
+    {
+        ESP_LOGE(TAG, "Failed to publish offline replay event");
+        s_stats.publish_errors++;
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Replayed offline event: %s timeBasis=%s ts=%lld (msg_id=%d)",
+             epc_hex, time_basis, timestamp_ms, msg_id);
+    return ESP_OK;
 }
 
 // ============================================================================
@@ -504,6 +569,26 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
     // Convert RSSI to dBm
     int rssi_dbm = rssi_to_dbm(event->rssi);
 
+    // Determine timeBasis and timestampMs based on current time quality
+    time_quality_t quality    = time_sync_get_quality();
+    const char    *time_basis = "relative";
+    int64_t        timestamp_ms;
+
+    if (quality == TIME_QUALITY_SYNCED)
+    {
+        // Wall-clock time is authoritative: use real Unix milliseconds
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        timestamp_ms = (int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000;
+        time_basis   = "synced";
+    }
+    else
+    {
+        // No authoritative time: use boot-relative milliseconds
+        timestamp_ms = (int64_t)(esp_timer_get_time() / 1000);
+        time_basis   = (quality == TIME_QUALITY_ESTIMATED) ? "estimated" : "relative";
+    }
+
     // Build JSON payload
     char payload[512];
     int  len;
@@ -511,20 +596,21 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
     if (offline)
     {
         // Include offline flag and replay timestamp
-        uint64_t replay_time = esp_timer_get_time() / 1000; // Current time in ms
+        uint64_t replay_time = (uint64_t)(esp_timer_get_time() / 1000);
         len                  = snprintf(payload, sizeof(payload),
                                         "{"
-                                                         "\"epc\":\"%s\","
-                                                         "\"timestampMs\":%lu,"
-                                                         "\"rssiDbm\":%d,"
-                                                         "\"antennaId\":%u,"
-                                                         "\"frequency\":%u,"
-                                                         "\"deviceId\":\"%s\","
-                                                         "\"offline\":true,"
-                                                         "\"replayTime\":%llu"
-                                                         "}",
-                                        epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac,
-                                        replay_time);
+                                        "\"epc\":\"%s\","
+                                        "\"timestampMs\":%lld,"
+                                        "\"rssiDbm\":%d,"
+                                        "\"antennaId\":%u,"
+                                        "\"frequency\":%u,"
+                                        "\"deviceId\":\"%s\","
+                                        "\"offline\":true,"
+                                        "\"replayTime\":%llu,"
+                                        "\"timeBasis\":\"%s\""
+                                        "}",
+                                        epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency,
+                                        s_device_mac, replay_time, time_basis);
     }
     else
     {
@@ -532,14 +618,16 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
         len = snprintf(payload, sizeof(payload),
                        "{"
                        "\"epc\":\"%s\","
-                       "\"timestampMs\":%lu,"
+                       "\"timestampMs\":%lld,"
                        "\"rssiDbm\":%d,"
                        "\"antennaId\":%u,"
                        "\"frequency\":%u,"
                        "\"deviceId\":\"%s\","
-                       "\"offline\":false"
+                       "\"offline\":false,"
+                       "\"timeBasis\":\"%s\""
                        "}",
-                       epc_hex, event->timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac);
+                       epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac,
+                       time_basis);
     }
 
     if (len >= sizeof(payload))

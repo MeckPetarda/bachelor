@@ -69,7 +69,9 @@ export function startMqttBroker(): Aedes {
 
   // Unsubscribe handler
   aedes.on("unsubscribe", (unsubscriptions, client) => {
-    logger.debug(`Client ${client.id} unsubscribed from: ${unsubscriptions.join(", ")}`);
+    logger.debug(
+      `Client ${client.id} unsubscribed from: ${unsubscriptions.join(", ")}`,
+    );
   });
 
   // Publish handler - route messages to appropriate handlers
@@ -81,7 +83,9 @@ export function startMqttBroker(): Aedes {
 
     // Only log if client is present (not internal publishes)
     if (client) {
-      logger.debug(`Message received from ${client.id} on topic: ${packet.topic}`);
+      logger.debug(
+        `Message received from ${client.id} on topic: ${packet.topic}`,
+      );
     }
 
     // Route to appropriate handler based on topic pattern
@@ -166,7 +170,7 @@ export function publishMessage(topic: string, payload: string | Buffer): void {
       if (error) {
         logger.error(`Failed to publish to ${topic}:`, error.message);
       }
-    }
+    },
   );
 }
 

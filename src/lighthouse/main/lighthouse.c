@@ -45,6 +45,8 @@
 #include "my_mqtt_client.h"
 #include "offline_event_logger.h"
 #include "rfid_reader.h"
+#include "settings_storage.h"
+#include "time_sync.h"
 #include "wifi_manager.h"
 #include "wifi_provisioning.h"
 
@@ -488,6 +490,9 @@ static void battery_critical_shutdown(void)
     mqtt_client_disconnect();
     vTaskDelay(pdMS_TO_TICKS(1000)); // Allow disconnect to complete
 
+    // Persist current time to NVS so next boot has an estimated lower bound
+    time_sync_notify_shutdown();
+
     // Flush pending offline events to storage via graceful deinit
     offline_logger_deinit();
 
@@ -604,6 +609,30 @@ esp_err_t init_wifi_provisioning()
 
         vTaskDelay(pdMS_TO_TICKS(50));
     }
+}
+
+esp_err_t init_time_sync(const char *broker_ip)
+{
+    ESP_LOGI(TAG, "Initializing SNTP time synchronization (server: %s)...", broker_ip);
+
+    esp_err_t ret = time_sync_init(broker_ip);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Failed to initialize time sync: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Continuing without SNTP — timestamps will be boot-relative");
+        return ret;
+    }
+
+    // Wait up to 5 seconds for the first SNTP sync.
+    // If it times out the device continues operating; SNTP retries in background.
+    time_sync_wait_for_sync(5000);
+
+    time_quality_t quality = time_sync_get_quality();
+    ESP_LOGI(TAG, "Time sync complete. Quality: %s",
+             quality == TIME_QUALITY_SYNCED    ? "SYNCED"    :
+             quality == TIME_QUALITY_ESTIMATED ? "ESTIMATED" : "NONE");
+
+    return ESP_OK;
 }
 
 esp_err_t init_mqtt()
@@ -828,6 +857,14 @@ void app_main(void)
         return;
     if (init_wifi() != ESP_OK)
         return;
+
+    // Initialize time sync using the MQTT broker IP as the NTP server address.
+    // The same Linux machine runs both the MQTT broker and the NTP daemon (chrony).
+    mqtt_broker_config_t broker_config;
+    settings_storage_init();
+    mqtt_settings_load(&broker_config);
+    init_time_sync(broker_config.broker_ip);
+
     if (init_mqtt() != ESP_OK)
         return;
 

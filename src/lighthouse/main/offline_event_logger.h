@@ -28,6 +28,7 @@
 
 #include "esp_err.h"
 #include "rfid_reader.h"
+#include "time_sync.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -78,6 +79,11 @@
  * - reader_id: Which reader detected (1=A, 2=B, etc.)
  * - rssi: Signal strength (raw value)
  * - crc32: CRC32 checksum for integrity verification
+ * - reserved[0]: time_quality_t at recording time (0=NONE, 1=ESTIMATED, 2=SYNCED)
+ * - reserved[1..3]: unused padding
+ *
+ * Backward compatibility: existing events have reserved[0]=0, which maps to
+ * TIME_QUALITY_NONE — the safe default (boot-relative timestamp, use received_at).
  */
 typedef struct __attribute__((packed))
 {
@@ -88,7 +94,7 @@ typedef struct __attribute__((packed))
     uint8_t  reader_id;       // 1 byte - reader ID (1=A, 2=B)
     uint16_t rssi;            // 2 bytes - signal strength
     uint32_t crc32;           // 4 bytes - CRC32 checksum
-    uint8_t  reserved[4];     // 4 bytes - padding to 48 bytes
+    uint8_t  reserved[4];     // 4 bytes - reserved[0]=time_quality_t, [1..3] unused
 } offline_event_t;
 
 /**
@@ -111,13 +117,16 @@ typedef struct
  * Called for each event during replay with offline flag set to true.
  * This allows the MQTT client to publish with appropriate metadata.
  *
- * @param event Original RFID tag event
- * @param offline_timestamp When event was originally detected
- * @param replay_timestamp Current time (when being replayed)
+ * @param event            Original RFID tag event (EPC, RSSI, etc.)
+ * @param offline_timestamp Boot-relative ms when event was originally detected
+ * @param replay_timestamp  Current time in boot-relative ms (when being replayed)
+ * @param rtc_timestamp_s   Unix seconds at detection time (0 if unknown)
+ * @param time_quality      Time quality at recording time (from reserved[0])
  * @return ESP_OK if event published successfully
  */
 typedef esp_err_t (*offline_replay_callback_t)(const rfid_tag_event_t *event, uint64_t offline_timestamp,
-                                               uint64_t replay_timestamp);
+                                               uint64_t replay_timestamp, uint32_t rtc_timestamp_s,
+                                               time_quality_t time_quality);
 
 // ============================================================================
 // PUBLIC API

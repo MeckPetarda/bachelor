@@ -7,6 +7,7 @@
  */
 
 #include "offline_event_logger.h"
+#include "time_sync.h"
 #include "esp_crc.h"
 #include "esp_littlefs.h"
 #include "esp_log.h"
@@ -93,8 +94,22 @@ static void rfid_event_to_offline_event(const rfid_tag_event_t *rfid_event, offl
     // Timestamp (milliseconds since boot)
     offline_event->timestamp_ms = esp_timer_get_time() / 1000;
 
-    // RTC timestamp (Unix time) - TODO: sync with NTP when available
-    offline_event->rtc_timestamp_s = 0; // Not implemented yet
+    // RTC timestamp and time quality — depends on current sync state
+    time_quality_t quality = time_sync_get_quality();
+    if (quality == TIME_QUALITY_SYNCED)
+    {
+        // Wall-clock time is available: store Unix seconds
+        int64_t ts_ms = time_sync_get_timestamp_ms();
+        offline_event->rtc_timestamp_s = (uint32_t)(ts_ms / 1000);
+    }
+    else
+    {
+        // No authoritative time — leave rtc_timestamp_s as 0
+        offline_event->rtc_timestamp_s = 0;
+    }
+
+    // Store time quality in reserved[0] for replay-time timeBasis selection
+    offline_event->reserved[0] = (uint8_t)quality;
 
     // EPC data
     offline_event->epc_length = rfid_event->epc_len;
@@ -375,11 +390,13 @@ static void replay_task(void *arg)
                     // Release mutex before callback (avoid holding during network I/O)
                     xSemaphoreGive(logger_state.storage_mutex);
 
-                    // Call replay callback
+                    // Call replay callback with stored time metadata
                     if (logger_state.replay_callback)
                     {
-                        uint64_t replay_time = esp_timer_get_time() / 1000;
-                        ret = logger_state.replay_callback(&rfid_event, offline_event.timestamp_ms, replay_time);
+                        uint64_t       replay_time   = esp_timer_get_time() / 1000;
+                        time_quality_t stored_quality = (time_quality_t)offline_event.reserved[0];
+                        ret = logger_state.replay_callback(&rfid_event, offline_event.timestamp_ms, replay_time,
+                                                           offline_event.rtc_timestamp_s, stored_quality);
 
                         if (ret == ESP_OK)
                         {

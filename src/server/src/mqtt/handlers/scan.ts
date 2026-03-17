@@ -33,7 +33,7 @@ export interface ScanEventData {
   epc: string;
   rssiDbm: number | null;
   timestamp: Date;
-  source: 'realtime' | 'offline_sync';
+  source: "realtime" | "offline_sync";
 }
 
 /**
@@ -59,7 +59,7 @@ export function setScanEventEmitter(emitter: ScanEventEmitter): void {
  */
 function validatePayload(payload: unknown): payload is ScanPayload {
   if (typeof payload !== "object" || payload === null) {
-    logger.error("Invalid payload", payload)
+    logger.error("Invalid payload", payload);
     return false;
   }
 
@@ -67,12 +67,12 @@ function validatePayload(payload: unknown): payload is ScanPayload {
 
   // Required fields
   if (typeof p.epc !== "string" || p.epc.length === 0) {
-    logger.error("Invalid epc", p.epc)
+    logger.error("Invalid epc", p.epc);
     return false;
   }
 
   if (typeof p.timestampMs !== "number") {
-    logger.error("Invalid timestamp", p.timestampMs)
+    logger.error("Invalid timestamp", p.timestampMs);
     return false;
   }
 
@@ -86,7 +86,7 @@ function validatePayload(payload: unknown): payload is ScanPayload {
  */
 export async function handleScanMessage(
   topic: string,
-  payload: string | Buffer
+  payload: string | Buffer,
 ): Promise<void> {
   const macAddress = extractMacAddress(topic);
   if (!macAddress) {
@@ -104,7 +104,7 @@ export async function handleScanMessage(
     return;
   }
 
-  logger.debug("scanData", scanData)
+  logger.debug("scanData", scanData);
 
   // Validate payload
   if (!validatePayload(scanData)) {
@@ -112,7 +112,9 @@ export async function handleScanMessage(
     return;
   }
 
-  logger.debug(`Processing scan from device ${macAddress}: EPC=${scanData.epc}`);
+  logger.debug(
+    `Processing scan from device ${macAddress}: EPC=${scanData.epc}`,
+  );
 
   try {
     // Look up lighthouse by deviceId (MAC address)
@@ -153,7 +155,7 @@ export async function handleScanMessage(
     }
 
     // Determine source based on backfill flag
-    const source = scanData.offline === true ? 'offline_sync' : 'realtime';
+    const source = scanData.offline === true ? "offline_sync" : "realtime";
 
     // Insert into raw_scans table
     const insertResult = await db
@@ -219,12 +221,12 @@ export async function handleScanMessage(
 function queueScanForProcessing(
   scanId: bigint,
   lighthouseId: number,
-  epc: string
+  epc: string,
 ): void {
   // TODO: Task 2.2 - Implement actual event processing queue
   // For now, just log that we would queue this scan
   logger.debug(
-    `Queued scan ${scanId} (lighthouse=${lighthouseId}, epc=${epc}) for processing`
+    `Queued scan ${scanId} (lighthouse=${lighthouseId}, epc=${epc}) for processing`,
   );
 }
 
@@ -233,7 +235,7 @@ function queueScanForProcessing(
  */
 export async function handleBatchScanMessage(
   topic: string,
-  payload: Buffer
+  payload: Buffer,
 ): Promise<void> {
   const macAddress = extractMacAddress(topic);
   if (!macAddress) {
@@ -248,7 +250,10 @@ export async function handleBatchScanMessage(
     const parsed = JSON.parse(payloadStr);
     scansData = Array.isArray(parsed) ? parsed : [parsed];
   } catch (error) {
-    logger.error(`Failed to parse batch scan payload from ${macAddress}:`, error);
+    logger.error(
+      `Failed to parse batch scan payload from ${macAddress}:`,
+      error,
+    );
     return;
   }
 
@@ -264,4 +269,3 @@ export async function handleBatchScanMessage(
     await handleScanMessage(topic, singlePayload);
   }
 }
-

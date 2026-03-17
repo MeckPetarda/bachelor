@@ -1,8 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+} from "bun:test";
 import mqtt from "mqtt";
 import { startMqttBroker, closeMqttBroker } from "../src/mqtt/broker";
-import { initDatabase, closeDatabase, getDatabase, schema } from "../src/database/client";
-import { eq, desc } from "drizzle-orm";
+import {
+  initDatabase,
+  closeDatabase,
+  getDatabase,
+  schema,
+} from "../src/database/client";
+import { eq } from "drizzle-orm";
 import { buildScanTopic } from "../src/mqtt/topics";
 import { clearAllStates } from "../src/mqtt/state";
 
@@ -23,7 +35,7 @@ const KNOWN_UNIX_MS = 1742169600000;
 async function waitFor(
   condition: () => Promise<boolean>,
   timeout = 5000,
-  interval = 100
+  interval = 100,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
@@ -39,15 +51,23 @@ async function connectClient(clientId: string): Promise<mqtt.MqttClient> {
   const client = mqtt.connect(MQTT_URL, { clientId, connectTimeout: 5000 });
   await new Promise<void>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error("Connection timeout")), 5000);
-    client.on("connect", () => { clearTimeout(t); resolve(); });
-    client.on("error", (err) => { clearTimeout(t); reject(err); });
+    client.on("connect", () => {
+      clearTimeout(t);
+      resolve();
+    });
+    client.on("error", (err) => {
+      clearTimeout(t);
+      reject(err);
+    });
   });
   return client;
 }
 
 async function disconnectClient(client: mqtt.MqttClient): Promise<void> {
   if (client.connected) {
-    await new Promise<void>((resolve) => client.end(false, {}, () => resolve()));
+    await new Promise<void>((resolve) =>
+      client.end(false, {}, () => resolve()),
+    );
   }
 }
 
@@ -55,7 +75,7 @@ async function disconnectClient(client: mqtt.MqttClient): Promise<void> {
 
 async function publishScan(
   client: mqtt.MqttClient,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
 ): Promise<void> {
   const topic = buildScanTopic(TEST_DEVICE_ID);
   await new Promise<void>((resolve, reject) => {
@@ -101,8 +121,12 @@ describe("Time Basis Scan Handling", () => {
     client = null;
 
     const db = getDatabase();
-    await db.delete(schema.rawScans).where(eq(schema.rawScans.lighthouseId, TEST_LIGHTHOUSE_ID));
-    await db.delete(schema.lighthouses).where(eq(schema.lighthouses.id, TEST_LIGHTHOUSE_ID));
+    await db
+      .delete(schema.rawScans)
+      .where(eq(schema.rawScans.lighthouseId, TEST_LIGHTHOUSE_ID));
+    await db
+      .delete(schema.lighthouses)
+      .where(eq(schema.lighthouses.id, TEST_LIGHTHOUSE_ID));
 
     await closeMqttBroker();
     await closeDatabase();
@@ -110,7 +134,9 @@ describe("Time Basis Scan Handling", () => {
 
   beforeEach(async () => {
     const db = getDatabase();
-    await db.delete(schema.rawScans).where(eq(schema.rawScans.lighthouseId, TEST_LIGHTHOUSE_ID));
+    await db
+      .delete(schema.rawScans)
+      .where(eq(schema.rawScans.lighthouseId, TEST_LIGHTHOUSE_ID));
     clearAllStates();
   });
 
@@ -393,9 +419,13 @@ describe("Time Basis Scan Handling", () => {
     const topic = buildScanTopic(TEST_DEVICE_ID);
 
     const scans = [
-      { epc: "E200MIX_SYNCED00001", timestampMs: KNOWN_UNIX_MS, timeBasis: "synced" },
-      { epc: "E200MIX_ESTIM00001",  timestampMs: 55000, timeBasis: "estimated" },
-      { epc: "E200MIX_RELAT00001",  timestampMs: 77000, timeBasis: "relative" },
+      {
+        epc: "E200MIX_SYNCED00001",
+        timestampMs: KNOWN_UNIX_MS,
+        timeBasis: "synced",
+      },
+      { epc: "E200MIX_ESTIM00001", timestampMs: 55000, timeBasis: "estimated" },
+      { epc: "E200MIX_RELAT00001", timestampMs: 77000, timeBasis: "relative" },
     ];
 
     const beforePublish = Date.now();
@@ -431,19 +461,25 @@ describe("Time Basis Scan Handling", () => {
     // Synced scan: timestamp should match KNOWN_UNIX_MS
     const syncedRow = byEpc["E200MIX_SYNCED00001"]!;
     expect(syncedRow.timeBasis).toBe("synced");
-    expect(Math.abs(syncedRow.timestamp.getTime() - KNOWN_UNIX_MS)).toBeLessThan(1000);
+    expect(
+      Math.abs(syncedRow.timestamp.getTime() - KNOWN_UNIX_MS),
+    ).toBeLessThan(1000);
 
     // Estimated scan: timestamp should be approximately now
     const estimatedRow = byEpc["E200MIX_ESTIM00001"]!;
     expect(estimatedRow.timeBasis).toBe("estimated");
-    expect(estimatedRow.timestamp.getTime()).toBeGreaterThan(beforePublish - 2000);
+    expect(estimatedRow.timestamp.getTime()).toBeGreaterThan(
+      beforePublish - 2000,
+    );
     expect(estimatedRow.timestamp.getTime()).toBeLessThan(afterPublish + 2000);
     expect(estimatedRow.timestampMs).toBe(BigInt(55000));
 
     // Relative scan: timestamp should be approximately now
     const relativeRow = byEpc["E200MIX_RELAT00001"]!;
     expect(relativeRow.timeBasis).toBe("relative");
-    expect(relativeRow.timestamp.getTime()).toBeGreaterThan(beforePublish - 2000);
+    expect(relativeRow.timestamp.getTime()).toBeGreaterThan(
+      beforePublish - 2000,
+    );
     expect(relativeRow.timestamp.getTime()).toBeLessThan(afterPublish + 2000);
     expect(relativeRow.timestampMs).toBe(BigInt(77000));
 
