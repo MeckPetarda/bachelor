@@ -63,6 +63,10 @@
 #define RFID_FREQ_902MHZ 0x07
 #define RFID_FREQ_915MHZ 0x21
 #define RFID_FREQ_928MHZ 0x3B
+#define RFID_FREQ_865MHZ 0x01
+#define RFID_FREQ_868MHZ 0x06
+#define RFID_FREQ_920MHZ 0x2B
+#define RFID_FREQ_925MHZ 0x35
 
 // ============================================================================
 // BEEPER MODES (Protocol V2.2, Section 2.1.11, page 14-15)
