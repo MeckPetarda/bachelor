@@ -1,15 +1,18 @@
-import { type Component, For, Show, onMount } from 'solid-js';
-import { EventsTable } from '../components/EventsTable';
+import { type Component, For, Show, onMount } from "solid-js";
+import { EventsTable } from "../components/EventsTable";
 import {
   eventsState,
   fetchEvents,
   setFilter,
   nextPage,
   prevPage,
-} from '../stores/events';
-import { lighthousesState, fetchAll as fetchLighthouses } from '../stores/lighthouses';
-import type { ScanSource } from '../types';
-import styles from './Events.module.css';
+} from "../stores/events";
+import {
+  lighthousesState,
+  fetchAll as fetchLighthouses,
+} from "../stores/lighthouses";
+import type { ScanSource } from "../types";
+import styles from "./Events.module.css";
 
 export const Events: Component = () => {
   onMount(() => {
@@ -19,19 +22,20 @@ export const Events: Component = () => {
 
   const handleLighthouseFilter = (e: Event) => {
     const value = (e.target as HTMLSelectElement).value;
-    setFilter('lighthouseId', value ? parseInt(value, 10) : undefined);
+    setFilter("lighthouseId", value ? parseInt(value, 10) : undefined);
   };
 
   const handleEpcFilter = (e: Event) => {
-    setFilter('epc', (e.target as HTMLInputElement).value);
+    setFilter("epc", (e.target as HTMLInputElement).value);
   };
 
   const handleSourceFilter = (value: ScanSource | undefined) => {
-    setFilter('source', value);
+    setFilter("source", value);
   };
 
   const currentPage = () =>
-    Math.floor(eventsState.pagination.offset / eventsState.pagination.limit) + 1;
+    Math.floor(eventsState.pagination.offset / eventsState.pagination.limit) +
+    1;
 
   const totalPages = () =>
     Math.ceil(eventsState.pagination.total / eventsState.pagination.limit);
@@ -52,7 +56,7 @@ export const Events: Component = () => {
           <label class="label">Lighthouse</label>
           <select
             class="select"
-            value={eventsState.filters.lighthouseId ?? ''}
+            value={eventsState.filters.lighthouseId ?? ""}
             onChange={handleLighthouseFilter}
           >
             <option value="">All lighthouses</option>
@@ -80,7 +84,7 @@ export const Events: Component = () => {
           <div class={styles.toggleGroup}>
             <button
               class={`${styles.toggleBtn} ${
-                eventsState.filters.source === undefined ? styles.active : ''
+                eventsState.filters.source === undefined ? styles.active : ""
               }`}
               onClick={() => handleSourceFilter(undefined)}
             >
@@ -88,17 +92,19 @@ export const Events: Component = () => {
             </button>
             <button
               class={`${styles.toggleBtn} ${
-                eventsState.filters.source === 'realtime' ? styles.active : ''
+                eventsState.filters.source === "realtime" ? styles.active : ""
               }`}
-              onClick={() => handleSourceFilter('realtime')}
+              onClick={() => handleSourceFilter("realtime")}
             >
               Realtime
             </button>
             <button
               class={`${styles.toggleBtn} ${
-                eventsState.filters.source === 'offline_sync' ? styles.active : ''
+                eventsState.filters.source === "offline_sync"
+                  ? styles.active
+                  : ""
               }`}
-              onClick={() => handleSourceFilter('offline_sync')}
+              onClick={() => handleSourceFilter("offline_sync")}
             >
               Offline Sync
             </button>
@@ -118,7 +124,8 @@ export const Events: Component = () => {
             Previous
           </button>
           <span class={styles.pageInfo}>
-            Page {currentPage()} of {totalPages()} ({eventsState.pagination.total} total)
+            Page {currentPage()} of {totalPages()} (
+            {eventsState.pagination.total} total)
           </span>
           <button
             class="btn btn-secondary btn-sm"

@@ -1,25 +1,22 @@
-const API_BASE = '/api/v1';
+const API_BASE = "/api/v1";
 
 export class ApiError extends Error {
   constructor(
     public status: number,
     public statusText: string,
-    public body?: unknown
+    public body?: unknown,
   ) {
     super(`${status} ${statusText}`);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${path}`;
   const headers = new Headers(options.headers);
 
-  if (options.body && typeof options.body === 'string') {
-    headers.set('Content-Type', 'application/json');
+  if (options.body && typeof options.body === "string") {
+    headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(url, {
@@ -46,23 +43,23 @@ async function request<T>(
 }
 
 export function get<T>(path: string): Promise<T> {
-  return request<T>(path, { method: 'GET' });
+  return request<T>(path, { method: "GET" });
 }
 
 export function post<T>(path: string, body?: unknown): Promise<T> {
   return request<T>(path, {
-    method: 'POST',
+    method: "POST",
     body: body ? JSON.stringify(body) : undefined,
   });
 }
 
 export function patch<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(body),
   });
 }
 
 export function del<T>(path: string): Promise<T> {
-  return request<T>(path, { method: 'DELETE' });
+  return request<T>(path, { method: "DELETE" });
 }

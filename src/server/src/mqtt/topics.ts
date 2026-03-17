@@ -15,7 +15,7 @@ const MAC_PATTERN = "[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}";
  * Captures MAC address as first group
  */
 export const SCAN_TOPIC_PATTERN = new RegExp(
-  `^${TOPIC_BASE}(${MAC_PATTERN})/scans$`
+  `^${TOPIC_BASE}(${MAC_PATTERN})/scans$`,
 );
 
 /**
@@ -23,7 +23,7 @@ export const SCAN_TOPIC_PATTERN = new RegExp(
  * Captures MAC address as first group
  */
 export const STATUS_TOPIC_PATTERN = new RegExp(
-  `^${TOPIC_BASE}(${MAC_PATTERN})/status$`
+  `^${TOPIC_BASE}(${MAC_PATTERN})/status$`,
 );
 
 /**
@@ -31,7 +31,7 @@ export const STATUS_TOPIC_PATTERN = new RegExp(
  * Captures MAC address as first group
  */
 export const HEALTH_TOPIC_PATTERN = new RegExp(
-  `^${TOPIC_BASE}(${MAC_PATTERN})/health$`
+  `^${TOPIC_BASE}(${MAC_PATTERN})/health$`,
 );
 
 /**
@@ -39,7 +39,7 @@ export const HEALTH_TOPIC_PATTERN = new RegExp(
  * Captures MAC address as first group and config key as second group
  */
 export const CONFIG_TOPIC_PATTERN = new RegExp(
-  `^${TOPIC_BASE}(${MAC_PATTERN})/config/([^/]+)$`
+  `^${TOPIC_BASE}(${MAC_PATTERN})/config/([^/]+)$`,
 );
 
 /**

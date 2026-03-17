@@ -1,6 +1,6 @@
-import { type Component, createSignal, For, Show } from 'solid-js';
-import type { PendingDevice, Group, Placement } from '../types';
-import styles from './Modal.module.css';
+import { type Component, createSignal, For, Show } from "solid-js";
+import type { PendingDevice, Group, Placement } from "../types";
+import styles from "./Modal.module.css";
 
 interface Props {
   device: PendingDevice;
@@ -15,11 +15,11 @@ interface Props {
 }
 
 export const ClaimModal: Component<Props> = (props) => {
-  const [name, setName] = createSignal('');
-  const [label, setLabel] = createSignal('');
-  const [placement, setPlacement] = createSignal<Placement>('STANDALONE');
-  const [groupId, setGroupId] = createSignal<string>('');
-  const [error, setError] = createSignal('');
+  const [name, setName] = createSignal("");
+  const [label, setLabel] = createSignal("");
+  const [placement, setPlacement] = createSignal<Placement>("STANDALONE");
+  const [groupId, setGroupId] = createSignal<string>("");
+  const [error, setError] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
 
   const availableGroups = () =>
@@ -27,10 +27,10 @@ export const ClaimModal: Component<Props> = (props) => {
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!name().trim()) {
-      setError('Name is required');
+      setError("Name is required");
       return;
     }
 
@@ -47,7 +47,7 @@ export const ClaimModal: Component<Props> = (props) => {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Failed to claim device');
+        setError("Failed to claim device");
       }
     } finally {
       setSubmitting(false);
@@ -141,7 +141,7 @@ export const ClaimModal: Component<Props> = (props) => {
               class="btn btn-primary"
               disabled={submitting()}
             >
-              {submitting() ? 'Claiming...' : 'Claim Device'}
+              {submitting() ? "Claiming..." : "Claim Device"}
             </button>
           </div>
         </form>

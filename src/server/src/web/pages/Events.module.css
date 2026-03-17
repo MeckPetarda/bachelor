@@ -42,7 +42,9 @@
   border: none;
   border-right: 1px solid var(--color-border);
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .toggleBtn:last-child {

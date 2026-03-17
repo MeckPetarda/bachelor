@@ -53,16 +53,29 @@ export async function errorHandler(c: Context, next: Next) {
     let status = 500;
     let message = "Internal Server Error";
 
-    if (error.message.includes("not found") || error.message.includes("Not found")) {
+    if (
+      error.message.includes("not found") ||
+      error.message.includes("Not found")
+    ) {
       status = 404;
       message = error.message;
-    } else if (error.message.includes("unauthorized") || error.message.includes("Unauthorized")) {
+    } else if (
+      error.message.includes("unauthorized") ||
+      error.message.includes("Unauthorized")
+    ) {
       status = 401;
       message = error.message;
-    } else if (error.message.includes("forbidden") || error.message.includes("Forbidden")) {
+    } else if (
+      error.message.includes("forbidden") ||
+      error.message.includes("Forbidden")
+    ) {
       status = 403;
       message = error.message;
-    } else if (error.message.includes("validation") || error.message.includes("invalid") || error.message.includes("Invalid")) {
+    } else if (
+      error.message.includes("validation") ||
+      error.message.includes("invalid") ||
+      error.message.includes("Invalid")
+    ) {
       status = 400;
       message = error.message;
     }
@@ -73,7 +86,7 @@ export async function errorHandler(c: Context, next: Next) {
         status,
         timestamp: new Date().toISOString(),
       },
-      status as 400 | 401 | 403 | 404 | 500
+      status as 400 | 401 | 403 | 404 | 500,
     );
   }
 }
@@ -97,7 +110,7 @@ async function verifyJWT(token: string, secret: string): Promise<JWTPayload> {
     encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign", "verify"]
+    ["sign", "verify"],
   );
 
   const data = encoder.encode(`${headerB64}.${payloadB64}`);
@@ -126,7 +139,7 @@ async function verifyJWT(token: string, secret: string): Promise<JWTPayload> {
 export async function createJWT(
   payload: Omit<JWTPayload, "iat" | "exp">,
   secret: string,
-  expiresIn = "24h"
+  expiresIn = "24h",
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
 
@@ -137,10 +150,18 @@ export async function createJWT(
     const value = parseInt(match[1], 10);
     const unit = match[2];
     switch (unit) {
-      case "h": expiresInSeconds = value * 60 * 60; break;
-      case "d": expiresInSeconds = value * 24 * 60 * 60; break;
-      case "m": expiresInSeconds = value * 60; break;
-      case "s": expiresInSeconds = value; break;
+      case "h":
+        expiresInSeconds = value * 60 * 60;
+        break;
+      case "d":
+        expiresInSeconds = value * 24 * 60 * 60;
+        break;
+      case "m":
+        expiresInSeconds = value * 60;
+        break;
+      case "s":
+        expiresInSeconds = value;
+        break;
     }
   }
 
@@ -160,12 +181,14 @@ export async function createJWT(
     encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"]
+    ["sign"],
   );
 
   const data = encoder.encode(`${headerB64}.${payloadB64}`);
   const signature = await crypto.subtle.sign("HMAC", key, data);
-  const signatureB64 = base64UrlEncode(String.fromCharCode(...new Uint8Array(signature)));
+  const signatureB64 = base64UrlEncode(
+    String.fromCharCode(...new Uint8Array(signature)),
+  );
 
   return `${headerB64}.${payloadB64}.${signatureB64}`;
 }
@@ -203,7 +226,7 @@ export function jwtAuth(secret: string) {
           error: "Unauthorized: Missing or invalid Authorization header",
           status: 401,
         },
-        401
+        401,
       );
     }
 
@@ -221,7 +244,7 @@ export function jwtAuth(secret: string) {
           error: `Unauthorized: ${error.message}`,
           status: 401,
         },
-        401
+        401,
       );
     }
   };

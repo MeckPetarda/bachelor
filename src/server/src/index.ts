@@ -2,10 +2,17 @@ import {
   initDatabase,
   closeDatabase,
   testConnection,
-  schema
+  schema,
 } from "./database/client";
-import { startMqttBroker, closeMqttBroker, getMqttBrokerStats } from "./mqtt/broker";
-import { startRetentionScheduler, stopRetentionScheduler } from "./database/cleanup";
+import {
+  startMqttBroker,
+  closeMqttBroker,
+  getMqttBrokerStats,
+} from "./mqtt/broker";
+import {
+  startRetentionScheduler,
+  stopRetentionScheduler,
+} from "./database/cleanup";
 import { app } from "./api/routes";
 import { getConfig } from "./config";
 import { createLogger } from "./utils/logger";
@@ -99,7 +106,9 @@ async function startup() {
     if (lighthouses.length > 0) {
       logger.info("Lighthouses:");
       lighthouses.forEach((lh) => {
-        logger.info(`  - ${lh.name} (${lh.deviceId}): ${lh.isActive ? 'active' : 'inactive'}`);
+        logger.info(
+          `  - ${lh.name} (${lh.deviceId}): ${lh.isActive ? "active" : "inactive"}`,
+        );
       });
     }
 
@@ -147,14 +156,16 @@ async function startup() {
         message(ws, message) {
           handleWebSocketMessage(
             ws as unknown as WebSocket,
-            typeof message === "string" ? message : Buffer.from(message)
+            typeof message === "string" ? message : Buffer.from(message),
           );
         },
       },
     });
 
     logger.info(`HTTP server running on port ${config.http.port}`);
-    logger.info(`WebSocket endpoint available at ws://localhost:${config.http.port}/ws`);
+    logger.info(
+      `WebSocket endpoint available at ws://localhost:${config.http.port}/ws`,
+    );
     logger.info("Server startup completed successfully");
   } catch (error) {
     logger.error("Startup failed:", error);

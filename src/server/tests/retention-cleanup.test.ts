@@ -1,5 +1,17 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { initDatabase, closeDatabase, getDatabase, schema } from "../src/database/client";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+} from "bun:test";
+import {
+  initDatabase,
+  closeDatabase,
+  getDatabase,
+  schema,
+} from "../src/database/client";
 import { eq } from "drizzle-orm";
 import {
   cleanupOldHealthSnapshots,
@@ -46,10 +58,14 @@ describe("Retention Cleanup", () => {
     const db = getDatabase();
     await db
       .delete(schema.lighthouseHealthSnapshots)
-      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     await db
       .delete(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
 
     // Close database
     await closeDatabase();
@@ -60,10 +76,14 @@ describe("Retention Cleanup", () => {
     const db = getDatabase();
     await db
       .delete(schema.lighthouseHealthSnapshots)
-      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     await db
       .delete(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
   });
 
   it("should delete health snapshots older than retention period", async () => {
@@ -88,7 +108,9 @@ describe("Retention Cleanup", () => {
     const beforeCleanup = await db
       .select()
       .from(schema.lighthouseHealthSnapshots)
-      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     expect(beforeCleanup.length).toBe(1);
 
     // Run cleanup
@@ -99,7 +121,9 @@ describe("Retention Cleanup", () => {
     const afterCleanup = await db
       .select()
       .from(schema.lighthouseHealthSnapshots)
-      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     expect(afterCleanup.length).toBe(0);
   });
 
@@ -129,7 +153,9 @@ describe("Retention Cleanup", () => {
     const afterCleanup = await db
       .select()
       .from(schema.lighthouseHealthSnapshots)
-      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     expect(afterCleanup.length).toBe(1);
   });
 
@@ -148,7 +174,9 @@ describe("Retention Cleanup", () => {
     const beforeCleanup = await db
       .select()
       .from(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     expect(beforeCleanup.length).toBe(1);
 
     // Run cleanup
@@ -159,7 +187,9 @@ describe("Retention Cleanup", () => {
     const afterCleanup = await db
       .select()
       .from(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     expect(afterCleanup.length).toBe(0);
   });
 
@@ -182,7 +212,9 @@ describe("Retention Cleanup", () => {
     const afterCleanup = await db
       .select()
       .from(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     expect(afterCleanup.length).toBe(1);
   });
 

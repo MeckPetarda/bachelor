@@ -85,7 +85,9 @@ export function getConnectedClientCount(): number {
  */
 export function handleWebSocketOpen(ws: WebSocket): void {
   connectedClients.add(ws);
-  logger.info(`WebSocket client connected. Total clients: ${connectedClients.size}`);
+  logger.info(
+    `WebSocket client connected. Total clients: ${connectedClients.size}`,
+  );
 }
 
 /**
@@ -93,13 +95,18 @@ export function handleWebSocketOpen(ws: WebSocket): void {
  */
 export function handleWebSocketClose(ws: WebSocket): void {
   connectedClients.delete(ws);
-  logger.info(`WebSocket client disconnected. Total clients: ${connectedClients.size}`);
+  logger.info(
+    `WebSocket client disconnected. Total clients: ${connectedClients.size}`,
+  );
 }
 
 /**
  * Handle WebSocket message (client -> server)
  */
-export function handleWebSocketMessage(ws: WebSocket, message: string | Buffer): void {
+export function handleWebSocketMessage(
+  ws: WebSocket,
+  message: string | Buffer,
+): void {
   // For now, we don't handle client messages
   // Could be used for subscription management in the future
   logger.debug("Received WebSocket message from client:", message.toString());
@@ -139,7 +146,10 @@ function broadcast<T>(type: WebSocketMessageType, payload: T): void {
 /**
  * Broadcast a new scan event
  */
-export function broadcastScan(data: ScanEventData, lighthouseName?: string): void {
+export function broadcastScan(
+  data: ScanEventData,
+  lighthouseName?: string,
+): void {
   const payload: ScanPayload = {
     id: data.scanId.toString(),
     lighthouseId: data.lighthouseId,
@@ -156,7 +166,10 @@ export function broadcastScan(data: ScanEventData, lighthouseName?: string): voi
 /**
  * Broadcast device online event
  */
-export function broadcastDeviceOnline(deviceId: string, lighthouseId: number | null): void {
+export function broadcastDeviceOnline(
+  deviceId: string,
+  lighthouseId: number | null,
+): void {
   const payload: DeviceStatusPayload = {
     deviceId,
     lighthouseId,
@@ -171,7 +184,7 @@ export function broadcastDeviceOnline(deviceId: string, lighthouseId: number | n
 export function broadcastDeviceOffline(
   deviceId: string,
   lighthouseId: number | null,
-  isGraceful: boolean
+  isGraceful: boolean,
 ): void {
   const payload: DeviceStatusPayload = {
     deviceId,
@@ -188,7 +201,7 @@ export function broadcastDeviceOffline(
 export function broadcastDeviceHealth(
   deviceId: string,
   lighthouseId: number | null,
-  health: DeviceHealthPayload["health"]
+  health: DeviceHealthPayload["health"],
 ): void {
   const payload: DeviceHealthPayload = {
     deviceId,

@@ -1,6 +1,6 @@
-import { type Component } from 'solid-js';
-import type { PendingDevice } from '../types';
-import styles from './PendingDeviceCard.module.css';
+import { type Component } from "solid-js";
+import type { PendingDevice } from "../types";
+import styles from "./PendingDeviceCard.module.css";
 
 interface Props {
   device: PendingDevice;
@@ -12,7 +12,9 @@ export const PendingDeviceCard: Component<Props> = (props) => {
     <div class={styles.card}>
       <div class={styles.header}>
         <div class={styles.status}>
-          <span class={`status-dot ${props.device.isConnected ? 'online' : 'offline'}`} />
+          <span
+            class={`status-dot ${props.device.isConnected ? "online" : "offline"}`}
+          />
           <span class={styles.deviceId}>{props.device.deviceId}</span>
         </div>
       </div>

@@ -27,7 +27,7 @@ const logger = createLogger("Status Handler");
  */
 export async function handleStatusMessage(
   topic: string,
-  payload: string | Buffer
+  payload: string | Buffer,
 ): Promise<void> {
   // Extract MAC address from topic
   const macAddress = extractMacAddress(topic);
@@ -121,7 +121,7 @@ export async function handleStatusMessage(
       .where(eq(schema.lighthouses.id, lighthouseId));
 
     logger.info(
-      `Lighthouse ${macAddress} ${isOnline ? "connected" : `disconnected (graceful: ${isGraceful})`}`
+      `Lighthouse ${macAddress} ${isOnline ? "connected" : `disconnected (graceful: ${isGraceful})`}`,
     );
   } catch (error) {
     logger.error(`Failed to process status message from ${macAddress}:`, error);

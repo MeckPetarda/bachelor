@@ -1,6 +1,6 @@
-import { type Component, createSignal, Show } from 'solid-js';
-import type { Group } from '../types';
-import styles from './Modal.module.css';
+import { type Component, createSignal, Show } from "solid-js";
+import type { Group } from "../types";
+import styles from "./Modal.module.css";
 
 interface Props {
   group?: Group;
@@ -9,19 +9,21 @@ interface Props {
 }
 
 export const GroupModal: Component<Props> = (props) => {
-  const [label, setLabel] = createSignal(props.group?.label ?? '');
-  const [description, setDescription] = createSignal(props.group?.description ?? '');
-  const [error, setError] = createSignal('');
+  const [label, setLabel] = createSignal(props.group?.label ?? "");
+  const [description, setDescription] = createSignal(
+    props.group?.description ?? "",
+  );
+  const [error, setError] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
 
   const isEdit = () => !!props.group;
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!label().trim()) {
-      setError('Label is required');
+      setError("Label is required");
       return;
     }
 
@@ -36,7 +38,7 @@ export const GroupModal: Component<Props> = (props) => {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Failed to save group');
+        setError("Failed to save group");
       }
     } finally {
       setSubmitting(false);
@@ -47,7 +49,9 @@ export const GroupModal: Component<Props> = (props) => {
     <div class={styles.overlay} onClick={props.onClose}>
       <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div class={styles.header}>
-          <h2 class={styles.title}>{isEdit() ? 'Edit Group' : 'Create Group'}</h2>
+          <h2 class={styles.title}>
+            {isEdit() ? "Edit Group" : "Create Group"}
+          </h2>
           <button class={styles.closeBtn} onClick={props.onClose}>
             \u00D7
           </button>
@@ -94,7 +98,7 @@ export const GroupModal: Component<Props> = (props) => {
               class="btn btn-primary"
               disabled={submitting()}
             >
-              {submitting() ? 'Saving...' : isEdit() ? 'Save' : 'Create'}
+              {submitting() ? "Saving..." : isEdit() ? "Save" : "Create"}
             </button>
           </div>
         </form>

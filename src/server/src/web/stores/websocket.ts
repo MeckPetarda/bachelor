@@ -1,11 +1,11 @@
-import { createSignal } from 'solid-js';
+import { createSignal } from "solid-js";
 import {
   handleDeviceOnline,
   handleDeviceOffline,
   handleDeviceHealth,
   handleDevicePending,
-} from './lighthouses';
-import { prependEvent } from './events';
+} from "./lighthouses";
+import { prependEvent } from "./events";
 import type {
   WsMessage,
   WsScanPayload,
@@ -14,7 +14,7 @@ import type {
   WsDeviceHealthPayload,
   WsDevicePendingPayload,
   Scan,
-} from '../types';
+} from "../types";
 
 const [connected, setConnected] = createSignal(false);
 
@@ -22,7 +22,7 @@ let ws: WebSocket | null = null;
 let reconnectTimeout: number | null = null;
 
 function getWsUrl(): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}/ws`;
 }
 
@@ -57,7 +57,7 @@ export function connect() {
       const msg = JSON.parse(event.data) as WsMessage;
       handleMessage(msg);
     } catch {
-      console.error('Failed to parse WebSocket message');
+      console.error("Failed to parse WebSocket message");
     }
   };
 }
@@ -75,7 +75,7 @@ export function disconnect() {
 
 function handleMessage(msg: WsMessage) {
   switch (msg.type) {
-    case 'scan': {
+    case "scan": {
       const payload = msg.payload as WsScanPayload;
       const scan: Scan = {
         id: payload.id,
@@ -90,22 +90,26 @@ function handleMessage(msg: WsMessage) {
       prependEvent(scan);
       break;
     }
-    case 'device:online': {
+    case "device:online": {
       const payload = msg.payload as WsDeviceOnlinePayload;
       handleDeviceOnline(payload.deviceId, payload.lighthouseId);
       break;
     }
-    case 'device:offline': {
+    case "device:offline": {
       const payload = msg.payload as WsDeviceOfflinePayload;
       handleDeviceOffline(payload.deviceId, payload.lighthouseId);
       break;
     }
-    case 'device:health': {
+    case "device:health": {
       const payload = msg.payload as WsDeviceHealthPayload;
-      handleDeviceHealth(payload.deviceId, payload.lighthouseId, payload.health);
+      handleDeviceHealth(
+        payload.deviceId,
+        payload.lighthouseId,
+        payload.health,
+      );
       break;
     }
-    case 'device:pending': {
+    case "device:pending": {
       const payload = msg.payload as WsDevicePendingPayload;
       handleDevicePending(payload.deviceId);
       break;

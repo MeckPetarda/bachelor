@@ -1,18 +1,19 @@
-import { type Component, For, Show, createSignal, onMount } from 'solid-js';
-import { LighthouseCard } from '../components/LighthouseCard';
-import { PendingDeviceCard } from '../components/PendingDeviceCard';
-import { ClaimModal } from '../components/ClaimModal';
+import { type Component, For, Show, createSignal, onMount } from "solid-js";
+import { LighthouseCard } from "../components/LighthouseCard";
+import { PendingDeviceCard } from "../components/PendingDeviceCard";
+import { ClaimModal } from "../components/ClaimModal";
 import {
   lighthousesState,
   fetchAll as fetchLighthouses,
   claimDevice,
-} from '../stores/lighthouses';
-import { groupsState, fetchAll as fetchGroups } from '../stores/groups';
-import type { PendingDevice, ClaimDeviceRequest } from '../types';
-import styles from './Lighthouses.module.css';
+} from "../stores/lighthouses";
+import { groupsState, fetchAll as fetchGroups } from "../stores/groups";
+import type { PendingDevice, ClaimDeviceRequest } from "../types";
+import styles from "./Lighthouses.module.css";
 
 export const Lighthouses: Component = () => {
-  const [claimingDevice, setClaimingDevice] = createSignal<PendingDevice | null>(null);
+  const [claimingDevice, setClaimingDevice] =
+    createSignal<PendingDevice | null>(null);
 
   onMount(() => {
     fetchLighthouses();

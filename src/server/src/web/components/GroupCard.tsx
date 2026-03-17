@@ -1,6 +1,6 @@
-import { type Component, For, Show } from 'solid-js';
-import type { Group } from '../types';
-import styles from './GroupCard.module.css';
+import { type Component, For, Show } from "solid-js";
+import type { Group } from "../types";
+import styles from "./GroupCard.module.css";
 
 interface Props {
   group: Group;
@@ -9,8 +9,7 @@ interface Props {
 }
 
 export const GroupCard: Component<Props> = (props) => {
-
-  console.log(props.group.members)
+  console.log(props.group.members);
 
   return (
     <div class={styles.card}>
@@ -31,9 +30,13 @@ export const GroupCard: Component<Props> = (props) => {
       </Show>
 
       <div class={styles.members}>
-        <span class={styles.membersLabel}>Members ({props.group.members?.length || 0}/2):</span>
+        <span class={styles.membersLabel}>
+          Members ({props.group.members?.length || 0}/2):
+        </span>
         <Show
-          when={props.group.members !== undefined && props.group.members.length > 0}
+          when={
+            props.group.members !== undefined && props.group.members.length > 0
+          }
           fallback={<span class={styles.noMembers}>No members assigned</span>}
         >
           <div class={styles.memberList}>
@@ -41,7 +44,9 @@ export const GroupCard: Component<Props> = (props) => {
               {(member) => (
                 <div class={styles.member}>
                   <span class={styles.memberName}>{member.name}</span>
-                  <span class={`badge ${placementBadgeClass(member.placement)}`}>
+                  <span
+                    class={`badge ${placementBadgeClass(member.placement)}`}
+                  >
                     {member.placement}
                   </span>
                 </div>
@@ -56,11 +61,11 @@ export const GroupCard: Component<Props> = (props) => {
 
 function placementBadgeClass(placement: string): string {
   switch (placement) {
-    case 'INSIDE':
-      return 'badge-success';
-    case 'OUTSIDE':
-      return 'badge-warning';
+    case "INSIDE":
+      return "badge-success";
+    case "OUTSIDE":
+      return "badge-warning";
     default:
-      return 'badge-neutral';
+      return "badge-neutral";
   }
 }

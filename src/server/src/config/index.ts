@@ -20,7 +20,7 @@ interface Config {
     healthRetentionDays: number;
     connectionRetentionDays: number;
   };
-  nodeEnv: 'development' | 'production' | 'test';
+  nodeEnv: "development" | "production" | "test";
 }
 
 function getEnvVar(name: string, defaultValue?: string): string {
@@ -49,23 +49,26 @@ function getEnvVarAsInt(name: string, defaultValue?: number): number {
 export function loadConfig(): Config {
   return {
     database: {
-      url: getEnvVar('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/attendance'),
+      url: getEnvVar(
+        "DATABASE_URL",
+        "postgresql://postgres:postgres@localhost:5432/attendance",
+      ),
     },
     jwt: {
-      secret: getEnvVar('JWT_SECRET', 'dev-secret-change-in-production'),
-      expiresIn: getEnvVar('JWT_EXPIRES_IN', '24h'),
+      secret: getEnvVar("JWT_SECRET", "dev-secret-change-in-production"),
+      expiresIn: getEnvVar("JWT_EXPIRES_IN", "24h"),
     },
     mqtt: {
-      port: getEnvVarAsInt('MQTT_PORT', 1883),
+      port: getEnvVarAsInt("MQTT_PORT", 1883),
     },
     http: {
-      port: getEnvVarAsInt('HTTP_PORT', 3000),
+      port: getEnvVarAsInt("HTTP_PORT", 3000),
     },
     retention: {
-      healthRetentionDays: getEnvVarAsInt('HEALTH_RETENTION_DAYS', 7),
-      connectionRetentionDays: getEnvVarAsInt('CONNECTION_RETENTION_DAYS', 30),
+      healthRetentionDays: getEnvVarAsInt("HEALTH_RETENTION_DAYS", 7),
+      connectionRetentionDays: getEnvVarAsInt("CONNECTION_RETENTION_DAYS", 30),
     },
-    nodeEnv: (getEnvVar('NODE_ENV', 'development') as Config['nodeEnv']),
+    nodeEnv: getEnvVar("NODE_ENV", "development") as Config["nodeEnv"],
   };
 }
 

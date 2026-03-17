@@ -28,7 +28,6 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
 
-
     "isolatedModules": true
   }
 }

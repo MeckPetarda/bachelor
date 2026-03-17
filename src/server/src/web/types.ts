@@ -1,5 +1,5 @@
-export type Placement = 'STANDALONE' | 'INSIDE' | 'OUTSIDE';
-export type ScanSource = 'realtime' | 'offline_sync';
+export type Placement = "STANDALONE" | "INSIDE" | "OUTSIDE";
+export type ScanSource = "realtime" | "offline_sync";
 
 export interface Health {
   uptimeSec: number;
@@ -116,11 +116,11 @@ export interface ListResponse<T> {
 
 // WebSocket message types
 export type WsMessageType =
-  | 'scan'
-  | 'device:online'
-  | 'device:offline'
-  | 'device:health'
-  | 'device:pending';
+  | "scan"
+  | "device:online"
+  | "device:offline"
+  | "device:health"
+  | "device:pending";
 
 export interface WsMessage<T = unknown> {
   type: WsMessageType;

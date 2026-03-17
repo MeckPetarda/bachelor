@@ -1,13 +1,13 @@
-import { createStore } from 'solid-js/store';
-import * as api from '../api';
-import { showToast } from './toast';
+import { createStore } from "solid-js/store";
+import * as api from "../api";
+import { showToast } from "./toast";
 import type {
   Lighthouse,
   PendingDevice,
   ClaimDeviceRequest,
   UpdateLighthouseRequest,
   Health,
-} from '../types';
+} from "../types";
 
 interface LighthousesState {
   registered: Lighthouse[];
@@ -36,9 +36,10 @@ export async function fetchAll() {
       loading: false,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch devices';
+    const message =
+      err instanceof Error ? err.message : "Failed to fetch devices";
     setState({ error: message, loading: false });
-    showToast(message, 'error');
+    showToast(message, "error");
   }
 }
 
@@ -49,73 +50,89 @@ export async function claimDevice(deviceId: string, data: ClaimDeviceRequest) {
       registered: [...s.registered, lighthouse],
       pending: s.pending.filter((d) => d.deviceId !== deviceId),
     }));
-    showToast(`Device "${data.name}" claimed successfully`, 'success');
+    showToast(`Device "${data.name}" claimed successfully`, "success");
     return lighthouse;
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to claim device';
-    showToast(message, 'error');
+    const message =
+      err instanceof Error ? err.message : "Failed to claim device";
+    showToast(message, "error");
     throw err;
   }
 }
 
-export async function updateLighthouse(id: number, data: UpdateLighthouseRequest) {
+export async function updateLighthouse(
+  id: number,
+  data: UpdateLighthouseRequest,
+) {
   try {
     const updated = await api.updateLighthouse(id, data);
-    setState('registered', (lighthouses) =>
-      lighthouses.map((l) => (l.id === id ? { ...l, ...updated } : l))
+    setState("registered", (lighthouses) =>
+      lighthouses.map((l) => (l.id === id ? { ...l, ...updated } : l)),
     );
-    showToast('Lighthouse updated', 'success');
+    showToast("Lighthouse updated", "success");
     return updated;
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to update lighthouse';
-    showToast(message, 'error');
+    const message =
+      err instanceof Error ? err.message : "Failed to update lighthouse";
+    showToast(message, "error");
     throw err;
   }
 }
 
 // WebSocket handlers
-export function handleDeviceOnline(deviceId: string, lighthouseId: number | null) {
+export function handleDeviceOnline(
+  deviceId: string,
+  lighthouseId: number | null,
+) {
   if (lighthouseId !== null) {
-    setState('registered', (l) => l.id === lighthouseId, 'runtime', (r) => ({
-      ...r,
-      isConnected: true,
-    }));
+    setState(
+      "registered",
+      (l) => l.id === lighthouseId,
+      "runtime",
+      (r) => ({
+        ...r,
+        isConnected: true,
+      }),
+    );
   } else {
     // Could be a pending device coming online
-    setState('pending', (d) => d.deviceId === deviceId, 'isConnected', true);
+    setState("pending", (d) => d.deviceId === deviceId, "isConnected", true);
   }
 }
 
-export function handleDeviceOffline(deviceId: string, lighthouseId: number | null) {
+export function handleDeviceOffline(
+  deviceId: string,
+  lighthouseId: number | null,
+) {
   if (lighthouseId !== null) {
-    setState('registered', (l) => l.id === lighthouseId, 'runtime', {
+    setState("registered", (l) => l.id === lighthouseId, "runtime", {
       isConnected: false,
       lastHealthAt: null,
       health: null,
     });
     const lighthouse = state.registered.find((l) => l.id === lighthouseId);
     if (lighthouse) {
-      showToast(`Device went offline: ${lighthouse.name}`, 'warning');
+      showToast(`Device went offline: ${lighthouse.name}`, "warning");
     }
   } else {
-    setState('pending', (d) => d.deviceId === deviceId, 'isConnected', false);
+    setState("pending", (d) => d.deviceId === deviceId, "isConnected", false);
   }
 }
 
 export function handleDeviceHealth(
   deviceId: string,
   lighthouseId: number | null,
-  health: Health
+  health: Health,
 ) {
   const now = new Date().toISOString();
   if (lighthouseId !== null) {
-    setState('registered', (l) => l.id === lighthouseId, 'runtime', {
+    setState("registered", (l) => l.id === lighthouseId, "runtime", {
       isConnected: true,
       lastHealthAt: now,
       health,
     });
   } else {
-    setState('pending', (d) => d.deviceId === deviceId, {
+    setState("pending", (d) => d.deviceId === deviceId, {
       isConnected: true,
       lastHealthAt: now,
       health,
@@ -126,9 +143,9 @@ export function handleDeviceHealth(
 export function handleDevicePending(deviceId: string) {
   // Refresh pending list to get the new device
   api.getPendingDevices().then((res) => {
-    setState('pending', res.data);
+    setState("pending", res.data);
   });
-  showToast(`New device detected: ${deviceId}`, 'info');
+  showToast(`New device detected: ${deviceId}`, "info");
 }
 
 export { state as lighthousesState };

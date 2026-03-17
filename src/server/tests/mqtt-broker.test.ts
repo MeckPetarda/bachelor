@@ -1,7 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+} from "bun:test";
 import mqtt from "mqtt";
-import { startMqttBroker, closeMqttBroker, getMqttBrokerStats } from "../src/mqtt/broker";
-import { initDatabase, closeDatabase, getDatabase, schema } from "../src/database/client";
+import {
+  startMqttBroker,
+  closeMqttBroker,
+  getMqttBrokerStats,
+} from "../src/mqtt/broker";
+import {
+  initDatabase,
+  closeDatabase,
+  getDatabase,
+  schema,
+} from "../src/database/client";
 import { eq, desc } from "drizzle-orm";
 import {
   buildScanTopic,
@@ -23,7 +39,7 @@ const TEST_LIGHTHOUSE_ID = 999;
 async function waitFor(
   condition: () => Promise<boolean>,
   timeout = 5000,
-  interval = 100
+  interval = 100,
 ): Promise<void> {
   const startTime = Date.now();
   while (Date.now() - startTime < timeout) {
@@ -96,10 +112,14 @@ describe("MQTT Broker Integration", () => {
       .where(eq(schema.rawScans.lighthouseId, TEST_LIGHTHOUSE_ID));
     await db
       .delete(schema.lighthouseHealthSnapshots)
-      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     await db
       .delete(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
     // Clear runtime state
     clearAllStates();
   });
@@ -151,7 +171,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -202,7 +225,6 @@ describe("MQTT Broker Integration", () => {
 
     expect(storedScans.length).toBe(1);
 
-
     const storedScan = storedScans[0];
 
     if (storedScan === undefined) return;
@@ -212,7 +234,10 @@ describe("MQTT Broker Integration", () => {
     expect(storedScan.antennaId).toBe(scanPayload.antennaId);
     expect(storedScan.frequency).toBe(scanPayload.frequency);
     expect(storedScan.sequenceNumber).toBe(scanPayload.sequenceNumber);
-    expect(storedScan.detectionConfidence).toBeCloseTo(scanPayload.detectionConfidence, 2);
+    expect(storedScan.detectionConfidence).toBeCloseTo(
+      scanPayload.detectionConfidence,
+      2,
+    );
     expect(storedScan.processed).toBe(false);
 
     // Disconnect
@@ -233,7 +258,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -257,11 +285,16 @@ describe("MQTT Broker Integration", () => {
 
       publishPromises.push(
         new Promise<void>((resolve, reject) => {
-          client!.publish(topic, JSON.stringify(scanPayload), { qos: 0 }, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        })
+          client!.publish(
+            topic,
+            JSON.stringify(scanPayload),
+            { qos: 0 },
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            },
+          );
+        }),
       );
     }
 
@@ -301,7 +334,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -353,7 +389,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -397,7 +436,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -416,10 +458,15 @@ describe("MQTT Broker Integration", () => {
     };
 
     await new Promise<void>((resolve, reject) => {
-      client!.publish(topic, JSON.stringify(invalidPayload), { qos: 0 }, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
+      client!.publish(
+        topic,
+        JSON.stringify(invalidPayload),
+        { qos: 0 },
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        },
+      );
     });
 
     // Wait a bit
@@ -450,7 +497,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -496,7 +546,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -521,7 +574,12 @@ describe("MQTT Broker Integration", () => {
       const events = await db
         .select()
         .from(schema.lighthouseConnectionEvents)
-        .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+        .where(
+          eq(
+            schema.lighthouseConnectionEvents.lighthouseId,
+            TEST_LIGHTHOUSE_ID,
+          ),
+        )
         .limit(1);
       return events.length > 0;
     }, 3000);
@@ -530,7 +588,9 @@ describe("MQTT Broker Integration", () => {
     const events = await db
       .select()
       .from(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      )
       .limit(1);
 
     expect(events.length).toBe(1);
@@ -551,7 +611,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -603,7 +666,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -655,7 +721,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -684,10 +753,15 @@ describe("MQTT Broker Integration", () => {
     // Publish health message
     const topic = buildHealthTopic(TEST_DEVICE_ID);
     await new Promise<void>((resolve, reject) => {
-      client!.publish(topic, JSON.stringify(healthPayload), { qos: 0 }, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
+      client!.publish(
+        topic,
+        JSON.stringify(healthPayload),
+        { qos: 0 },
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        },
+      );
     });
 
     // Wait for snapshot to be stored
@@ -695,7 +769,9 @@ describe("MQTT Broker Integration", () => {
       const snapshots = await db
         .select()
         .from(schema.lighthouseHealthSnapshots)
-        .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID))
+        .where(
+          eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+        )
         .limit(1);
       return snapshots.length > 0;
     }, 3000);
@@ -704,7 +780,9 @@ describe("MQTT Broker Integration", () => {
     const snapshots = await db
       .select()
       .from(schema.lighthouseHealthSnapshots)
-      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID))
+      .where(
+        eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+      )
       .limit(1);
 
     expect(snapshots.length).toBe(1);
@@ -730,7 +808,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -759,10 +840,15 @@ describe("MQTT Broker Integration", () => {
     // Publish health message
     const topic = buildHealthTopic(TEST_DEVICE_ID);
     await new Promise<void>((resolve, reject) => {
-      client!.publish(topic, JSON.stringify(healthPayload), { qos: 0 }, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
+      client!.publish(
+        topic,
+        JSON.stringify(healthPayload),
+        { qos: 0 },
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        },
+      );
     });
 
     // Wait for state update
@@ -793,7 +879,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -807,10 +896,15 @@ describe("MQTT Broker Integration", () => {
     // Publish malformed health message (missing required fields)
     const topic = buildHealthTopic(TEST_DEVICE_ID);
     await new Promise<void>((resolve, reject) => {
-      client!.publish(topic, JSON.stringify({ uptime_sec: 100 }), { qos: 0 }, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
+      client!.publish(
+        topic,
+        JSON.stringify({ uptime_sec: 100 }),
+        { qos: 0 },
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        },
+      );
     });
 
     // Wait a bit
@@ -820,7 +914,9 @@ describe("MQTT Broker Integration", () => {
     const snapshots = await db
       .select()
       .from(schema.lighthouseHealthSnapshots)
-      .where(eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID));
+      .where(
+        eq(schema.lighthouseHealthSnapshots.lighthouseId, TEST_LIGHTHOUSE_ID),
+      );
 
     expect(snapshots.length).toBe(0);
 
@@ -845,7 +941,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -874,10 +973,15 @@ describe("MQTT Broker Integration", () => {
     };
 
     await new Promise<void>((resolve, reject) => {
-      client!.publish(topic, JSON.stringify(healthPayload), { qos: 0 }, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
+      client!.publish(
+        topic,
+        JSON.stringify(healthPayload),
+        { qos: 0 },
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        },
+      );
     });
 
     // Wait a bit
@@ -910,7 +1014,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -945,19 +1052,26 @@ describe("MQTT Broker Integration", () => {
       const events = await db
         .select()
         .from(schema.lighthouseConnectionEvents)
-        .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+        .where(
+          eq(
+            schema.lighthouseConnectionEvents.lighthouseId,
+            TEST_LIGHTHOUSE_ID,
+          ),
+        )
         .orderBy(desc(schema.lighthouseConnectionEvents.recordedAt));
-      return events.some(e => e.eventType === "disconnected");
+      return events.some((e) => e.eventType === "disconnected");
     }, 3000);
 
     // Verify disconnect event was recorded as graceful
     const events = await db
       .select()
       .from(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      )
       .orderBy(desc(schema.lighthouseConnectionEvents.recordedAt));
 
-    const disconnectEvent = events.find(e => e.eventType === "disconnected");
+    const disconnectEvent = events.find((e) => e.eventType === "disconnected");
     expect(disconnectEvent).toBeDefined();
     expect(disconnectEvent?.isGraceful).toBe(true);
 
@@ -978,7 +1092,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -1007,19 +1124,26 @@ describe("MQTT Broker Integration", () => {
       const events = await db
         .select()
         .from(schema.lighthouseConnectionEvents)
-        .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+        .where(
+          eq(
+            schema.lighthouseConnectionEvents.lighthouseId,
+            TEST_LIGHTHOUSE_ID,
+          ),
+        )
         .orderBy(desc(schema.lighthouseConnectionEvents.recordedAt));
-      return events.some(e => e.eventType === "disconnected");
+      return events.some((e) => e.eventType === "disconnected");
     }, 3000);
 
     // Verify disconnect event was recorded as ungraceful
     const events = await db
       .select()
       .from(schema.lighthouseConnectionEvents)
-      .where(eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID))
+      .where(
+        eq(schema.lighthouseConnectionEvents.lighthouseId, TEST_LIGHTHOUSE_ID),
+      )
       .orderBy(desc(schema.lighthouseConnectionEvents.recordedAt));
 
-    const disconnectEvent = events.find(e => e.eventType === "disconnected");
+    const disconnectEvent = events.find((e) => e.eventType === "disconnected");
     expect(disconnectEvent).toBeDefined();
     expect(disconnectEvent?.isGraceful).toBe(false);
 
@@ -1042,7 +1166,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -1075,7 +1202,9 @@ describe("MQTT Broker Integration", () => {
 
     // Verify the message
     expect(receivedMessage).not.toBeNull();
-    expect(receivedMessage?.topic).toBe(buildConfigTopic(TEST_DEVICE_ID, "scan_interval"));
+    expect(receivedMessage?.topic).toBe(
+      buildConfigTopic(TEST_DEVICE_ID, "scan_interval"),
+    );
 
     const payload = JSON.parse(receivedMessage!.payload);
     expect(payload.value).toBe(30);
@@ -1098,7 +1227,10 @@ describe("MQTT Broker Integration", () => {
     });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(
+        () => reject(new Error("Connection timeout")),
+        5000,
+      );
       client!.on("connect", () => {
         clearTimeout(timeout);
         resolve();
@@ -1127,21 +1259,35 @@ describe("MQTT Broker Integration", () => {
     publishConfig(TEST_DEVICE_ID, "string_config", "test_value");
     publishConfig(TEST_DEVICE_ID, "number_config", 42.5);
     publishConfig(TEST_DEVICE_ID, "boolean_config", true);
-    publishConfig(TEST_DEVICE_ID, "object_config", { nested: "value", count: 10 });
+    publishConfig(TEST_DEVICE_ID, "object_config", {
+      nested: "value",
+      count: 10,
+    });
 
     // Wait for all messages to be received
     await waitFor(async () => receivedMessages.length >= 4, 3000);
 
     // Verify each message type
-    const stringMsg = receivedMessages.find(m => m.topic.includes("string_config"));
-    const numberMsg = receivedMessages.find(m => m.topic.includes("number_config"));
-    const boolMsg = receivedMessages.find(m => m.topic.includes("boolean_config"));
-    const objectMsg = receivedMessages.find(m => m.topic.includes("object_config"));
+    const stringMsg = receivedMessages.find((m) =>
+      m.topic.includes("string_config"),
+    );
+    const numberMsg = receivedMessages.find((m) =>
+      m.topic.includes("number_config"),
+    );
+    const boolMsg = receivedMessages.find((m) =>
+      m.topic.includes("boolean_config"),
+    );
+    const objectMsg = receivedMessages.find((m) =>
+      m.topic.includes("object_config"),
+    );
 
     expect(JSON.parse(stringMsg!.payload).value).toBe("test_value");
     expect(JSON.parse(numberMsg!.payload).value).toBe(42.5);
     expect(JSON.parse(boolMsg!.payload).value).toBe(true);
-    expect(JSON.parse(objectMsg!.payload).value).toEqual({ nested: "value", count: 10 });
+    expect(JSON.parse(objectMsg!.payload).value).toEqual({
+      nested: "value",
+      count: 10,
+    });
 
     // Disconnect
     await new Promise<void>((resolve) => {

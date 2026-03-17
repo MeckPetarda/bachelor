@@ -1,6 +1,18 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+} from "bun:test";
 import { app } from "../src/api/routes";
-import { initDatabase, closeDatabase, getDatabase, schema } from "../src/database/client";
+import {
+  initDatabase,
+  closeDatabase,
+  getDatabase,
+  schema,
+} from "../src/database/client";
 import { startMqttBroker, closeMqttBroker } from "../src/mqtt/broker";
 import { createJWT } from "../src/api/middleware";
 import { getConfig } from "../src/config";
@@ -47,7 +59,7 @@ describe("REST API Endpoints", () => {
     authToken = await createJWT(
       { sub: "test-user-id", username: TEST_USERNAME, role: "STANDALONE" },
       config.jwt.secret,
-      "1h"
+      "1h",
     );
   });
 
@@ -301,9 +313,12 @@ describe("REST API Endpoints", () => {
         }),
       });
 
-      const res = await app.request(`/api/v1/lighthouses/${TEST_LIGHTHOUSE_ID}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
+      const res = await app.request(
+        `/api/v1/lighthouses/${TEST_LIGHTHOUSE_ID}`,
+        {
+          headers: { Authorization: `Bearer ${authToken}` },
+        },
+      );
 
       expect(res.status).toBe(200);
 
@@ -351,18 +366,21 @@ describe("REST API Endpoints", () => {
         }),
       });
 
-      const res = await app.request(`/api/v1/lighthouses/${TEST_LIGHTHOUSE_ID}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
+      const res = await app.request(
+        `/api/v1/lighthouses/${TEST_LIGHTHOUSE_ID}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Updated Lighthouse Name",
+            placement: "OUTSIDE",
+            comment: "Updated via PATCH",
+          }),
         },
-        body: JSON.stringify({
-          name: "Updated Lighthouse Name",
-          placement: "OUTSIDE",
-          comment: "Updated via PATCH",
-        }),
-      });
+      );
 
       expect(res.status).toBe(200);
 
@@ -400,14 +418,17 @@ describe("REST API Endpoints", () => {
         }),
       });
 
-      const res = await app.request(`/api/v1/lighthouses/${TEST_LIGHTHOUSE_ID}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
+      const res = await app.request(
+        `/api/v1/lighthouses/${TEST_LIGHTHOUSE_ID}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ isActive: false }),
         },
-        body: JSON.stringify({ isActive: false }),
-      });
+      );
 
       expect(res.status).toBe(200);
 

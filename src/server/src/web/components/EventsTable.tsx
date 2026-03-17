@@ -1,6 +1,6 @@
-import { type Component, For, Show, createSignal, onMount } from 'solid-js';
-import type { Scan } from '../types';
-import styles from './EventsTable.module.css';
+import { type Component, For, Show, createSignal, onMount } from "solid-js";
+import type { Scan } from "../types";
+import styles from "./EventsTable.module.css";
 
 interface Props {
   events: Scan[];
@@ -50,7 +50,7 @@ export const EventsTable: Component<Props> = (props) => {
 
   const formatDate = (isoString: string): string => {
     const date = new Date(isoString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
 
   return (
@@ -78,7 +78,7 @@ export const EventsTable: Component<Props> = (props) => {
             <For each={props.events}>
               {(event) => (
                 <tr
-                  class={isNewEvent(event.id) ? styles.highlight : ''}
+                  class={isNewEvent(event.id) ? styles.highlight : ""}
                   title={formatDate(event.timestamp)}
                 >
                   <td class={styles.time}>{formatTime(event.timestamp)}</td>
@@ -86,10 +86,10 @@ export const EventsTable: Component<Props> = (props) => {
                   <td class={styles.epc}>{event.epc}</td>
                   <td class={styles.rssi}>{event.rssiDbm} dBm</td>
                   <td>
-                    <Show when={event.source === 'offline_sync'}>
+                    <Show when={event.source === "offline_sync"}>
                       <span class="badge badge-warning">Offline</span>
                     </Show>
-                    <Show when={event.source === 'realtime'}>
+                    <Show when={event.source === "realtime"}>
                       <span class="badge badge-success">Live</span>
                     </Show>
                   </td>

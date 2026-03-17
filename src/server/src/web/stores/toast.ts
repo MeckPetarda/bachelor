@@ -1,6 +1,6 @@
-import { createSignal } from 'solid-js';
+import { createSignal } from "solid-js";
 
-export type ToastType = 'success' | 'error' | 'info' | 'warning';
+export type ToastType = "success" | "error" | "info" | "warning";
 
 export interface Toast {
   id: number;
@@ -12,7 +12,7 @@ let nextId = 0;
 
 const [toasts, setToasts] = createSignal<Toast[]>([]);
 
-export function showToast(message: string, type: ToastType = 'info') {
+export function showToast(message: string, type: ToastType = "info") {
   const id = nextId++;
   const toast: Toast = { id, message, type };
 

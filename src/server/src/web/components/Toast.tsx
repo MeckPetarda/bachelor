@@ -1,12 +1,12 @@
-import { type Component, For } from 'solid-js';
-import { toasts, dismissToast, type ToastType } from '../stores/toast';
-import styles from './Toast.module.css';
+import { type Component, For } from "solid-js";
+import { toasts, dismissToast, type ToastType } from "../stores/toast";
+import styles from "./Toast.module.css";
 
 const typeIcons: Record<ToastType, string> = {
-  success: '\u2713',
-  error: '\u2717',
-  warning: '\u26A0',
-  info: '\u2139',
+  success: "\u2713",
+  error: "\u2717",
+  warning: "\u26A0",
+  info: "\u2139",
 };
 
 export const Toast: Component = () => {

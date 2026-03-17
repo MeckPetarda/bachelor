@@ -43,7 +43,9 @@ const lighthouseStates = new Map<string, LighthouseRuntimeState>();
  * @param mac - The lighthouse MAC address
  * @returns The runtime state or undefined if not found
  */
-export function getLighthouseState(mac: string): LighthouseRuntimeState | undefined {
+export function getLighthouseState(
+  mac: string,
+): LighthouseRuntimeState | undefined {
   return lighthouseStates.get(mac.toUpperCase());
 }
 
@@ -52,7 +54,10 @@ export function getLighthouseState(mac: string): LighthouseRuntimeState | undefi
  * @param mac - The lighthouse MAC address
  * @param isRegistered - Whether the device is registered in the database
  */
-export function setLighthouseConnected(mac: string, isRegistered: boolean = false): void {
+export function setLighthouseConnected(
+  mac: string,
+  isRegistered: boolean = false,
+): void {
   const normalizedMac = mac.toUpperCase();
   const existing = lighthouseStates.get(normalizedMac);
   const now = new Date();
@@ -73,7 +78,10 @@ export function setLighthouseConnected(mac: string, isRegistered: boolean = fals
  * @param mac - The lighthouse MAC address
  * @param graceful - Whether the disconnection was graceful (explicit offline message)
  */
-export function setLighthouseDisconnected(mac: string, graceful: boolean): void {
+export function setLighthouseDisconnected(
+  mac: string,
+  graceful: boolean,
+): void {
   const normalizedMac = mac.toUpperCase();
   const existing = lighthouseStates.get(normalizedMac);
   const now = new Date();
@@ -95,7 +103,11 @@ export function setLighthouseDisconnected(mac: string, graceful: boolean): void 
  * @param health - The health payload
  * @param isRegistered - Whether the device is registered in the database
  */
-export function updateLighthouseHealth(mac: string, health: HealthPayload, isRegistered: boolean = false): void {
+export function updateLighthouseHealth(
+  mac: string,
+  health: HealthPayload,
+  isRegistered: boolean = false,
+): void {
   const normalizedMac = mac.toUpperCase();
   const existing = lighthouseStates.get(normalizedMac);
   const now = new Date();

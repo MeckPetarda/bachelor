@@ -1,8 +1,8 @@
-import { type Component, onMount, onCleanup, type JSX } from 'solid-js';
-import { A } from '@solidjs/router';
-import { Toast } from './components/Toast';
-import { connect, disconnect } from './stores/websocket';
-import styles from './App.module.css';
+import { type Component, onMount, onCleanup, type JSX } from "solid-js";
+import { A } from "@solidjs/router";
+import { Toast } from "./components/Toast";
+import { connect, disconnect } from "./stores/websocket";
+import styles from "./App.module.css";
 
 interface AppProps {
   children?: JSX.Element;

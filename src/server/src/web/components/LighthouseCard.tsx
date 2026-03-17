@@ -1,6 +1,6 @@
-import { type Component, Show, createSignal } from 'solid-js';
-import type { Lighthouse } from '../types';
-import styles from './LighthouseCard.module.css';
+import { type Component, Show, createSignal } from "solid-js";
+import type { Lighthouse } from "../types";
+import styles from "./LighthouseCard.module.css";
 
 interface Props {
   lighthouse: Lighthouse;
@@ -29,16 +29,20 @@ export const LighthouseCard: Component<Props> = (props) => {
     <div class={styles.card} onClick={() => setExpanded(!expanded())}>
       <div class={styles.header}>
         <div class={styles.status}>
-          <span class={`status-dot ${isConnected() ? 'online' : 'offline'}`} />
+          <span class={`status-dot ${isConnected() ? "online" : "offline"}`} />
           <span class={styles.name}>
             {props.lighthouse.label || props.lighthouse.name}
           </span>
         </div>
         <div class={styles.badges}>
           <Show when={props.lighthouse.group}>
-            <span class="badge badge-info">{props.lighthouse.group!.label}</span>
+            <span class="badge badge-info">
+              {props.lighthouse.group!.label}
+            </span>
           </Show>
-          <span class={`badge ${placementBadgeClass(props.lighthouse.placement)}`}>
+          <span
+            class={`badge ${placementBadgeClass(props.lighthouse.placement)}`}
+          >
             {props.lighthouse.placement}
           </span>
         </div>
@@ -50,11 +54,15 @@ export const LighthouseCard: Component<Props> = (props) => {
         <div class={styles.health}>
           <div class={styles.healthRow}>
             <span class={styles.healthLabel}>Uptime</span>
-            <span class={styles.healthValue}>{formatUptime(health()!.uptimeSec)}</span>
+            <span class={styles.healthValue}>
+              {formatUptime(health()!.uptimeSec)}
+            </span>
           </div>
           <div class={styles.healthRow}>
             <span class={styles.healthLabel}>Free Heap</span>
-            <span class={styles.healthValue}>{formatBytes(health()!.freeHeapBytes)}</span>
+            <span class={styles.healthValue}>
+              {formatBytes(health()!.freeHeapBytes)}
+            </span>
           </div>
           <div class={styles.healthRow}>
             <span class={styles.healthLabel}>WiFi RSSI</span>
@@ -65,7 +73,10 @@ export const LighthouseCard: Component<Props> = (props) => {
             <span class={styles.healthValue}>
               {health()!.rfidState}
               <Show when={!health()!.rfidIsResponsive}>
-                <span class="badge badge-danger" style={{ "margin-left": "0.5rem" }}>
+                <span
+                  class="badge badge-danger"
+                  style={{ "margin-left": "0.5rem" }}
+                >
                   Unresponsive
                 </span>
               </Show>

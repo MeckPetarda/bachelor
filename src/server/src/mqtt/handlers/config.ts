@@ -50,9 +50,11 @@ export function publishConfig(mac: string, key: string, value: unknown): void {
       if (error) {
         logger.error(`Failed to publish config to ${topic}:`, error.message);
       } else {
-        logger.debug(`Published config to ${topic}: ${key}=${JSON.stringify(value)}`);
+        logger.debug(
+          `Published config to ${topic}: ${key}=${JSON.stringify(value)}`,
+        );
       }
-    }
+    },
   );
 }
 
@@ -61,7 +63,10 @@ export function publishConfig(mac: string, key: string, value: unknown): void {
  * @param mac - The lighthouse MAC address
  * @param configs - Object with config key-value pairs
  */
-export function publishConfigs(mac: string, configs: Record<string, unknown>): void {
+export function publishConfigs(
+  mac: string,
+  configs: Record<string, unknown>,
+): void {
   for (const [key, value] of Object.entries(configs)) {
     publishConfig(mac, key, value);
   }

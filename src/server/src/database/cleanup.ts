@@ -32,7 +32,7 @@ export async function cleanupOldHealthSnapshots(): Promise<number> {
 
   if (deletedCount > 0) {
     logger.info(
-      `Deleted ${deletedCount} health snapshots older than ${retentionDays} days`
+      `Deleted ${deletedCount} health snapshots older than ${retentionDays} days`,
     );
   }
 
@@ -59,7 +59,7 @@ export async function cleanupOldConnectionEvents(): Promise<number> {
 
   if (deletedCount > 0) {
     logger.info(
-      `Deleted ${deletedCount} connection events older than ${retentionDays} days`
+      `Deleted ${deletedCount} connection events older than ${retentionDays} days`,
     );
   }
 
@@ -77,7 +77,7 @@ export async function runRetentionCleanup(): Promise<void> {
     const connectionDeleted = await cleanupOldConnectionEvents();
 
     logger.info(
-      `Retention cleanup complete: ${healthDeleted} health snapshots, ${connectionDeleted} connection events deleted`
+      `Retention cleanup complete: ${healthDeleted} health snapshots, ${connectionDeleted} connection events deleted`,
     );
   } catch (error) {
     logger.error("Error during retention cleanup:", error);
@@ -98,14 +98,11 @@ export function startRetentionScheduler(): void {
   });
 
   // Schedule daily cleanup (24 hours)
-  cleanupIntervalId = setInterval(
-    () => {
-      runRetentionCleanup().catch((error) => {
-        logger.error("Scheduled retention cleanup failed:", error);
-      });
-    },
-    DAY_MS
-  );
+  cleanupIntervalId = setInterval(() => {
+    runRetentionCleanup().catch((error) => {
+      logger.error("Scheduled retention cleanup failed:", error);
+    });
+  }, DAY_MS);
 
   logger.info("Retention cleanup scheduler started (runs daily)");
 }

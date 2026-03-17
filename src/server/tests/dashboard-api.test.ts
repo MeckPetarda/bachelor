@@ -1,6 +1,19 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+} from "bun:test";
 import { app } from "../src/api/routes";
-import { initDatabase, closeDatabase, getDatabase, schema } from "../src/database/client";
+import {
+  initDatabase,
+  closeDatabase,
+  getDatabase,
+  schema,
+} from "../src/database/client";
 import { startMqttBroker, closeMqttBroker } from "../src/mqtt/broker";
 import { createJWT } from "../src/api/middleware";
 import { getConfig } from "../src/config";
@@ -57,7 +70,7 @@ describe("Dashboard API Endpoints", () => {
     authToken = await createJWT(
       { sub: "test-user-id", username: TEST_USERNAME, role: "STANDALONE" },
       config.jwt.secret,
-      "1h"
+      "1h",
     );
   });
 
@@ -191,14 +204,17 @@ describe("Dashboard API Endpoints", () => {
 
   describe("POST /api/v1/devices/pending/:deviceId/claim", () => {
     it("should return 404 for non-existent pending device", async () => {
-      const res = await app.request("/api/v1/devices/pending/XX:XX:XX:XX:XX:XX/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: TEST_LIGHTHOUSE_NAME,
-          placement: "STANDALONE",
-        }),
-      });
+      const res = await app.request(
+        "/api/v1/devices/pending/XX:XX:XX:XX:XX:XX/claim",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: TEST_LIGHTHOUSE_NAME,
+            placement: "STANDALONE",
+          }),
+        },
+      );
 
       expect(res.status).toBe(404);
       const body = await res.json();
@@ -209,11 +225,14 @@ describe("Dashboard API Endpoints", () => {
       // Add a pending device
       setLighthouseConnected(TEST_PENDING_DEVICE_ID, false);
 
-      const res = await app.request(`/api/v1/devices/pending/${TEST_PENDING_DEVICE_ID}/claim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
+      const res = await app.request(
+        `/api/v1/devices/pending/${TEST_PENDING_DEVICE_ID}/claim`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
 
       expect(res.status).toBe(400);
     });
@@ -222,15 +241,18 @@ describe("Dashboard API Endpoints", () => {
       // Add a pending device
       setLighthouseConnected(TEST_PENDING_DEVICE_ID, false);
 
-      const res = await app.request(`/api/v1/devices/pending/${TEST_PENDING_DEVICE_ID}/claim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: TEST_LIGHTHOUSE_NAME,
-          label: "Test Label",
-          placement: "INSIDE",
-        }),
-      });
+      const res = await app.request(
+        `/api/v1/devices/pending/${TEST_PENDING_DEVICE_ID}/claim`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: TEST_LIGHTHOUSE_NAME,
+            label: "Test Label",
+            placement: "INSIDE",
+          }),
+        },
+      );
 
       expect(res.status).toBe(201);
 
@@ -258,14 +280,17 @@ describe("Dashboard API Endpoints", () => {
       // Add a pending device
       setLighthouseConnected(TEST_PENDING_DEVICE_ID, false);
 
-      const res = await app.request(`/api/v1/devices/pending/${TEST_PENDING_DEVICE_ID}/claim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: TEST_LIGHTHOUSE_NAME,
-          placement: "STANDALONE",
-        }),
-      });
+      const res = await app.request(
+        `/api/v1/devices/pending/${TEST_PENDING_DEVICE_ID}/claim`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: TEST_LIGHTHOUSE_NAME,
+            placement: "STANDALONE",
+          }),
+        },
+      );
 
       expect(res.status).toBe(400);
       const body = await res.json();
@@ -284,22 +309,35 @@ describe("Dashboard API Endpoints", () => {
 
       // Add 2 lighthouses to the group
       await db.insert(schema.lighthouses).values([
-        { name: "Group Member 1", deviceId: "G1:G1:G1:G1:G1:G1", placement: "INSIDE", groupId },
-        { name: "Group Member 2", deviceId: "G2:G2:G2:G2:G2:G2", placement: "OUTSIDE", groupId },
+        {
+          name: "Group Member 1",
+          deviceId: "G1:G1:G1:G1:G1:G1",
+          placement: "INSIDE",
+          groupId,
+        },
+        {
+          name: "Group Member 2",
+          deviceId: "G2:G2:G2:G2:G2:G2",
+          placement: "OUTSIDE",
+          groupId,
+        },
       ]);
 
       // Add a pending device
       setLighthouseConnected(TEST_PENDING_DEVICE_ID, false);
 
-      const res = await app.request(`/api/v1/devices/pending/${TEST_PENDING_DEVICE_ID}/claim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: TEST_LIGHTHOUSE_NAME,
-          placement: "STANDALONE",
-          groupId,
-        }),
-      });
+      const res = await app.request(
+        `/api/v1/devices/pending/${TEST_PENDING_DEVICE_ID}/claim`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: TEST_LIGHTHOUSE_NAME,
+            placement: "STANDALONE",
+            groupId,
+          }),
+        },
+      );
 
       expect(res.status).toBe(400);
       const body = await res.json();
@@ -342,7 +380,9 @@ describe("Dashboard API Endpoints", () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      const testGroup = body.data.find((g: { label: string }) => g.label === TEST_GROUP_LABEL);
+      const testGroup = body.data.find(
+        (g: { label: string }) => g.label === TEST_GROUP_LABEL,
+      );
       expect(testGroup).toBeDefined();
       expect(testGroup.description).toBe("Test Description");
       expect(testGroup.members.length).toBe(1);
@@ -547,7 +587,9 @@ describe("Dashboard API Endpoints", () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      const testLighthouse = body.data.find((lh: { name: string }) => lh.name === TEST_LIGHTHOUSE_NAME);
+      const testLighthouse = body.data.find(
+        (lh: { name: string }) => lh.name === TEST_LIGHTHOUSE_NAME,
+      );
       expect(testLighthouse).toBeDefined();
       expect(testLighthouse.runtime).toBeDefined();
       expect(testLighthouse.runtime.isConnected).toBe(true);
@@ -575,7 +617,9 @@ describe("Dashboard API Endpoints", () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      const testLighthouse = body.data.find((lh: { name: string }) => lh.name === TEST_LIGHTHOUSE_NAME);
+      const testLighthouse = body.data.find(
+        (lh: { name: string }) => lh.name === TEST_LIGHTHOUSE_NAME,
+      );
       expect(testLighthouse.group).toBeDefined();
       expect(testLighthouse.group.label).toBe(TEST_GROUP_LABEL);
     });
@@ -601,14 +645,17 @@ describe("Dashboard API Endpoints", () => {
         })
         .returning();
 
-      const res = await app.request(`/api/v1/lighthouses/${lhResult[0].id}/update`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          groupId: groupResult[0].id,
-          placement: "INSIDE",
-        }),
-      });
+      const res = await app.request(
+        `/api/v1/lighthouses/${lhResult[0].id}/update`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            groupId: groupResult[0].id,
+            placement: "INSIDE",
+          }),
+        },
+      );
 
       expect(res.status).toBe(200);
 
@@ -637,11 +684,14 @@ describe("Dashboard API Endpoints", () => {
         })
         .returning();
 
-      const res = await app.request(`/api/v1/lighthouses/${lhResult[0].id}/update`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId: null }),
-      });
+      const res = await app.request(
+        `/api/v1/lighthouses/${lhResult[0].id}/update`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupId: null }),
+        },
+      );
 
       expect(res.status).toBe(200);
 
@@ -661,8 +711,18 @@ describe("Dashboard API Endpoints", () => {
 
       // Add 2 lighthouses to the group
       await db.insert(schema.lighthouses).values([
-        { name: "Group Member 1", deviceId: "G1:G1:G1:G1:G1:G1", placement: "INSIDE", groupId },
-        { name: "Group Member 2", deviceId: "G2:G2:G2:G2:G2:G2", placement: "OUTSIDE", groupId },
+        {
+          name: "Group Member 1",
+          deviceId: "G1:G1:G1:G1:G1:G1",
+          placement: "INSIDE",
+          groupId,
+        },
+        {
+          name: "Group Member 2",
+          deviceId: "G2:G2:G2:G2:G2:G2",
+          placement: "OUTSIDE",
+          groupId,
+        },
       ]);
 
       // Create a lighthouse not in the group
@@ -675,11 +735,14 @@ describe("Dashboard API Endpoints", () => {
         })
         .returning();
 
-      const res = await app.request(`/api/v1/lighthouses/${lhResult[0].id}/update`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId }),
-      });
+      const res = await app.request(
+        `/api/v1/lighthouses/${lhResult[0].id}/update`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupId }),
+        },
+      );
 
       expect(res.status).toBe(400);
       const body = await res.json();
@@ -755,7 +818,9 @@ describe("Dashboard API Endpoints", () => {
     });
 
     it("should filter by lighthouseId", async () => {
-      const res = await app.request(`/api/v1/scans?lighthouseId=${testLighthouseId}`);
+      const res = await app.request(
+        `/api/v1/scans?lighthouseId=${testLighthouseId}`,
+      );
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -802,7 +867,9 @@ describe("Dashboard API Endpoints", () => {
     });
 
     it("should return scans in descending timestamp order", async () => {
-      const res = await app.request(`/api/v1/scans?lighthouseId=${testLighthouseId}`);
+      const res = await app.request(
+        `/api/v1/scans?lighthouseId=${testLighthouseId}`,
+      );
       expect(res.status).toBe(200);
 
       const body = await res.json();

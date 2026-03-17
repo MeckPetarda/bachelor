@@ -31,7 +31,9 @@ interface HealthMessagePayload {
 /**
  * Validate that the payload has all required fields with correct types
  */
-function validateHealthPayload(payload: unknown): payload is HealthMessagePayload {
+function validateHealthPayload(
+  payload: unknown,
+): payload is HealthMessagePayload {
   if (typeof payload !== "object" || payload === null) {
     return false;
   }
@@ -83,7 +85,7 @@ function convertToHealthPayload(payload: HealthMessagePayload): HealthPayload {
  */
 export async function handleHealthMessage(
   topic: string,
-  payload: string | Buffer
+  payload: string | Buffer,
 ): Promise<void> {
   // Extract MAC address from topic
   const macAddress = extractMacAddress(topic);
@@ -107,7 +109,9 @@ export async function handleHealthMessage(
     return;
   }
 
-  logger.debug(`Processing health from ${macAddress}: uptime=${healthData.uptime_sec}s`);
+  logger.debug(
+    `Processing health from ${macAddress}: uptime=${healthData.uptime_sec}s`,
+  );
 
   try {
     // Look up lighthouse by deviceId (MAC)
