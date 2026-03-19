@@ -1,17 +1,17 @@
 import { Hono } from "hono";
 import { eq, and, gte, lte, ilike, desc, sql, count } from "drizzle-orm";
-import { getDatabase, schema, isHealthy } from "../database/client";
-import { getMqttBrokerStats } from "../mqtt/broker";
-import { getConfig } from "../config";
-import { createLogger } from "../utils/logger";
-import { requestLogger, errorHandler, jwtAuth, createJWT } from "./middleware";
+import { getDatabase, schema, isHealthy } from "../../database/client";
+import { getMqttBrokerStats } from "../../mqtt/broker";
+import { getConfig } from "../../config";
+import { createLogger } from "../../utils/logger";
+import { requestLogger, errorHandler, jwtAuth, createJWT } from "../middleware";
 import {
   getPendingDeviceStates,
   getLighthouseState,
   getAllLighthouseStates,
   isPendingDevice,
   markDeviceAsRegistered,
-} from "../mqtt/state";
+} from "../../mqtt/state";
 
 const logger = createLogger("Routes");
 
