@@ -31,6 +31,9 @@ const App: Component<AppProps> = (props) => {
           <A href="/events" class={styles.navLink} activeClass={styles.active}>
             Events
           </A>
+          <A href="/users" class={styles.navLink} activeClass={styles.active}>
+            Users
+          </A>
         </div>
       </nav>
       <main class={styles.main}>{props.children}</main>

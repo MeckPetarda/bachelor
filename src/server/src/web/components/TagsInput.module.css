@@ -1,0 +1,64 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tagRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tagDot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary, #4f7cff);
+  opacity: 0.7;
+}
+
+.tagDotAdd {
+  background: transparent;
+  border: 1.5px solid var(--color-muted, #aaa);
+  opacity: 0.5;
+}
+
+.tagInput {
+  flex: 1;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+}
+
+.removeBtn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+
+  background: transparent;
+  color: var(--color-muted, #aaa);
+}
+
+.removeBtn:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.addIcon {
+  font-size: 1.1rem;
+  color: var(--color-muted, #aaa);
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}

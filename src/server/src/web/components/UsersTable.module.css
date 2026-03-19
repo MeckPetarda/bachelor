@@ -1,0 +1,80 @@
+.container {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.loading,
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  background: var(--color-hover);
+  font-weight: 600;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: var(--color-hover);
+}
+
+.mono {
+  font-family: monospace;
+  font-size: 0.8125rem;
+}
+
+.email {
+  font-size: 0.8125rem;
+}
+
+.implied {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: 0.8125rem;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag {
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.actions {
+  text-align: right;
+  white-space: nowrap;
+}

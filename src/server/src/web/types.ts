@@ -158,3 +158,12 @@ export interface WsDeviceHealthPayload {
 export interface WsDevicePendingPayload {
   deviceId: string;
 }
+
+export interface User {
+  id?: number;
+  name?: string;
+  tags: string[];
+  sync_id: number;
+  email?: string;
+  active: boolean;
+}
