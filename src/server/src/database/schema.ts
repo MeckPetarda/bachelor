@@ -153,8 +153,7 @@ export const tagAssignments = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     userId: uuid()
-      .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "set null" }),
     tagEpc: varchar({ length: 96 }).notNull(),
     assignedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     deactivatedAt: timestamp({ withTimezone: true }),

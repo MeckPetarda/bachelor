@@ -58,15 +58,6 @@ export const Users: Component = () => {
     await deleteUser(user.id);
   };
 
-  const mockUser: User = {
-    id: "-sasdss",
-    name: "Jane Smith",
-    tags: ["E2003412B8E6A1C5F0024D9A", "E2004701C3F8B2D6A1053E8C"],
-    sync_id: "42",
-    email: "jane.smith@example.com",
-    isActive: true,
-  };
-
   return (
     <div class={styles.page}>
       <div class="page-header">

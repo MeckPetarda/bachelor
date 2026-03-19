@@ -304,6 +304,26 @@ router.delete("/users/:id", async (c) => {
     return c.json({ error: "User not found", status: 404 }, 404);
   }
 
+  await db
+    .update(schema.tagAssignments)
+    .set({ deactivatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.tagAssignments.userId, id),
+        isNull(schema.tagAssignments.deactivatedAt),
+      ),
+    );
+
+  await db
+    .update(schema.tagAssignments)
+    .set({ deactivatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.tagAssignments.userId, id),
+        isNull(schema.tagAssignments.deactivatedAt),
+      ),
+    );
+
   await db.delete(schema.users).where(eq(schema.users.id, id));
 
   logger.info(`User ${id} deleted`);
