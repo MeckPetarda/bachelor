@@ -59,7 +59,7 @@ export const Users: Component = () => {
   };
 
   const mockUser: User = {
-    id: 1,
+    id: "-sasdss",
     name: "Jane Smith",
     tags: ["E2003412B8E6A1C5F0024D9A", "E2004701C3F8B2D6A1053E8C"],
     sync_id: "42",
@@ -80,6 +80,7 @@ export const Users: Component = () => {
         users={usersState.users}
         loading={usersState.loading}
         onEdit={(u) => openEditModal(u)}
+        onDelete={handleDelete}
       />
 
       <Show when={showModal()}>

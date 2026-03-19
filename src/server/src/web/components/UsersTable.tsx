@@ -6,6 +6,7 @@ interface Props {
   users: User[];
   loading: boolean;
   onEdit: (user: User) => void;
+  onDelete: (user: User) => void;
 }
 
 export const UsersTable: Component<Props> = (props) => {
@@ -80,6 +81,12 @@ export const UsersTable: Component<Props> = (props) => {
                       onClick={() => props.onEdit(user)}
                     >
                       Edit
+                    </button>
+                    <button
+                      class="btn btn-danger"
+                      onClick={() => props.onDelete(user)}
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>

@@ -160,7 +160,7 @@ export interface WsDevicePendingPayload {
 }
 
 export interface User {
-  id?: number;
+  id?: string;
   name?: string;
   tags: string[];
   sync_id: string;

@@ -105,7 +105,7 @@ export function getUsers(): Promise<ListResponse<User>> {
   return get<ListResponse<User>>("/users");
 }
 
-export function getUser(id: number): Promise<User> {
+export function getUser(id: string): Promise<User> {
   return get<User>(`/users/${id}`);
 }
 
@@ -114,12 +114,12 @@ export function createUser(data: CreateUserRequest): Promise<User> {
 }
 
 export function updateUser(
-  id: number,
+  id: string,
   data: UpdateUserRequest,
 ): Promise<User> {
   return patch<User>(`/users/${id}`, data);
 }
 
-export function deleteUser(id: number): Promise<void> {
+export function deleteUser(id: string): Promise<void> {
   return del<void>(`/users/${id}`);
 }

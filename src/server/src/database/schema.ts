@@ -138,14 +138,14 @@ export const users = pgTable(
   "users",
   {
     id: uuid().primaryKey().defaultRandom(),
-    remoteId: varchar({ length: 255 }),
+    syncId: varchar({ length: 255 }),
     name: varchar({ length: 255 }),
     email: varchar({ length: 255 }),
     isActive: boolean().default(true),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("idx_users_remote_id").on(table.remoteId)],
+  (table) => [index("idx_users_sync_id").on(table.syncId)],
 );
 
 export const tagAssignments = pgTable(

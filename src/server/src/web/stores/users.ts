@@ -47,7 +47,7 @@ export async function createUser(data: CreateUserRequest) {
   }
 }
 
-export async function updateUser(id: number, data: UpdateUserRequest) {
+export async function updateUser(id: string, data: UpdateUserRequest) {
   try {
     const updated = await api.updateUser(id, data);
     setState("users", (g) => g.id === id, updated);
@@ -61,14 +61,14 @@ export async function updateUser(id: number, data: UpdateUserRequest) {
   }
 }
 
-export async function deleteUser(id: number) {
+export async function deleteUser(id: string) {
   try {
     await api.deleteUser(id);
     setState("users", (users) => users.filter((g) => g.id !== id));
-    showToast("Users deleted", "success");
+    showToast("User deleted", "success");
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : "Failed to delete users";
+      err instanceof Error ? err.message : "Failed to delete user";
     showToast(message, "error");
     throw err;
   }

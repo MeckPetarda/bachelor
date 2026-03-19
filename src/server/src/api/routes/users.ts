@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getDatabase, schema } from "../../database/client";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { createLogger } from "../../utils/logger";
 import { errorHandler, requestLogger } from "../middleware";
 
@@ -26,11 +26,11 @@ router.get("/users", async (c) => {
       tagEpc: schema.tagAssignments.tagEpc,
     })
     .from(schema.tagAssignments)
-    .where(sql`${schema.tagAssignments.deactivatedAt} IS NULL`);
+    .where(isNull(schema.tagAssignments.deactivatedAt));
 
   const data = users.map((user) => ({
     id: user.id,
-    sync_id: user.remoteId,
+    sync_id: user.syncId,
     name: user.name,
     email: user.email,
     isActive: user.isActive,
@@ -67,7 +67,7 @@ router.post("/users", async (c) => {
   const result = await db
     .insert(schema.users)
     .values({
-      remoteId: body.sync_id?.trim() ?? null,
+      syncId: body.sync_id?.trim() ?? null,
       name: body.name?.trim() ?? null,
       email: body.email?.trim() ?? null,
       isActive: body.isActive,
@@ -90,7 +90,10 @@ router.post("/users", async (c) => {
       .update(schema.tagAssignments)
       .set({ deactivatedAt: now })
       .where(
-        sql`${schema.tagAssignments.tagEpc} IN ${tags} AND ${schema.tagAssignments.deactivatedAt} IS NULL`,
+        and(
+          inArray(schema.tagAssignments.tagEpc, tags),
+          isNull(schema.tagAssignments.deactivatedAt),
+        ),
       );
 
     // Create new assignments
@@ -109,7 +112,7 @@ router.post("/users", async (c) => {
   return c.json(
     {
       id: createdUser.id,
-      syncId: createdUser.remoteId,
+      sync_id: createdUser.syncId,
       name: createdUser.name,
       email: createdUser.email,
       isActive: createdUser.isActive,
@@ -142,15 +145,13 @@ router.get("/users/:id", async (c) => {
   }
 
   return c.json({
-    data: {
-      id: user.id,
-      remoteId: user.remoteId,
-      name: user.name,
-      email: user.email,
-      isActive: user.isActive,
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString(),
-    },
+    id: user.id,
+    sync_id: user.syncId,
+    name: user.name,
+    email: user.email,
+    isActive: user.isActive,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
   });
 });
 
@@ -162,7 +163,7 @@ router.patch("/users/:id", async (c) => {
   const id = c.req.param("id");
 
   const body = await c.req.json<{
-    remoteId?: string | null;
+    sync_id?: string | null;
     name?: string | null;
     email?: string | null;
     isActive?: boolean;
@@ -186,8 +187,8 @@ router.patch("/users/:id", async (c) => {
     updatedAt: now,
   };
 
-  if (body.remoteId !== undefined) {
-    updateData.remoteId = body.remoteId?.trim() ?? null;
+  if (body.sync_id !== undefined) {
+    updateData.syncId = body.sync_id?.trim() ?? null;
   }
   if (body.name !== undefined) {
     updateData.name = body.name?.trim() ?? null;
@@ -221,7 +222,10 @@ router.patch("/users/:id", async (c) => {
       .select({ tagEpc: schema.tagAssignments.tagEpc })
       .from(schema.tagAssignments)
       .where(
-        sql`${schema.tagAssignments.userId} = ${id} AND ${schema.tagAssignments.deactivatedAt} IS NULL`,
+        and(
+          eq(schema.tagAssignments.userId, id),
+          isNull(schema.tagAssignments.deactivatedAt),
+        ),
       );
 
     const currentTags = new Set(currentAssignments.map((a) => a.tagEpc));
@@ -234,7 +238,11 @@ router.patch("/users/:id", async (c) => {
         .update(schema.tagAssignments)
         .set({ deactivatedAt: now })
         .where(
-          sql`${schema.tagAssignments.userId} = ${id} AND ${schema.tagAssignments.tagEpc} IN ${toRemove} AND ${schema.tagAssignments.deactivatedAt} IS NULL`,
+          and(
+            eq(schema.tagAssignments.userId, id),
+            inArray(schema.tagAssignments.tagEpc, toRemove),
+            isNull(schema.tagAssignments.deactivatedAt),
+          ),
         );
     }
 
@@ -246,7 +254,10 @@ router.patch("/users/:id", async (c) => {
         .update(schema.tagAssignments)
         .set({ deactivatedAt: now })
         .where(
-          sql`${schema.tagAssignments.tagEpc} IN ${toAdd} AND ${schema.tagAssignments.deactivatedAt} IS NULL`,
+          and(
+            inArray(schema.tagAssignments.tagEpc, toAdd),
+            isNull(schema.tagAssignments.deactivatedAt),
+          ),
         );
 
       await db.insert(schema.tagAssignments).values(
@@ -263,16 +274,14 @@ router.patch("/users/:id", async (c) => {
   logger.info(`User ${id} updated`);
 
   return c.json({
-    data: {
-      id: updatedUser.id,
-      remoteId: updatedUser.remoteId,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      isActive: updatedUser.isActive,
-      ...(tags !== undefined && { tags }),
-      createdAt: updatedUser.createdAt.toISOString(),
-      updatedAt: updatedUser.updatedAt.toISOString(),
-    },
+    id: updatedUser.id,
+    sync_id: updatedUser.syncId,
+    name: updatedUser.name,
+    email: updatedUser.email,
+    isActive: updatedUser.isActive,
+    ...(tags !== undefined && { tags }),
+    createdAt: updatedUser.createdAt.toISOString(),
+    updatedAt: updatedUser.updatedAt.toISOString(),
   });
 });
 
