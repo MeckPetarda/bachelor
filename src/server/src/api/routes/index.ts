@@ -10,6 +10,7 @@ import devicesRoutes from "./devices";
 import groupsRoutes from "./groups";
 import lighthousesRoutes from "./lighthouses";
 import scansRoutes from "./scans";
+import usersRoutes from "./users";
 
 const logger = createLogger("Routes");
 
@@ -139,6 +140,7 @@ app.route("/api/v1", devicesRoutes);
 app.route("/api/v1", groupsRoutes);
 app.route("/api/v1", lighthousesRoutes);
 app.route("/api/v1", scansRoutes);
+app.route("/api/v1", usersRoutes);
 app.route("/api/v1", protectedRoutes);
 
 // ============================================================================

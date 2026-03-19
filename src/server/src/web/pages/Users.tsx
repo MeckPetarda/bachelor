@@ -1,28 +1,71 @@
-import { type Component, createSignal, Show } from "solid-js";
+import { type Component, createSignal, Show, onMount } from "solid-js";
 
 import styles from "./Users.module.css";
 import { UserModal } from "../components/UserModal";
 import { UsersTable } from "../components/UsersTable";
 import type { User } from "../types";
+import {
+  createUser,
+  deleteUser,
+  fetchAll,
+  updateUser,
+  usersState,
+} from "../stores/users";
 
 export const Users: Component = () => {
   const [showModal, setShowModal] = createSignal(false);
-  const [editUser, setEditUser] = createSignal<User | undefined>();
+  const [editingUser, setEditingUser] = createSignal<User | undefined>();
+
+  onMount(() => {
+    fetchAll();
+  });
 
   const openCreateModal = () => {
+    setEditingUser(undefined);
     setShowModal(true);
+  };
+
+  const openEditModal = (user: User) => {
+    setEditingUser(user);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingUser(undefined);
+  };
+
+  const handleSubmit = async (data: User) => {
+    const user = editingUser();
+    if (user) {
+      if (!user.id)
+        throw new Error(
+          "How do you want me to updates something without an id???",
+        );
+
+      await updateUser(user.id, data);
+    } else {
+      await createUser(data);
+    }
+  };
+
+  const handleDelete = async (user: User) => {
+    if (!user.id)
+      throw new Error(
+        "How do you want me to updates something without an id???",
+      );
+
+    await deleteUser(user.id);
   };
 
   const mockUser: User = {
     id: 1,
     name: "Jane Smith",
     tags: ["E2003412B8E6A1C5F0024D9A", "E2004701C3F8B2D6A1053E8C"],
-    sync_id: 42,
+    sync_id: "42",
     email: "jane.smith@example.com",
-    active: true,
+    isActive: true,
   };
-
-  const mockUsers: User[] = [mockUser];
 
   return (
     <div class={styles.page}>
@@ -34,24 +77,16 @@ export const Users: Component = () => {
       </div>
 
       <UsersTable
-        users={mockUsers}
-        loading={false}
-        onEdit={(u) => {
-          setEditUser(u);
-          setShowModal(true);
-        }}
+        users={usersState.users}
+        loading={usersState.loading}
+        onEdit={(u) => openEditModal(u)}
       />
 
       <Show when={showModal()}>
         <UserModal
-          user={editUser()}
-          onClose={() => {
-            setShowModal(false);
-            setEditUser(undefined);
-          }}
-          onSubmit={async (data) => {
-            console.log(data);
-          }}
+          user={editingUser()}
+          onClose={() => closeModal()}
+          onSubmit={handleSubmit}
         />
       </Show>
     </div>

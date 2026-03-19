@@ -66,7 +66,7 @@ export const UsersTable: Component<Props> = (props) => {
                   </td>
                   <td>
                     <Show
-                      when={user.active}
+                      when={user.isActive}
                       fallback={
                         <span class="badge badge-warning">Inactive</span>
                       }

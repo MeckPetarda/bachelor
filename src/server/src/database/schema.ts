@@ -138,7 +138,6 @@ export const users = pgTable(
   "users",
   {
     id: uuid().primaryKey().defaultRandom(),
-    internalId: varchar({ length: 255 }).notNull().unique(),
     remoteId: varchar({ length: 255 }),
     name: varchar({ length: 255 }),
     email: varchar({ length: 255 }),
@@ -146,10 +145,7 @@ export const users = pgTable(
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [
-    index("idx_users_internal_id").on(table.internalId),
-    index("idx_users_remote_id").on(table.remoteId),
-  ],
+  (table) => [index("idx_users_remote_id").on(table.remoteId)],
 );
 
 export const tagAssignments = pgTable(

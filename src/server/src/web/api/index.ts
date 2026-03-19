@@ -11,6 +11,9 @@ import type {
   ScansFilter,
   PaginatedResponse,
   ListResponse,
+  User,
+  CreateUserRequest,
+  UpdateUserRequest,
 } from "../types";
 
 // Lighthouses
@@ -95,4 +98,28 @@ export function getScans(
   const query = params.toString();
   const path = query ? `/scans?${query}` : "/scans";
   return get<PaginatedResponse<Scan>>(path);
+}
+
+// Users
+export function getUsers(): Promise<ListResponse<User>> {
+  return get<ListResponse<User>>("/users");
+}
+
+export function getUser(id: number): Promise<User> {
+  return get<User>(`/users/${id}`);
+}
+
+export function createUser(data: CreateUserRequest): Promise<User> {
+  return post<User>("/users", data);
+}
+
+export function updateUser(
+  id: number,
+  data: UpdateUserRequest,
+): Promise<User> {
+  return patch<User>(`/users/${id}`, data);
+}
+
+export function deleteUser(id: number): Promise<void> {
+  return del<void>(`/users/${id}`);
 }

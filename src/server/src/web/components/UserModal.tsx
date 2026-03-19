@@ -13,9 +13,9 @@ interface Props {
 export interface UserFormData {
   name?: string;
   tags: string[];
-  sync_id: number;
+  sync_id: string;
   email?: string;
-  active: boolean;
+  isActive: boolean;
 }
 
 export const UserModal: Component<Props> = (props) => {
@@ -25,7 +25,7 @@ export const UserModal: Component<Props> = (props) => {
     props.user?.sync_id != null ? String(props.user.sync_id) : "",
   );
   const [email, setEmail] = createSignal(props.user?.email ?? "");
-  const [active, setActive] = createSignal(props.user?.active ?? true);
+  const [active, setActive] = createSignal(props.user?.isActive ?? true);
   const [error, setError] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
 
@@ -35,11 +35,7 @@ export const UserModal: Component<Props> = (props) => {
     e.preventDefault();
     setError("");
 
-    const syncIdNum = parseInt(syncId(), 10);
-    if (!syncId().trim() || isNaN(syncIdNum)) {
-      setError("Sync ID is required and must be a whole number");
-      return;
-    }
+    const syncIdNum = syncId();
 
     const emailVal = email().trim();
     if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
@@ -54,7 +50,7 @@ export const UserModal: Component<Props> = (props) => {
         tags: tags(),
         sync_id: syncIdNum,
         email: emailVal || undefined,
-        active: active(),
+        isActive: active(),
       });
       props.onClose();
     } catch (err) {

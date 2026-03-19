@@ -163,7 +163,11 @@ export interface User {
   id?: number;
   name?: string;
   tags: string[];
-  sync_id: number;
+  sync_id: string;
   email?: string;
-  active: boolean;
+  isActive: boolean;
 }
+
+export interface CreateUserRequest extends User {}
+
+export interface UpdateUserRequest extends User {}
