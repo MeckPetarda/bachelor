@@ -13,8 +13,18 @@ import type {
   WsDeviceOfflinePayload,
   WsDeviceHealthPayload,
   WsDevicePendingPayload,
+  WsEventNewPayload,
   Scan,
 } from "../types";
+
+// Tracks algorithm IDs of processed events that arrived since last refresh
+const [pendingEventsAlgorithms, setPendingEventsAlgorithms] = createSignal<string[]>([]);
+
+export function resetPendingEventsAlgorithms() {
+  setPendingEventsAlgorithms([]);
+}
+
+export { pendingEventsAlgorithms };
 
 const [connected, setConnected] = createSignal(false);
 
@@ -112,6 +122,11 @@ function handleMessage(msg: WsMessage) {
     case "device:pending": {
       const payload = msg.payload as WsDevicePendingPayload;
       handleDevicePending(payload.deviceId);
+      break;
+    }
+    case "event:new": {
+      const payload = msg.payload as WsEventNewPayload;
+      setPendingEventsAlgorithms((prev) => [...prev, payload.algorithmId]);
       break;
     }
   }

@@ -120,7 +120,19 @@ export type WsMessageType =
   | "device:online"
   | "device:offline"
   | "device:health"
-  | "device:pending";
+  | "device:pending"
+  | "event:new";
+
+export interface WsEventNewPayload {
+  id: string;
+  algorithmId: string;
+  direction: string;
+  tagEpc: string;
+  userId: string | null;
+  groupId: number;
+  confidence: number;
+  timestamp: string;
+}
 
 export interface WsMessage<T = unknown> {
   type: WsMessageType;

@@ -6,6 +6,7 @@ import { Lighthouses } from "./pages/Lighthouses";
 import { Groups } from "./pages/Groups";
 import { Events } from "./pages/Events";
 import { Users } from "./pages/Users";
+import { ProcessedEvents } from "./pages/ProcessedEvents";
 
 import "./styles/global.css";
 
@@ -22,6 +23,7 @@ render(
       <Route path="/groups" component={Groups} />
       <Route path="/events" component={Events} />
       <Route path="/users" component={Users} />
+      <Route path="/processed" component={ProcessedEvents} />
     </Router>
   ),
   root,
