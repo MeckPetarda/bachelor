@@ -171,3 +171,77 @@ export interface User {
 export interface CreateUserRequest extends User {}
 
 export interface UpdateUserRequest extends User {}
+
+// Processed events
+export interface ProcessedEvent {
+  id: string;
+  algorithmId: "temporal_centroid" | "rssi_weighted_centroid" | "manual";
+  direction: "in" | "out" | "unknown";
+  tagEpc: string;
+  userId: string | null;
+  userName: string | null;
+  userSyncId: string | null;
+  groupId: number;
+  groupLabel: string;
+  confidence: number;
+  centroidSeparationFactor: number;
+  clusterSizeFactor: number;
+  bilateralCoverageFactor: number;
+  rssiTrendConsistencyFactor: number | null;
+  timestamp: string;
+  clusterStartedAt: string;
+  clusterEndedAt: string;
+  insideScanCount: number;
+  outsideScanCount: number;
+  createdAt: string;
+}
+
+export interface ProcessedEventScan {
+  id: string;
+  epc: string;
+  rssiDbm: number | null;
+  timestamp: string;
+  timestampMs: string;
+  antennaId: number | null;
+  frequency: number | null;
+  source: "realtime" | "offline_sync";
+  timeBasis: "synced" | "estimated" | "relative";
+}
+
+export interface LighthouseScans {
+  lighthouseId: number | null;
+  lighthouseName: string;
+  scans: ProcessedEventScan[];
+}
+
+export interface CompanionEvent {
+  id: string;
+  algorithmId: string;
+  direction: string;
+  confidence: number;
+}
+
+export interface ProcessedEventDetail {
+  event: ProcessedEvent & {
+    metadata: Record<string, unknown>;
+    syncedToIntegration: boolean;
+  };
+  scans: {
+    inside: LighthouseScans;
+    outside: LighthouseScans;
+  };
+  companionEvent: CompanionEvent | null;
+}
+
+export interface ProcessedEventsFilter {
+  algorithmId: string;
+  groupId?: number;
+  userId?: string;
+  tagEpc?: string;
+  direction?: "in" | "out" | "unknown";
+  from?: string;
+  to?: string;
+  minConfidence?: number;
+  limit?: number;
+  offset?: number;
+}

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { getDatabase, schema } from "../database/client";
 import { createLogger } from "../utils/logger";
 import { processCluster } from "./event-processor";
@@ -208,7 +208,7 @@ async function handleUngroupedScans(): Promise<void> {
         isNull(schema.lighthouses.groupId),
         isNull(schema.rawScans.processedAt),
         isNull(schema.rawScans.orphanedAt),
-        sql`${schema.rawScans.timestamp} < ${cutoff}`,
+        lt(schema.rawScans.timestamp, cutoff),
       ),
     );
 
