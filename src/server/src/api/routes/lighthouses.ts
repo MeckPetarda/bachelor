@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { jwtAuth } from "../middleware";
 import { getConfig } from "../../config";
 import { getDatabase, schema } from "../../database/client";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { createLogger } from "../../utils/logger";
 import { getAllLighthouseStates } from "../../mqtt/state";
 
@@ -284,6 +284,32 @@ router.patch("/lighthouses/:id", async (c) => {
     .where(eq(schema.lighthouses.id, id))
     .returning();
 
+  // When groupId or placement changes, re-enable misconfigured_group orphans
+  // for the affected group(s) so the sweeper can retry them.
+  if (body.groupId !== undefined || body.placement !== undefined) {
+    const oldGroupId = existing[0]!.groupId;
+    const newGroupId = result[0]?.groupId ?? null;
+    const groupIds = [...new Set([oldGroupId, newGroupId].filter((g): g is number => g !== null))];
+    for (const gId of groupIds) {
+      await db
+        .update(schema.rawScans)
+        .set({ orphanedAt: null, orphanReason: null })
+        .where(
+          and(
+            inArray(
+              schema.rawScans.lighthouseId,
+              db
+                .select({ id: schema.lighthouses.id })
+                .from(schema.lighthouses)
+                .where(eq(schema.lighthouses.groupId, gId)),
+            ),
+            eq(schema.rawScans.orphanReason, "misconfigured_group"),
+            isNull(schema.rawScans.processedAt),
+          ),
+        );
+    }
+  }
+
   logger.info(`Lighthouse ${id} updated`);
 
   return c.json({ data: result[0] });
@@ -370,6 +396,32 @@ router.patch("/lighthouses/:id/update", async (c) => {
     .set(updateData)
     .where(eq(schema.lighthouses.id, id))
     .returning();
+
+  // When groupId or placement changes, re-enable misconfigured_group orphans
+  // for the affected group(s) so the sweeper can retry them.
+  if (body.groupId !== undefined || body.placement !== undefined) {
+    const oldGroupId = existing[0]!.groupId;
+    const newGroupId = result[0]?.groupId ?? null;
+    const groupIds = [...new Set([oldGroupId, newGroupId].filter((g): g is number => g !== null))];
+    for (const gId of groupIds) {
+      await db
+        .update(schema.rawScans)
+        .set({ orphanedAt: null, orphanReason: null })
+        .where(
+          and(
+            inArray(
+              schema.rawScans.lighthouseId,
+              db
+                .select({ id: schema.lighthouses.id })
+                .from(schema.lighthouses)
+                .where(eq(schema.lighthouses.groupId, gId)),
+            ),
+            eq(schema.rawScans.orphanReason, "misconfigured_group"),
+            isNull(schema.rawScans.processedAt),
+          ),
+        );
+    }
+  }
 
   logger.info(`Lighthouse ${id} updated`);
 

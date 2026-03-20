@@ -7,6 +7,7 @@ import { createLogger } from "../../utils/logger";
 import { requestLogger, errorHandler, jwtAuth, createJWT } from "../middleware";
 
 import devicesRoutes from "./devices";
+import eventsRoutes from "./events";
 import groupsRoutes from "./groups";
 import lighthousesRoutes from "./lighthouses";
 import scansRoutes from "./scans";
@@ -137,6 +138,7 @@ protectedRoutes.use("*", jwtAuth(getConfig().jwt.secret));
 
 // Mount protected routes under /api/v1 AFTER public routes
 app.route("/api/v1", devicesRoutes);
+app.route("/api/v1", eventsRoutes);
 app.route("/api/v1", groupsRoutes);
 app.route("/api/v1", lighthousesRoutes);
 app.route("/api/v1", scansRoutes);

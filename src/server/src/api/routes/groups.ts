@@ -1,15 +1,13 @@
 import { Hono } from "hono";
 import { getDatabase, schema } from "../../database/client";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { createLogger } from "../../utils/logger";
 import { errorHandler, requestLogger } from "../middleware";
 
 const logger = createLogger("Routes");
 
-// Create Hono router with middleware
 const router = new Hono();
 
-// Apply global middleware
 router.use("*", requestLogger);
 router.use("*", errorHandler);
 
@@ -20,10 +18,8 @@ router.use("*", errorHandler);
 router.get("/groups", async (c) => {
   const db = getDatabase();
 
-  // Get all groups
   const groups = await db.select().from(schema.lighthouseGroups);
 
-  // Get all lighthouses with group assignments
   const lighthouses = await db
     .select({
       id: schema.lighthouses.id,
@@ -35,11 +31,12 @@ router.get("/groups", async (c) => {
     .from(schema.lighthouses)
     .where(sql`${schema.lighthouses.groupId} IS NOT NULL`);
 
-  // Build response with members
   const data = groups.map((group) => ({
     id: group.id,
     label: group.label,
     description: group.description,
+    activityTimeoutMs: group.activityTimeoutMs,
+    orphanTimeoutMs: group.orphanTimeoutMs,
     members: lighthouses
       .filter((lh) => lh.groupId === group.id)
       .map((lh) => ({
@@ -52,10 +49,7 @@ router.get("/groups", async (c) => {
     updatedAt: group.updatedAt.toISOString(),
   }));
 
-  return c.json({
-    data,
-    count: data.length,
-  });
+  return c.json({ data, count: data.length });
 });
 
 /**
@@ -66,13 +60,11 @@ router.post("/groups", async (c) => {
   const body = await c.req.json<{
     label: string;
     description?: string;
+    activityTimeoutMs?: number;
+    orphanTimeoutMs?: number;
   }>();
 
-  if (
-    !body.label ||
-    typeof body.label !== "string" ||
-    body.label.trim() === ""
-  ) {
+  if (!body.label || typeof body.label !== "string" || body.label.trim() === "") {
     return c.json({ error: "Missing required field: label", status: 400 }, 400);
   }
 
@@ -84,6 +76,12 @@ router.post("/groups", async (c) => {
     .values({
       label: body.label.trim(),
       description: body.description?.trim() ?? null,
+      ...(body.activityTimeoutMs !== undefined && {
+        activityTimeoutMs: body.activityTimeoutMs,
+      }),
+      ...(body.orphanTimeoutMs !== undefined && {
+        orphanTimeoutMs: body.orphanTimeoutMs,
+      }),
       createdAt: now,
       updatedAt: now,
     })
@@ -101,6 +99,8 @@ router.post("/groups", async (c) => {
       id: createdGroup.id,
       label: createdGroup.label,
       description: createdGroup.description,
+      activityTimeoutMs: createdGroup.activityTimeoutMs,
+      orphanTimeoutMs: createdGroup.orphanTimeoutMs,
       members: [],
       createdAt: createdGroup.createdAt.toISOString(),
       updatedAt: createdGroup.updatedAt.toISOString(),
@@ -133,7 +133,6 @@ router.get("/groups/:id", async (c) => {
     return c.json({ error: "Group not found", status: 404 }, 404);
   }
 
-  // Get members
   const members = await db
     .select({
       id: schema.lighthouses.id,
@@ -149,6 +148,8 @@ router.get("/groups/:id", async (c) => {
       id: group.id,
       label: group.label,
       description: group.description,
+      activityTimeoutMs: group.activityTimeoutMs,
+      orphanTimeoutMs: group.orphanTimeoutMs,
       members,
       createdAt: group.createdAt.toISOString(),
       updatedAt: group.updatedAt.toISOString(),
@@ -170,11 +171,12 @@ router.patch("/groups/:id", async (c) => {
   const body = await c.req.json<{
     label?: string;
     description?: string | null;
+    activityTimeoutMs?: number;
+    orphanTimeoutMs?: number;
   }>();
 
   const db = getDatabase();
 
-  // Check if group exists
   const existing = await db
     .select()
     .from(schema.lighthouseGroups)
@@ -185,10 +187,7 @@ router.patch("/groups/:id", async (c) => {
     return c.json({ error: "Group not found", status: 404 }, 404);
   }
 
-  // Build update object
-  const updateData: Record<string, unknown> = {
-    updatedAt: new Date(),
-  };
+  const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
   if (body.label !== undefined) {
     if (typeof body.label !== "string" || body.label.trim() === "") {
@@ -199,6 +198,12 @@ router.patch("/groups/:id", async (c) => {
   if (body.description !== undefined) {
     updateData.description = body.description?.trim() ?? null;
   }
+  if (body.activityTimeoutMs !== undefined) {
+    updateData.activityTimeoutMs = body.activityTimeoutMs;
+  }
+  if (body.orphanTimeoutMs !== undefined) {
+    updateData.orphanTimeoutMs = body.orphanTimeoutMs;
+  }
 
   const result = await db
     .update(schema.lighthouseGroups)
@@ -206,7 +211,30 @@ router.patch("/groups/:id", async (c) => {
     .where(eq(schema.lighthouseGroups.id, id))
     .returning();
 
-  // Get members
+  const updatedGroup = result[0];
+  if (!updatedGroup) {
+    return c.json({ error: "Failed to update group", status: 500 }, 500);
+  }
+
+  // Re-enable misconfigured_group orphans so the sweeper can retry them now
+  // that the group configuration may have changed.
+  await db
+    .update(schema.rawScans)
+    .set({ orphanedAt: null, orphanReason: null })
+    .where(
+      and(
+        inArray(
+          schema.rawScans.lighthouseId,
+          db
+            .select({ id: schema.lighthouses.id })
+            .from(schema.lighthouses)
+            .where(eq(schema.lighthouses.groupId, id)),
+        ),
+        eq(schema.rawScans.orphanReason, "misconfigured_group"),
+        isNull(schema.rawScans.processedAt),
+      ),
+    );
+
   const members = await db
     .select({
       id: schema.lighthouses.id,
@@ -217,11 +245,6 @@ router.patch("/groups/:id", async (c) => {
     .from(schema.lighthouses)
     .where(eq(schema.lighthouses.groupId, id));
 
-  const updatedGroup = result[0];
-  if (!updatedGroup) {
-    return c.json({ error: "Failed to update group", status: 500 }, 500);
-  }
-
   logger.info(`Group ${id} updated`);
 
   return c.json({
@@ -229,6 +252,8 @@ router.patch("/groups/:id", async (c) => {
       id: updatedGroup.id,
       label: updatedGroup.label,
       description: updatedGroup.description,
+      activityTimeoutMs: updatedGroup.activityTimeoutMs,
+      orphanTimeoutMs: updatedGroup.orphanTimeoutMs,
       members,
       createdAt: updatedGroup.createdAt.toISOString(),
       updatedAt: updatedGroup.updatedAt.toISOString(),
@@ -249,7 +274,6 @@ router.delete("/groups/:id", async (c) => {
 
   const db = getDatabase();
 
-  // Check if group exists
   const existing = await db
     .select()
     .from(schema.lighthouseGroups)
@@ -260,10 +284,7 @@ router.delete("/groups/:id", async (c) => {
     return c.json({ error: "Group not found", status: 404 }, 404);
   }
 
-  // Delete the group (ON DELETE SET NULL will handle lighthouses)
-  await db
-    .delete(schema.lighthouseGroups)
-    .where(eq(schema.lighthouseGroups.id, id));
+  await db.delete(schema.lighthouseGroups).where(eq(schema.lighthouseGroups.id, id));
 
   logger.info(`Group ${id} deleted`);
 
