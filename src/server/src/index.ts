@@ -13,6 +13,10 @@ import {
   startRetentionScheduler,
   stopRetentionScheduler,
 } from "./database/cleanup";
+import {
+  startEventSweeper,
+  stopEventSweeper,
+} from "./services/event-sweeper";
 import { app } from "./api/routes";
 import { getConfig } from "./config";
 import { createLogger } from "./utils/logger";
@@ -59,6 +63,9 @@ async function gracefulShutdown(signal: string) {
 
     // Stop retention cleanup scheduler
     stopRetentionScheduler();
+
+    // Stop event sweeper (wait for any in-progress cycle)
+    await stopEventSweeper();
 
     // Close MQTT broker (stop accepting new messages)
     await closeMqttBroker();
@@ -125,6 +132,10 @@ async function startup() {
 
     // Start retention cleanup scheduler
     startRetentionScheduler();
+
+    // Start event sweeper (background poller for closed RFID clusters)
+    startEventSweeper();
+    logger.info("Event sweeper started");
 
     // Start HTTP server with WebSocket support
     const config = getConfig();
