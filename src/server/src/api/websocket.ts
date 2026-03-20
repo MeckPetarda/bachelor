@@ -15,7 +15,9 @@ export type WebSocketMessageType =
   | "device:online"
   | "device:offline"
   | "device:health"
-  | "device:pending";
+  | "device:pending"
+  | "event:new"
+  | "event:orphaned";
 
 /**
  * Base WebSocket message structure
@@ -221,6 +223,44 @@ export function broadcastPendingDevice(deviceId: string): void {
   };
 
   broadcast("device:pending", payload);
+}
+
+// ─── Traversal / orphan event payloads ───────────────────────────────────────
+
+export interface TraversalEventPayload {
+  id: string;
+  algorithmId: string;
+  direction: string;
+  tagEpc: string;
+  userId: string | null;
+  groupId: number;
+  confidence: number;
+  timestamp: string;
+  clusterStartedAt: string;
+  clusterEndedAt: string;
+  scanCount: number;
+}
+
+export interface OrphanedScanPayload {
+  scanId: string;
+  epc: string;
+  lighthouseId: number;
+  timestamp: string;
+  orphanReason: string;
+}
+
+/**
+ * Broadcast a processed traversal event (called once per algorithm result)
+ */
+export function broadcastTraversalEvent(data: TraversalEventPayload): void {
+  broadcast("event:new", data);
+}
+
+/**
+ * Broadcast an orphaned scan notification
+ */
+export function broadcastOrphanedScan(data: OrphanedScanPayload): void {
+  broadcast("event:orphaned", data);
 }
 
 /**
