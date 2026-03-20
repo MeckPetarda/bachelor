@@ -171,7 +171,6 @@ export async function handleScanMessage(
         detectionConfidence: scanData.detectionConfidence ?? null,
         timestampMs: BigInt(scanData.timestampMs),
         timestamp: scanTimestamp,
-        processed: false,
         source,
         timeBasis: basis,
       })
@@ -205,29 +204,10 @@ export async function handleScanMessage(
       });
     }
 
-    // Add to event processing queue (async, non-blocking)
-    // This will be implemented in Task 2.2
-    queueScanForProcessing(scanId, lighthouseId, scanData.epc);
   } catch (error) {
     logger.error(`Failed to store scan from ${macAddress}:`, error);
     // Don't rethrow - we don't want to crash the broker for a single failed insert
   }
-}
-
-/**
- * Queue a scan for async processing (direction detection)
- * This is a placeholder that will be replaced with actual queue implementation in Task 2.2
- */
-function queueScanForProcessing(
-  scanId: bigint,
-  lighthouseId: number,
-  epc: string,
-): void {
-  // TODO: Task 2.2 - Implement actual event processing queue
-  // For now, just log that we would queue this scan
-  logger.debug(
-    `Queued scan ${scanId} (lighthouse=${lighthouseId}, epc=${epc}) for processing`,
-  );
 }
 
 /**

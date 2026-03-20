@@ -238,7 +238,7 @@ describe("MQTT Broker Integration", () => {
       scanPayload.detectionConfidence,
       2,
     );
-    expect(storedScan.processed).toBe(false);
+    expect(storedScan.processedAt).toBeNull();
 
     // Disconnect
     await new Promise<void>((resolve) => {

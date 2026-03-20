@@ -13,6 +13,7 @@ import {
   uniqueIndex,
   pgEnum,
   serial,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -36,12 +37,28 @@ export const timeBasis = pgEnum("time_basis", [
   "relative",
 ]);
 
+export const directionType = pgEnum("direction_type", ["in", "out", "unknown"]);
+
+export const algorithmType = pgEnum("algorithm_type", [
+  "temporal_centroid",
+  "rssi_weighted_centroid",
+  "manual",
+]);
+
+export const orphanReasonType = pgEnum("orphan_reason_type", [
+  "insufficient_data",
+  "misconfigured_group",
+  "unsyncable",
+]);
+
 export const lighthouseGroups = pgTable(
   "lighthouse_groups",
   {
     id: serial().primaryKey(),
     label: varchar({ length: 255 }).notNull(),
     description: varchar({ length: 500 }),
+    activityTimeoutMs: integer().notNull().default(4000),
+    orphanTimeoutMs: integer().notNull().default(8000),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
@@ -92,7 +109,9 @@ export const rawScans = pgTable(
     timestampMs: bigserial({ mode: "bigint" }).notNull(),
     timestamp: timestamp({ withTimezone: true }).notNull(),
     receivedAt: timestamp({ withTimezone: true }).defaultNow(),
-    processed: boolean().default(false),
+    processedAt: timestamp({ withTimezone: true }),
+    orphanedAt: timestamp({ withTimezone: true }),
+    orphanReason: orphanReasonType(),
     source: scanSource().notNull().default("realtime"),
     timeBasis: timeBasis().notNull().default("synced"),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
@@ -103,7 +122,12 @@ export const rawScans = pgTable(
       table.lighthouseId,
       table.timestamp,
     ),
-    index("idx_raw_scans_processed").on(table.processed),
+    index("idx_raw_scans_unprocessed")
+      .on(table.epc, table.timestamp)
+      .where(sql`processed_at IS NULL AND orphaned_at IS NULL`),
+    index("idx_raw_scans_orphaned")
+      .on(table.orphanedAt)
+      .where(sql`orphaned_at IS NOT NULL`),
   ],
 );
 
@@ -111,26 +135,48 @@ export const processedEvents = pgTable(
   "processed_events",
   {
     id: uuid().primaryKey().defaultRandom(),
-    eventType: varchar({ length: 50 }).notNull(),
-    tagId: varchar({ length: 96 }).notNull(),
+    algorithmId: algorithmType().notNull(),
+    direction: directionType().notNull(),
+    tagEpc: varchar({ length: 96 }).notNull(),
     userId: uuid(),
-    lighthousePair: varchar({ length: 50 }),
+    groupId: integer()
+      .notNull()
+      .references(() => lighthouseGroups.id),
+    confidence: real().notNull(),
+    centroidSeparationFactor: real().notNull(),
+    clusterSizeFactor: real().notNull(),
+    bilateralCoverageFactor: real().notNull(),
+    rssiTrendConsistencyFactor: real(),
     timestamp: timestamp({ withTimezone: true }).notNull(),
-    confidence: real(),
+    clusterStartedAt: timestamp({ withTimezone: true }).notNull(),
+    clusterEndedAt: timestamp({ withTimezone: true }).notNull(),
+    metadata: jsonb(),
     syncedToIntegration: boolean().default(false),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    index("idx_processed_events_tag_timestamp").on(
-      table.tagId,
-      table.timestamp,
-    ),
-    index("idx_processed_events_user_timestamp").on(
-      table.userId,
-      table.timestamp,
-    ),
+    index("idx_processed_events_tag_timestamp").on(table.tagEpc, table.timestamp),
+    index("idx_processed_events_user_timestamp").on(table.userId, table.timestamp),
     index("idx_processed_events_timestamp").on(table.timestamp),
     index("idx_processed_events_synced").on(table.syncedToIntegration),
+    index("idx_processed_events_algorithm").on(table.algorithmId, table.timestamp),
+    index("idx_processed_events_group").on(table.groupId, table.timestamp),
+  ],
+);
+
+export const processedEventScans = pgTable(
+  "processed_event_scans",
+  {
+    processedEventId: uuid()
+      .notNull()
+      .references(() => processedEvents.id, { onDelete: "cascade" }),
+    rawScanId: bigserial({ mode: "bigint" })
+      .notNull()
+      .references(() => rawScans.id),
+  },
+  (table) => [
+    primaryKey({ columns: [table.processedEventId, table.rawScanId] }),
+    index("idx_processed_event_scans_raw_scan").on(table.rawScanId),
   ],
 );
 
