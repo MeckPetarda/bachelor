@@ -14,6 +14,9 @@ import type {
   User,
   CreateUserRequest,
   UpdateUserRequest,
+  ProcessedEvent,
+  ProcessedEventDetail,
+  ProcessedEventsFilter,
 } from "../types";
 
 // Lighthouses
@@ -122,4 +125,27 @@ export function updateUser(
 
 export function deleteUser(id: string): Promise<void> {
   return del<void>(`/users/${id}`);
+}
+
+// Processed events
+export function getProcessedEvents(
+  filters: ProcessedEventsFilter,
+): Promise<PaginatedResponse<ProcessedEvent>> {
+  const params = new URLSearchParams();
+  params.set("algorithmId", filters.algorithmId);
+  if (filters.groupId !== undefined) params.set("groupId", String(filters.groupId));
+  if (filters.userId) params.set("userId", filters.userId);
+  if (filters.tagEpc) params.set("tagEpc", filters.tagEpc);
+  if (filters.direction) params.set("direction", filters.direction);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  if (filters.minConfidence !== undefined)
+    params.set("minConfidence", String(filters.minConfidence));
+  if (filters.limit !== undefined) params.set("limit", String(filters.limit));
+  if (filters.offset !== undefined) params.set("offset", String(filters.offset));
+  return get<PaginatedResponse<ProcessedEvent>>(`/events?${params.toString()}`);
+}
+
+export function getProcessedEventDetail(id: string): Promise<ProcessedEventDetail> {
+  return get<ProcessedEventDetail>(`/events/${id}`);
 }
