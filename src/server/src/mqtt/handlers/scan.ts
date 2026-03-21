@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { extractMacAddress } from "../topics";
 import { broadcastScan } from "../../api/websocket";
 
-const logger = createLogger("Scan Handler", LogLevel.DEBUG);
+const logger = createLogger("Scan Handler");
 
 /**
  * Scan message payload structure from lighthouse

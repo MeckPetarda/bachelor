@@ -4,6 +4,7 @@ import { createLogger } from "../utils/logger";
 import { processCluster } from "./event-processor";
 import type { ScanData } from "./algorithms/types";
 import { broadcastOrphanedScan } from "../api/websocket";
+import { duration } from "drizzle-orm/gel-core";
 
 const logger = createLogger("EventSweeper");
 
@@ -173,9 +174,16 @@ async function sweep(): Promise<void> {
     }
 
     const durationMs = Date.now() - started;
-    logger.info(
-      `Sweep done in ${durationMs}ms — found: ${clustersFound}, processed: ${processed}, orphaned: ${orphaned}, skipped: ${skipped}`,
-    );
+    if (
+      clustersFound !== 0 ||
+      processed !== 0 ||
+      orphaned !== 0 ||
+      skipped !== 0
+    ) {
+      logger.info(
+        `Sweep done in ${durationMs}ms — found: ${clustersFound}, processed: ${processed}, orphaned: ${orphaned}, skipped: ${skipped}`,
+      );
+    }
   } catch (error) {
     logger.error("Sweep error:", error);
   }
