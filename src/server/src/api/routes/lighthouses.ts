@@ -289,7 +289,11 @@ router.patch("/lighthouses/:id", async (c) => {
   if (body.groupId !== undefined || body.placement !== undefined) {
     const oldGroupId = existing[0]!.groupId;
     const newGroupId = result[0]?.groupId ?? null;
-    const groupIds = [...new Set([oldGroupId, newGroupId].filter((g): g is number => g !== null))];
+    const groupIds = [
+      ...new Set(
+        [oldGroupId, newGroupId].filter((g): g is number => g !== null),
+      ),
+    ];
     for (const gId of groupIds) {
       await db
         .update(schema.rawScans)
@@ -402,7 +406,11 @@ router.patch("/lighthouses/:id/update", async (c) => {
   if (body.groupId !== undefined || body.placement !== undefined) {
     const oldGroupId = existing[0]!.groupId;
     const newGroupId = result[0]?.groupId ?? null;
-    const groupIds = [...new Set([oldGroupId, newGroupId].filter((g): g is number => g !== null))];
+    const groupIds = [
+      ...new Set(
+        [oldGroupId, newGroupId].filter((g): g is number => g !== null),
+      ),
+    ];
     for (const gId of groupIds) {
       await db
         .update(schema.rawScans)

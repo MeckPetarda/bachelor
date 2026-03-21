@@ -8,14 +8,14 @@ import {
 import { resolveTagUser } from "../src/services/tag-resolver";
 import { eq, or } from "drizzle-orm";
 
-// ─── Test data ────────────────────────────────────────────────────────────────
+// --- Test data ----------------------------------------------------------------
 
 const TEST_USER_ID = "00000000-0000-0000-0001-000000000001";
 const TEST_EPC_ACTIVE = "ETEST_ACTIVE_0000001";
 const TEST_EPC_DEACTIVATED = "ETEST_DEACTIVATED001";
 const TEST_EPC_UNASSIGNED = "ETEST_UNASSIGNED0001";
 
-// ─── Suite lifecycle ──────────────────────────────────────────────────────────
+// --- Suite lifecycle ----------------------------------------------------------
 
 describe("Tag Resolver", () => {
   beforeAll(async () => {
@@ -59,36 +59,36 @@ describe("Tag Resolver", () => {
     const db = getDatabase();
 
     // Clean up tag assignments
-    await db.delete(schema.tagAssignments).where(
-      or(
-        eq(schema.tagAssignments.tagEpc, TEST_EPC_ACTIVE),
-        eq(schema.tagAssignments.tagEpc, TEST_EPC_DEACTIVATED),
-      ),
-    );
+    await db
+      .delete(schema.tagAssignments)
+      .where(
+        or(
+          eq(schema.tagAssignments.tagEpc, TEST_EPC_ACTIVE),
+          eq(schema.tagAssignments.tagEpc, TEST_EPC_DEACTIVATED),
+        ),
+      );
 
     // Clean up user
-    await db
-      .delete(schema.users)
-      .where(eq(schema.users.id, TEST_USER_ID));
+    await db.delete(schema.users).where(eq(schema.users.id, TEST_USER_ID));
 
     await closeDatabase();
   });
 
-  // ─── Test 1: Returns userId for an EPC with an active assignment ────────────
+  // --- Test 1: Returns userId for an EPC with an active assignment ------------
 
   it("should return userId for an EPC with an active assignment", async () => {
     const result = await resolveTagUser(TEST_EPC_ACTIVE);
     expect(result).toBe(TEST_USER_ID);
   });
 
-  // ─── Test 2: Returns null for an EPC with no assignment at all ─────────────
+  // --- Test 2: Returns null for an EPC with no assignment at all -------------
 
   it("should return null for an EPC with no assignment", async () => {
     const result = await resolveTagUser(TEST_EPC_UNASSIGNED);
     expect(result).toBeNull();
   });
 
-  // ─── Test 3: Returns null for an EPC whose assignment has been deactivated ──
+  // --- Test 3: Returns null for an EPC whose assignment has been deactivated --
 
   it("should return null for an EPC whose assignment has been deactivated", async () => {
     const result = await resolveTagUser(TEST_EPC_DEACTIVATED);

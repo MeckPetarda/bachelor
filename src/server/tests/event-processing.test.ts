@@ -7,14 +7,14 @@
  *   3  Misconfigured group
  *   4  Single-lighthouse cluster (insufficient_data)
  *   5  Unsyncable scans
- *   6  Algorithm 2 confidence ≥ Algorithm 1 when RSSI agrees
+ *   6  Algorithm 2 confidence >= Algorithm 1 when RSSI agrees
  *   7  Algorithm 2 confidence < Algorithm 1 when RSSI contradicts
  *   8  POST /api/v1/events/manual
- *   9  GET /api/v1/events — algorithmId filter
- *  10  GET /api/v1/events/unresolved — orphaned scans
+ *   9  GET /api/v1/events - algorithmId filter
+ *  10  GET /api/v1/events/unresolved - orphaned scans
  *
  * Requires a running PostgreSQL instance (uses the standard DATABASE_URL env var).
- * No MQTT broker needed — processCluster and the events API do not use MQTT.
+ * No MQTT broker needed - processCluster and the events API do not use MQTT.
  */
 
 import {
@@ -36,7 +36,7 @@ import { eq, inArray } from "drizzle-orm";
 import { processCluster } from "../src/services/event-processor";
 import type { ScanData } from "../src/services/algorithms/types";
 
-// ─── Test fixture constants ───────────────────────────────────────────────────
+// --- Test fixture constants ---------------------------------------------------
 // IDs chosen to avoid collisions with other test files (997, 998, 999, 1).
 
 const TEST_OUTSIDE_LH_ID = 991;
@@ -53,7 +53,7 @@ const BASE_MS = new Date("2025-01-15T10:00:00Z").getTime();
 let testGroupId: number;
 let miscGroupId: number;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------------------
 
 type Database = ReturnType<typeof getDatabase>;
 
@@ -110,7 +110,7 @@ const ALL_TEST_LH_IDS = [
   TEST_MISC_LH_ID_B,
 ];
 
-// ─── Suite lifecycle ──────────────────────────────────────────────────────────
+// --- Suite lifecycle ----------------------------------------------------------
 
 describe("Event Processing Pipeline", () => {
   beforeAll(async () => {
@@ -121,7 +121,7 @@ describe("Event Processing Pipeline", () => {
     const [good] = await db
       .insert(schema.lighthouseGroups)
       .values({
-        label: "EP Test Group — Good",
+        label: "EP Test Group - Good",
         activityTimeoutMs: 4000,
         orphanTimeoutMs: 8000,
       })
@@ -131,7 +131,7 @@ describe("Event Processing Pipeline", () => {
     const [bad] = await db
       .insert(schema.lighthouseGroups)
       .values({
-        label: "EP Test Group — Misconfigured",
+        label: "EP Test Group - Misconfigured",
         activityTimeoutMs: 4000,
         orphanTimeoutMs: 8000,
       })
@@ -189,7 +189,7 @@ describe("Event Processing Pipeline", () => {
       .delete(schema.rawScans)
       .where(inArray(schema.rawScans.lighthouseId, ALL_TEST_LH_IDS));
 
-    // Lighthouses must be deleted before groups (FK: lighthouse.groupId → groups.id).
+    // Lighthouses must be deleted before groups (FK: lighthouse.groupId -> groups.id).
     await db
       .delete(schema.lighthouses)
       .where(inArray(schema.lighthouses.id, ALL_TEST_LH_IDS));
@@ -216,12 +216,12 @@ describe("Event Processing Pipeline", () => {
       .where(inArray(schema.rawScans.lighthouseId, ALL_TEST_LH_IDS));
   });
 
-  // ─── Test 1: Basic IN detection ─────────────────────────────────────────────
+  // --- Test 1: Basic IN detection ---------------------------------------------
 
   it("1. detects IN direction when outside scans precede inside scans", async () => {
     const db = getDatabase();
 
-    // 5 outside scans (1000–3000 ms) then 5 inside scans (3000–5000 ms).
+    // 5 outside scans (1000-3000 ms) then 5 inside scans (3000-5000 ms).
     const scans = await insertScans(db, [
       { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 1000 },
       { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 1500 },
@@ -253,7 +253,7 @@ describe("Event Processing Pipeline", () => {
       expect(ev.bilateralCoverageFactor).toBeGreaterThan(0);
     }
 
-    // Junction table: 10 scans × 2 events = 20 rows.
+    // Junction table: 10 scans * 2 events = 20 rows.
     const scanIds = scans.map((s) => s.id);
     const junction = await db
       .select()
@@ -271,12 +271,12 @@ describe("Event Processing Pipeline", () => {
     }
   });
 
-  // ─── Test 2: Basic OUT detection ────────────────────────────────────────────
+  // --- Test 2: Basic OUT detection --------------------------------------------
 
   it("2. detects OUT direction when inside scans precede outside scans", async () => {
     const db = getDatabase();
 
-    // Inside earlier → OUT direction.
+    // Inside earlier -> OUT direction.
     const scans = await insertScans(db, [
       { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 1000 },
       { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 1500 },
@@ -304,7 +304,7 @@ describe("Event Processing Pipeline", () => {
     }
   });
 
-  // ─── Test 3: Misconfigured group ─────────────────────────────────────────────
+  // --- Test 3: Misconfigured group ---------------------------------------------
 
   it("3. returns misconfigured_group when group has no OUTSIDE lighthouse", async () => {
     const db = getDatabase();
@@ -323,7 +323,7 @@ describe("Event Processing Pipeline", () => {
     }
   });
 
-  // ─── Test 4: Single-lighthouse cluster → insufficient_data ──────────────────
+  // --- Test 4: Single-lighthouse cluster -> insufficient_data ------------------
 
   it("4. returns insufficient_data when only one side has scans", async () => {
     const db = getDatabase();
@@ -342,7 +342,7 @@ describe("Event Processing Pipeline", () => {
     }
   });
 
-  // ─── Test 5: Unsyncable scans ────────────────────────────────────────────────
+  // --- Test 5: Unsyncable scans ------------------------------------------------
 
   it("5. returns unsyncable when all scans have non-synced timeBasis", async () => {
     const db = getDatabase();
@@ -377,32 +377,72 @@ describe("Event Processing Pipeline", () => {
     }
   });
 
-  // ─── Test 6: RSSI agreement boosts Algorithm 2 confidence ──────────────────
+  // --- Test 6: RSSI agreement boosts Algorithm 2 confidence ------------------
 
-  it("6. Algorithm 2 confidence ≥ Algorithm 1 when RSSI trend agrees with direction", async () => {
+  it("6. Algorithm 2 confidence >= Algorithm 1 when RSSI trend agrees with direction", async () => {
     const db = getDatabase();
 
-    // Outside scans: early timestamps + falling RSSI (−50 → −80).
-    //   High-weight scans are early → weighted outside centroid pulled earlier.
+    // Outside scans: early timestamps + falling RSSI (-50 -> -80).
+    //   High-weight scans are early -> weighted outside centroid pulled earlier.
     //   Slope < 0 = expected for "in" direction (weakening as person leaves).
     //
-    // Inside scans: late timestamps + rising RSSI (−80 → −50).
-    //   High-weight scans are late → weighted inside centroid pulled later.
+    // Inside scans: late timestamps + rising RSSI (-80 -> -50).
+    //   High-weight scans are late -> weighted inside centroid pulled later.
     //   Slope > 0 = expected for "in" direction (strengthening as person enters).
     //
-    // Both trends agree → rssiTrendConsistencyFactor = 1.0.
-    // Weighted centroid separation > unweighted → algo2 CSF > algo1 CSF.
+    // Both trends agree -> rssiTrendConsistencyFactor = 1.0.
+    // Weighted centroid separation > unweighted -> algo2 CSF > algo1 CSF.
     const scans = await insertScans(db, [
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 1000, rssiDbm: -50 },
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 1500, rssiDbm: -57 },
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 2000, rssiDbm: -65 },
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 2500, rssiDbm: -72 },
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 3000, rssiDbm: -80 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 3000, rssiDbm: -80 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 3500, rssiDbm: -72 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 4000, rssiDbm: -65 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 4500, rssiDbm: -57 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 5000, rssiDbm: -50 },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 1000,
+        rssiDbm: -50,
+      },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 1500,
+        rssiDbm: -57,
+      },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 2000,
+        rssiDbm: -65,
+      },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 2500,
+        rssiDbm: -72,
+      },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 3000,
+        rssiDbm: -80,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 3000,
+        rssiDbm: -80,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 3500,
+        rssiDbm: -72,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 4000,
+        rssiDbm: -65,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 4500,
+        rssiDbm: -57,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 5000,
+        rssiDbm: -50,
+      },
     ]);
 
     const result = await processCluster(scans, testGroupId, TEST_EPC);
@@ -425,30 +465,70 @@ describe("Event Processing Pipeline", () => {
     expect(algo2.confidence).toBeGreaterThanOrEqual(algo1.confidence);
   });
 
-  // ─── Test 7: RSSI contradiction degrades Algorithm 2 confidence ─────────────
+  // --- Test 7: RSSI contradiction degrades Algorithm 2 confidence -------------
 
   it("7. Algorithm 2 confidence < Algorithm 1 when RSSI trend contradicts direction", async () => {
     const db = getDatabase();
 
-    // Outside scans: early timestamps + RISING RSSI (−80 → −50).
+    // Outside scans: early timestamps + RISING RSSI (-80 -> -50).
     //   Slope > 0 = expects exit (weakening), but temporal says "in". CONTRADICTS.
     //
-    // Inside scans: late timestamps + FALLING RSSI (−50 → −80).
+    // Inside scans: late timestamps + FALLING RSSI (-50 -> -80).
     //   Slope < 0 = expects entry (strengthening), but temporal says "in". CONTRADICTS.
     //
-    // Both contradict → rssiTrendConsistencyFactor = CONFIDENCE_FACTOR_FLOOR.
-    // Weighted centroid separation < unweighted → algo2 CSF < algo1 CSF.
+    // Both contradict -> rssiTrendConsistencyFactor = CONFIDENCE_FACTOR_FLOOR.
+    // Weighted centroid separation < unweighted -> algo2 CSF < algo1 CSF.
     const scans = await insertScans(db, [
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 1000, rssiDbm: -80 },
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 1500, rssiDbm: -72 },
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 2000, rssiDbm: -65 },
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 2500, rssiDbm: -57 },
-      { lighthouseId: TEST_OUTSIDE_LH_ID, timestampOffsetMs: 3000, rssiDbm: -50 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 3000, rssiDbm: -50 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 3500, rssiDbm: -57 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 4000, rssiDbm: -65 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 4500, rssiDbm: -72 },
-      { lighthouseId: TEST_INSIDE_LH_ID, timestampOffsetMs: 5000, rssiDbm: -80 },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 1000,
+        rssiDbm: -80,
+      },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 1500,
+        rssiDbm: -72,
+      },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 2000,
+        rssiDbm: -65,
+      },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 2500,
+        rssiDbm: -57,
+      },
+      {
+        lighthouseId: TEST_OUTSIDE_LH_ID,
+        timestampOffsetMs: 3000,
+        rssiDbm: -50,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 3000,
+        rssiDbm: -50,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 3500,
+        rssiDbm: -57,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 4000,
+        rssiDbm: -65,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 4500,
+        rssiDbm: -72,
+      },
+      {
+        lighthouseId: TEST_INSIDE_LH_ID,
+        timestampOffsetMs: 5000,
+        rssiDbm: -80,
+      },
     ]);
 
     const result = await processCluster(scans, testGroupId, TEST_EPC);
@@ -470,7 +550,7 @@ describe("Event Processing Pipeline", () => {
     expect(algo2.confidence).toBeLessThan(algo1.confidence);
   });
 
-  // ─── Test 8: Manual event creation ──────────────────────────────────────────
+  // --- Test 8: Manual event creation ------------------------------------------
 
   it("8. POST /api/v1/events/manual creates event with all confidence factors = 1.0", async () => {
     const res = await app.request("/api/v1/events/manual", {
@@ -499,7 +579,7 @@ describe("Event Processing Pipeline", () => {
     expect(typeof body.id).toBe("string");
   });
 
-  // ─── Test 9: Events API filtering by algorithmId ────────────────────────────
+  // --- Test 9: Events API filtering by algorithmId ----------------------------
 
   it("9. GET /api/v1/events filters correctly by algorithmId", async () => {
     const db = getDatabase();
@@ -515,7 +595,7 @@ describe("Event Processing Pipeline", () => {
     ]);
     await processCluster(scans, testGroupId, TEST_EPC);
 
-    // — Filter: temporal_centroid only ———————————————————————————————————————
+    // - Filter: temporal_centroid only ---------------------------------------
     const res1 = await app.request(
       `/api/v1/events?algorithmId=temporal_centroid&groupId=${testGroupId}`,
     );
@@ -529,7 +609,7 @@ describe("Event Processing Pipeline", () => {
       expect(ev.algorithmId).toBe("temporal_centroid");
     }
 
-    // — Filter: rssi_weighted_centroid only ──────────────────────────────────
+    // - Filter: rssi_weighted_centroid only ----------------------------------
     const res2 = await app.request(
       `/api/v1/events?algorithmId=rssi_weighted_centroid&groupId=${testGroupId}`,
     );
@@ -542,12 +622,12 @@ describe("Event Processing Pipeline", () => {
       expect(ev.algorithmId).toBe("rssi_weighted_centroid");
     }
 
-    // — Missing algorithmId → 400 ────────────────────────────────────────────
+    // - Missing algorithmId -> 400 --------------------------------------------
     const res3 = await app.request("/api/v1/events");
     expect(res3.status).toBe(400);
   });
 
-  // ─── Test 10: Unresolved events API ─────────────────────────────────────────
+  // --- Test 10: Unresolved events API -----------------------------------------
 
   it("10. GET /api/v1/events/unresolved returns orphaned scans with correct reasons", async () => {
     const db = getDatabase();

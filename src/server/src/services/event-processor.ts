@@ -4,7 +4,11 @@ import { createLogger } from "../utils/logger";
 import { resolveTagUser } from "./tag-resolver";
 import { analyzeTemporalCentroid } from "./algorithms/temporal-centroid";
 import { analyzeRssiWeightedCentroid } from "./algorithms/rssi-weighted-centroid";
-import type { ScanData, PartitionedCluster, AlgorithmResult } from "./algorithms/types";
+import type {
+  ScanData,
+  PartitionedCluster,
+  AlgorithmResult,
+} from "./algorithms/types";
 import {
   broadcastTraversalEvent,
   type TraversalEventPayload,
@@ -14,7 +18,10 @@ const logger = createLogger("EventProcessor");
 
 export type ProcessResult =
   | { processed: true }
-  | { processed: false; reason: "misconfigured_group" | "unsyncable" | "insufficient_data" };
+  | {
+      processed: false;
+      reason: "misconfigured_group" | "unsyncable" | "insufficient_data";
+    };
 
 /**
  * Process a closed cluster of raw scans for one EPC in one group.
@@ -32,7 +39,7 @@ export async function processCluster(
 ): Promise<ProcessResult> {
   const db = getDatabase();
 
-  // ── Step 1: Validate group config ─────────────────────────────────────────
+  // -- Step 1: Validate group config -----------------------------------------
   // The group must contain exactly one INSIDE and one OUTSIDE lighthouse.
 
   const groupLighthouses = await db
@@ -52,7 +59,7 @@ export async function processCluster(
 
   if (insideLighthouses.length !== 1 || outsideLighthouses.length !== 1) {
     logger.warn(
-      `Group ${groupId}: misconfigured — found ${insideLighthouses.length} INSIDE, ${outsideLighthouses.length} OUTSIDE lighthouses`,
+      `Group ${groupId}: misconfigured - found ${insideLighthouses.length} INSIDE, ${outsideLighthouses.length} OUTSIDE lighthouses`,
     );
     return { processed: false, reason: "misconfigured_group" };
   }
@@ -60,7 +67,7 @@ export async function processCluster(
   const insideLighthouseId = insideLighthouses[0]!.id;
   const outsideLighthouseId = outsideLighthouses[0]!.id;
 
-  // ── Step 2: Filter to synced scans only ───────────────────────────────────
+  // -- Step 2: Filter to synced scans only -----------------------------------
 
   const syncedScans = scans.filter((s) => s.timeBasis === "synced");
   if (syncedScans.length === 0) {
@@ -70,7 +77,7 @@ export async function processCluster(
     return { processed: false, reason: "unsyncable" };
   }
 
-  // ── Step 3: Partition by lighthouse ───────────────────────────────────────
+  // -- Step 3: Partition by lighthouse ---------------------------------------
 
   const insideScans = syncedScans.filter(
     (s) => s.lighthouseId === insideLighthouseId,
@@ -79,7 +86,7 @@ export async function processCluster(
     (s) => s.lighthouseId === outsideLighthouseId,
   );
 
-  // ── Step 4: Validate bilateral coverage ───────────────────────────────────
+  // -- Step 4: Validate bilateral coverage -----------------------------------
 
   if (insideScans.length === 0 || outsideScans.length === 0) {
     logger.debug(
@@ -89,7 +96,7 @@ export async function processCluster(
     return { processed: false, reason: "insufficient_data" };
   }
 
-  // ── Step 5: Build PartitionedCluster ──────────────────────────────────────
+  // -- Step 5: Build PartitionedCluster --------------------------------------
 
   const allScans = [...outsideScans, ...insideScans];
   const times = allScans.map((s) => s.timestamp.getTime());
@@ -103,16 +110,16 @@ export async function processCluster(
     clusterEndedAt: new Date(Math.max(...times)),
   };
 
-  // ── Step 6: Resolve user ──────────────────────────────────────────────────
+  // -- Step 6: Resolve user --------------------------------------------------
 
   const userId = await resolveTagUser(epc);
 
-  // ── Steps 7 & 8: Run both algorithms ──────────────────────────────────────
+  // -- Steps 7 & 8: Run both algorithms --------------------------------------
 
   const result1 = analyzeTemporalCentroid(cluster);
   const result2 = analyzeRssiWeightedCentroid(cluster);
 
-  // ── Step 9: Atomic write ──────────────────────────────────────────────────
+  // -- Step 9: Atomic write --------------------------------------------------
 
   const scanIds = allScans.map((s) => s.id);
 
@@ -139,25 +146,43 @@ export async function processCluster(
     return { eventId1: ev1.id, eventId2: ev2.id };
   });
 
-  logger.debug(
+  logger.info(
     `Processed EPC ${epc} group ${groupId}: ` +
       `algo1=${result1.direction}(${result1.confidence.toFixed(3)}) ` +
       `algo2=${result2.direction}(${result2.confidence.toFixed(3)})`,
   );
 
-  // ── Step 10: Broadcast (after commit, non-blocking) ───────────────────────
+  // -- Step 10: Broadcast (after commit, non-blocking) -----------------------
 
   setImmediate(() => {
-    broadcastEvent(eventId1, result1, epc, userId, groupId, cluster, scanIds.length);
-    broadcastEvent(eventId2, result2, epc, userId, groupId, cluster, scanIds.length);
+    broadcastEvent(
+      eventId1,
+      result1,
+      epc,
+      userId,
+      groupId,
+      cluster,
+      scanIds.length,
+    );
+    broadcastEvent(
+      eventId2,
+      result2,
+      epc,
+      userId,
+      groupId,
+      cluster,
+      scanIds.length,
+    );
   });
 
   return { processed: true };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------------------
 
-type Tx = Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0];
+type Tx = Parameters<
+  Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]
+>[0];
 
 async function insertEvent(
   tx: Tx,
@@ -179,7 +204,8 @@ async function insertEvent(
       centroidSeparationFactor: result.centroidSeparationFactor,
       clusterSizeFactor: result.clusterSizeFactor,
       bilateralCoverageFactor: result.bilateralCoverageFactor,
-      rssiTrendConsistencyFactor: result.rssiTrendConsistencyFactor ?? undefined,
+      rssiTrendConsistencyFactor:
+        result.rssiTrendConsistencyFactor ?? undefined,
       timestamp: result.timestamp,
       clusterStartedAt: cluster.clusterStartedAt,
       clusterEndedAt: cluster.clusterEndedAt,

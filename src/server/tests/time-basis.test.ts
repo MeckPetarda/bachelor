@@ -18,7 +18,7 @@ import { eq } from "drizzle-orm";
 import { buildScanTopic } from "../src/mqtt/topics";
 import { clearAllStates } from "../src/mqtt/state";
 
-// ─── Test configuration ───────────────────────────────────────────────────────
+// --- Test configuration -------------------------------------------------------
 
 const MQTT_PORT = 1883;
 const MQTT_URL = `mqtt://localhost:${MQTT_PORT}`;
@@ -30,7 +30,7 @@ const TEST_DEVICE_ID = "AA:BB:CC:DD:EE:03";
 // A known Unix timestamp used in "synced" tests: 2025-03-17T00:00:00Z
 const KNOWN_UNIX_MS = 1742169600000;
 
-// ─── Helper: wait for a condition with timeout ─────────────────────────────────
+// --- Helper: wait for a condition with timeout ---------------------------------
 
 async function waitFor(
   condition: () => Promise<boolean>,
@@ -45,7 +45,7 @@ async function waitFor(
   throw new Error(`Timeout waiting for condition after ${timeout}ms`);
 }
 
-// ─── Helper: connect an MQTT test client ──────────────────────────────────────
+// --- Helper: connect an MQTT test client --------------------------------------
 
 async function connectClient(clientId: string): Promise<mqtt.MqttClient> {
   const client = mqtt.connect(MQTT_URL, { clientId, connectTimeout: 5000 });
@@ -71,7 +71,7 @@ async function disconnectClient(client: mqtt.MqttClient): Promise<void> {
   }
 }
 
-// ─── Helper: publish a scan and wait for it to appear in raw_scans ────────────
+// --- Helper: publish a scan and wait for it to appear in raw_scans ------------
 
 async function publishScan(
   client: mqtt.MqttClient,
@@ -86,7 +86,7 @@ async function publishScan(
   });
 }
 
-// ─── Suite lifecycle ──────────────────────────────────────────────────────────
+// --- Suite lifecycle ----------------------------------------------------------
 
 describe("Time Basis Scan Handling", () => {
   let client: mqtt.MqttClient | null = null;
@@ -140,7 +140,7 @@ describe("Time Basis Scan Handling", () => {
     clearAllStates();
   });
 
-  // ─── Test 1: timeBasis "synced" — timestamp used directly ──────────────────
+  // --- Test 1: timeBasis "synced" - timestamp used directly ------------------
 
   it('should use timestampMs directly when timeBasis is "synced"', async () => {
     const db = getDatabase();
@@ -184,13 +184,13 @@ describe("Time Basis Scan Handling", () => {
     client = null;
   });
 
-  // ─── Test 2: timeBasis "estimated" — falls back to received_at ─────────────
+  // --- Test 2: timeBasis "estimated" - falls back to received_at -------------
 
   it('should use received_at when timeBasis is "estimated"', async () => {
     const db = getDatabase();
     client = await connectClient("tb-test-estimated");
 
-    const bootRelativeMs = 45000; // 45 seconds after boot — not a real Unix ts
+    const bootRelativeMs = 45000; // 45 seconds after boot - not a real Unix ts
     const beforePublish = Date.now();
 
     await publishScan(client, {
@@ -232,7 +232,7 @@ describe("Time Basis Scan Handling", () => {
     client = null;
   });
 
-  // ─── Test 3: timeBasis "relative" — falls back to received_at ──────────────
+  // --- Test 3: timeBasis "relative" - falls back to received_at --------------
 
   it('should use received_at when timeBasis is "relative"', async () => {
     const db = getDatabase();
@@ -277,7 +277,7 @@ describe("Time Basis Scan Handling", () => {
     client = null;
   });
 
-  // ─── Test 4: Missing timeBasis — backward compatibility ────────────────────
+  // --- Test 4: Missing timeBasis - backward compatibility --------------------
 
   it('should default to "synced" behavior when timeBasis is absent', async () => {
     const db = getDatabase();
@@ -287,7 +287,7 @@ describe("Time Basis Scan Handling", () => {
       epc: "E200COMPAT000000001",
       timestampMs: KNOWN_UNIX_MS,
       rssiDbm: -50,
-      // timeBasis intentionally omitted — simulates pre-update firmware
+      // timeBasis intentionally omitted - simulates pre-update firmware
     });
 
     await waitFor(async () => {
@@ -318,7 +318,7 @@ describe("Time Basis Scan Handling", () => {
     client = null;
   });
 
-  // ─── Test 5: Offline replay with timeBasis "synced" ────────────────────────
+  // --- Test 5: Offline replay with timeBasis "synced" ------------------------
 
   it('should use timestampMs for offline "synced" replay', async () => {
     const db = getDatabase();
@@ -363,7 +363,7 @@ describe("Time Basis Scan Handling", () => {
     client = null;
   });
 
-  // ─── Test 6: Offline replay with timeBasis "relative" ──────────────────────
+  // --- Test 6: Offline replay with timeBasis "relative" ----------------------
 
   it('should use received_at for offline "relative" replay', async () => {
     const db = getDatabase();
@@ -410,7 +410,7 @@ describe("Time Basis Scan Handling", () => {
     client = null;
   });
 
-  // ─── Test 7: Mixed timeBasis values — no state leakage ─────────────────────
+  // --- Test 7: Mixed timeBasis values - no state leakage ---------------------
 
   it("should handle a batch of mixed timeBasis values independently", async () => {
     const db = getDatabase();

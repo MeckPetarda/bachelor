@@ -76,7 +76,7 @@ export const UserModal: Component<Props> = (props) => {
             <label class="label">
               Name{" "}
               <span class={styles.hint}>
-                (optional — implied from RFID if absent)
+                (optional - implied from RFID if absent)
               </span>
             </label>
             <input
@@ -152,7 +152,7 @@ export const UserModal: Component<Props> = (props) => {
               class="btn btn-primary"
               disabled={submitting()}
             >
-              {submitting() ? "Saving…" : isEdit() ? "Save" : "Create"}
+              {submitting() ? "Saving..." : isEdit() ? "Save" : "Create"}
             </button>
           </div>
         </form>

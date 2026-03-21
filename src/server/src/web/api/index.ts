@@ -116,10 +116,7 @@ export function createUser(data: CreateUserRequest): Promise<User> {
   return post<User>("/users", data);
 }
 
-export function updateUser(
-  id: string,
-  data: UpdateUserRequest,
-): Promise<User> {
+export function updateUser(id: string, data: UpdateUserRequest): Promise<User> {
   return patch<User>(`/users/${id}`, data);
 }
 
@@ -133,7 +130,8 @@ export function getProcessedEvents(
 ): Promise<PaginatedResponse<ProcessedEvent>> {
   const params = new URLSearchParams();
   params.set("algorithmId", filters.algorithmId);
-  if (filters.groupId !== undefined) params.set("groupId", String(filters.groupId));
+  if (filters.groupId !== undefined)
+    params.set("groupId", String(filters.groupId));
   if (filters.userId) params.set("userId", filters.userId);
   if (filters.tagEpc) params.set("tagEpc", filters.tagEpc);
   if (filters.direction) params.set("direction", filters.direction);
@@ -142,10 +140,13 @@ export function getProcessedEvents(
   if (filters.minConfidence !== undefined)
     params.set("minConfidence", String(filters.minConfidence));
   if (filters.limit !== undefined) params.set("limit", String(filters.limit));
-  if (filters.offset !== undefined) params.set("offset", String(filters.offset));
+  if (filters.offset !== undefined)
+    params.set("offset", String(filters.offset));
   return get<PaginatedResponse<ProcessedEvent>>(`/events?${params.toString()}`);
 }
 
-export function getProcessedEventDetail(id: string): Promise<ProcessedEventDetail> {
+export function getProcessedEventDetail(
+  id: string,
+): Promise<ProcessedEventDetail> {
   return get<ProcessedEventDetail>(`/events/${id}`);
 }

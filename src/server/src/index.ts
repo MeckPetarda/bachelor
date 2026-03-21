@@ -13,10 +13,7 @@ import {
   startRetentionScheduler,
   stopRetentionScheduler,
 } from "./database/cleanup";
-import {
-  startEventSweeper,
-  stopEventSweeper,
-} from "./services/event-sweeper";
+import { startEventSweeper, stopEventSweeper } from "./services/event-sweeper";
 import { app } from "./api/routes";
 import { getConfig } from "./config";
 import { createLogger } from "./utils/logger";
@@ -25,7 +22,6 @@ import {
   handleWebSocketClose,
   handleWebSocketMessage,
   closeAllConnections,
-  getConnectedClientCount,
 } from "./api/websocket";
 
 const logger = createLogger("Server");

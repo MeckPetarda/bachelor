@@ -19,7 +19,7 @@ type AlgoTab = "temporal_centroid" | "rssi_weighted_centroid" | "both";
 
 const LIMIT = 50;
 
-// ── Formatting helpers ─────────────────────────────────────────────────────
+// -- Formatting helpers -----------------------------------------------------
 
 function formatRelTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -40,30 +40,32 @@ function algoLabel(id: string): string {
   return "Manual";
 }
 
-// ── Component ─────────────────────────────────────────────────────────────
+// -- Component -------------------------------------------------------------
 
 export const ProcessedEvents: Component = () => {
-  // ── Filter state ─────────────────────────────────────────────────────────
+  // -- Filter state ---------------------------------------------------------
   const [algoTab, setAlgoTab] = createSignal<AlgoTab>("temporal_centroid");
   const [search, setSearch] = createSignal("");
   const [direction, setDirection] = createSignal("");
-  const [groupFilter, setGroupFilter] = createSignal<number | undefined>(undefined);
+  const [groupFilter, setGroupFilter] = createSignal<number | undefined>(
+    undefined,
+  );
   const [dateFrom, setDateFrom] = createSignal("");
   const [dateTo, setDateTo] = createSignal("");
   const [page, setPage] = createSignal(0);
 
-  // ── "Both" local state ────────────────────────────────────────────────────
+  // -- "Both" local state ----------------------------------------------------
   const [bothEvents, setBothEvents] = createSignal<ProcessedEvent[]>([]);
   const [bothTotal, setBothTotal] = createSignal(0);
   const [bothLoading, setBothLoading] = createSignal(false);
 
-  // ── Modal state ───────────────────────────────────────────────────────────
+  // -- Modal state -----------------------------------------------------------
   const [showModal, setShowModal] = createSignal(false);
 
-  // ── Debounce timer ────────────────────────────────────────────────────────
+  // -- Debounce timer --------------------------------------------------------
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
-  // ── Derived: common filters shared between single and both modes ──────────
+  // -- Derived: common filters shared between single and both modes ----------
   const commonFilters = (): Partial<ProcessedEventsFilter> => ({
     tagEpc: search() || undefined,
     direction: (direction() || undefined) as ProcessedEventsFilter["direction"],
@@ -73,7 +75,7 @@ export const ProcessedEvents: Component = () => {
     limit: LIMIT,
   });
 
-  // ── Fetch for single-algorithm mode (uses the store) ──────────────────────
+  // -- Fetch for single-algorithm mode (uses the store) ----------------------
   const doFetchSingle = (offset = 0) => {
     fetchEvents({
       algorithmId: algoTab() as "temporal_centroid" | "rssi_weighted_centroid",
@@ -82,17 +84,24 @@ export const ProcessedEvents: Component = () => {
     });
   };
 
-  // ── Fetch for both-algorithm mode (bypasses store for data) ──────────────
+  // -- Fetch for both-algorithm mode (bypasses store for data) --------------
   const doFetchBoth = async () => {
     setBothLoading(true);
     try {
       const filters = { ...commonFilters(), offset: 0 };
       const [r1, r2] = await Promise.all([
-        api.getProcessedEvents({ ...filters, algorithmId: "temporal_centroid" }),
-        api.getProcessedEvents({ ...filters, algorithmId: "rssi_weighted_centroid" }),
+        api.getProcessedEvents({
+          ...filters,
+          algorithmId: "temporal_centroid",
+        }),
+        api.getProcessedEvents({
+          ...filters,
+          algorithmId: "rssi_weighted_centroid",
+        }),
       ]);
       const merged = [...r1.data, ...r2.data].sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
       );
       setBothEvents(merged);
       setBothTotal(r1.total + r2.total);
@@ -106,7 +115,7 @@ export const ProcessedEvents: Component = () => {
     else doFetchSingle(0);
   };
 
-  // ── Display values (unified single/both) ──────────────────────────────────
+  // -- Display values (unified single/both) ----------------------------------
   const displayEvents = () =>
     algoTab() === "both" ? bothEvents() : processedEventsState.events;
   const displayTotal = () =>
@@ -114,7 +123,7 @@ export const ProcessedEvents: Component = () => {
   const displayLoading = () =>
     algoTab() === "both" ? bothLoading() : processedEventsState.loading;
 
-  // ── WebSocket new-events banner ───────────────────────────────────────────
+  // -- WebSocket new-events banner -------------------------------------------
   const newEventCount = () => {
     const algo = algoTab();
     const pending = pendingEventsAlgorithms();
@@ -128,7 +137,7 @@ export const ProcessedEvents: Component = () => {
     doFetch();
   };
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // -- Handlers --------------------------------------------------------------
   const handleAlgoTab = (tab: AlgoTab) => {
     setAlgoTab(tab);
     setPage(0);
@@ -205,8 +214,8 @@ export const ProcessedEvents: Component = () => {
   };
 
   const dirLabel = (d: string) => {
-    if (d === "in") return "→ In";
-    if (d === "out") return "← Out";
+    if (d === "in") return "-> In";
+    if (d === "out") return "<- Out";
     return "? Unknown";
   };
 
@@ -227,7 +236,7 @@ export const ProcessedEvents: Component = () => {
         <h1 class="page-title">Processed Events</h1>
       </div>
 
-      {/* ── Filters ── */}
+      {/* -- Filters -- */}
       <div class={styles.filters}>
         <div class={styles.filterGroup}>
           <label class="label">Algorithm</label>
@@ -266,7 +275,11 @@ export const ProcessedEvents: Component = () => {
 
         <div class={styles.filterGroup}>
           <label class="label">Direction</label>
-          <select class="select" value={direction()} onChange={handleDirectionChange}>
+          <select
+            class="select"
+            value={direction()}
+            onChange={handleDirectionChange}
+          >
             <option value="">All</option>
             <option value="in">In</option>
             <option value="out">Out</option>
@@ -305,11 +318,12 @@ export const ProcessedEvents: Component = () => {
         </div>
       </div>
 
-      {/* ── New events banner ── */}
+      {/* -- New events banner -- */}
       <Show when={newEventCount() > 0}>
         <div class={styles.banner}>
           <span>
-            {newEventCount()} new event{newEventCount() === 1 ? "" : "s"} detected
+            {newEventCount()} new event{newEventCount() === 1 ? "" : "s"}{" "}
+            detected
           </span>
           <button class={styles.bannerBtn} onClick={handleRefresh}>
             Click to refresh
@@ -317,10 +331,10 @@ export const ProcessedEvents: Component = () => {
         </div>
       </Show>
 
-      {/* ── Table ── */}
+      {/* -- Table -- */}
       <div class={styles.tableWrap}>
         <Show when={displayLoading()}>
-          <div class={styles.loadingState}>Loading events…</div>
+          <div class={styles.loadingState}>Loading events...</div>
         </Show>
 
         <Show when={!displayLoading() && displayEvents().length === 0}>
@@ -346,11 +360,18 @@ export const ProcessedEvents: Component = () => {
               <For each={displayEvents()}>
                 {(event) => (
                   <tr class={styles.row} onClick={() => handleRowClick(event)}>
-                    <td class={dirClass(event.direction)}>{dirLabel(event.direction)}</td>
+                    <td class={dirClass(event.direction)}>
+                      {dirLabel(event.direction)}
+                    </td>
                     <td title={event.tagEpc}>
-                      <Show when={event.userName} fallback={
-                        <span class={styles.epcMono}>…{event.tagEpc.slice(-5)}</span>
-                      }>
+                      <Show
+                        when={event.userName}
+                        fallback={
+                          <span class={styles.epcMono}>
+                            ...{event.tagEpc.slice(-5)}
+                          </span>
+                        }
+                      >
                         {event.userName}
                       </Show>
                     </td>
@@ -376,7 +397,7 @@ export const ProcessedEvents: Component = () => {
         </Show>
       </div>
 
-      {/* ── Pagination ── */}
+      {/* -- Pagination -- */}
       <Show when={algoTab() === "both"}>
         <p class={styles.bothNote}>
           Both mode shows the most recent {LIMIT} events per algorithm (
@@ -406,7 +427,7 @@ export const ProcessedEvents: Component = () => {
         </div>
       </Show>
 
-      {/* ── Detail modal ── */}
+      {/* -- Detail modal -- */}
       <Show when={showModal()}>
         <EventDetailModal onClose={handleModalClose} />
       </Show>

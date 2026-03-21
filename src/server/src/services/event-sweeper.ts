@@ -4,7 +4,6 @@ import { createLogger } from "../utils/logger";
 import { processCluster } from "./event-processor";
 import type { ScanData } from "./algorithms/types";
 import { broadcastOrphanedScan } from "../api/websocket";
-import { duration } from "drizzle-orm/gel-core";
 
 const logger = createLogger("EventSweeper");
 
@@ -43,7 +42,7 @@ export async function stopEventSweeper(): Promise<void> {
   logger.info("Event sweeper stopped");
 }
 
-// ─── Sweep cycle ──────────────────────────────────────────────────────────────
+// --- Sweep cycle --------------------------------------------------------------
 
 async function sweep(): Promise<void> {
   if (shuttingDown) return;
@@ -56,7 +55,7 @@ async function sweep(): Promise<void> {
   let skipped = 0;
 
   try {
-    // Step 1: Find closed clusters — those whose latest scan is older than
+    // Step 1: Find closed clusters - those whose latest scan is older than
     // the group's activityTimeoutMs threshold.
     const closedClusters = await db
       .select({
@@ -181,7 +180,7 @@ async function sweep(): Promise<void> {
       skipped !== 0
     ) {
       logger.info(
-        `Sweep done in ${durationMs}ms — found: ${clustersFound}, processed: ${processed}, orphaned: ${orphaned}, skipped: ${skipped}`,
+        `Sweep done in ${durationMs}ms - found: ${clustersFound}, processed: ${processed}, orphaned: ${orphaned}, skipped: ${skipped}`,
       );
     }
   } catch (error) {
@@ -189,7 +188,7 @@ async function sweep(): Promise<void> {
   }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------------------
 
 /**
  * Mark scans for lighthouses with no group as misconfigured, once they exceed

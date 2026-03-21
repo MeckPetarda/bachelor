@@ -64,7 +64,11 @@ router.post("/groups", async (c) => {
     orphanTimeoutMs?: number;
   }>();
 
-  if (!body.label || typeof body.label !== "string" || body.label.trim() === "") {
+  if (
+    !body.label ||
+    typeof body.label !== "string" ||
+    body.label.trim() === ""
+  ) {
     return c.json({ error: "Missing required field: label", status: 400 }, 400);
   }
 
@@ -284,7 +288,9 @@ router.delete("/groups/:id", async (c) => {
     return c.json({ error: "Group not found", status: 404 }, 404);
   }
 
-  await db.delete(schema.lighthouseGroups).where(eq(schema.lighthouseGroups.id, id));
+  await db
+    .delete(schema.lighthouseGroups)
+    .where(eq(schema.lighthouseGroups.id, id));
 
   logger.info(`Group ${id} deleted`);
 

@@ -10,16 +10,16 @@ function centroid(dates: Date[]): number {
 }
 
 /**
- * Algorithm 1 — Temporal Centroid.
+ * Algorithm 1 - Temporal Centroid.
  *
  * Pure function: no DB access, no side effects.
  *
  * Direction is determined by which lighthouse's time-centroid is earlier:
- *   outsideCentroid < insideCentroid  →  "in"
- *   insideCentroid  < outsideCentroid →  "out"
- *   |delta| ≤ 1 ms                   →  "unknown"
+ *   outsideCentroid < insideCentroid  ->  "in"
+ *   insideCentroid  < outsideCentroid ->  "out"
+ *   |delta| <= 1 ms                   ->  "unknown"
  *
- * Confidence = centroidSeparationFactor × clusterSizeFactor × bilateralCoverageFactor
+ * Confidence = centroidSeparationFactor * clusterSizeFactor * bilateralCoverageFactor
  * All factors are clamped to [CONFIDENCE_FACTOR_FLOOR, 1.0].
  */
 export function analyzeTemporalCentroid(
@@ -35,7 +35,7 @@ export function analyzeTemporalCentroid(
   const clusterDurationMs =
     clusterEndedAt.getTime() - clusterStartedAt.getTime();
 
-  // ── Direction ──────────────────────────────────────────────────────────────
+  // -- Direction --------------------------------------------------------------
 
   let direction: "in" | "out" | "unknown";
   if (centroidDeltaMs <= 1) {
@@ -46,10 +46,10 @@ export function analyzeTemporalCentroid(
     direction = "out";
   }
 
-  // ── Canonical event timestamp ──────────────────────────────────────────────
-  //   "in"  → entry side (outside) centroid
-  //   "out" → entry side (inside) centroid
-  //   "unknown" → midpoint
+  // -- Canonical event timestamp ----------------------------------------------
+  //   "in"  -> entry side (outside) centroid
+  //   "out" -> entry side (inside) centroid
+  //   "unknown" -> midpoint
 
   let timestamp: Date;
   if (direction === "in") {
@@ -60,16 +60,16 @@ export function analyzeTemporalCentroid(
     timestamp = new Date((outsideCentroidMs + insideCentroidMs) / 2);
   }
 
-  // ── Confidence factors ─────────────────────────────────────────────────────
+  // -- Confidence factors -----------------------------------------------------
 
   // 1. Centroid separation: how far apart are the two centroids relative to
-  //    the total cluster duration. Zero duration → floor.
+  //    the total cluster duration. Zero duration -> floor.
   const centroidSeparationFactor =
     clusterDurationMs === 0
       ? CONFIDENCE_FACTOR_FLOOR
       : clamp(centroidDeltaMs / clusterDurationMs);
 
-  // 2. Cluster size: more scans → higher confidence. Saturates at 10 total.
+  // 2. Cluster size: more scans -> higher confidence. Saturates at 10 total.
   const totalScans = insideScans.length + outsideScans.length;
   const clusterSizeFactor = clamp(Math.min(1.0, (totalScans - 2) / 8));
 

@@ -3,7 +3,7 @@ import { processedEventsState, fetchEventDetail } from "../stores/processedEvent
 import type { CompanionEvent, ProcessedEventDetail, ProcessedEventScan } from "../types";
 import styles from "./EventDetailModal.module.css";
 
-// ── SVG constants ──────────────────────────────────────────────────────────
+// -- SVG constants ----------------------------------------------------------
 const W = 700, H = 280;
 const PL = 52, PR = 20, PT = 24, PB = 44;
 const CW = W - PL - PR;  // 628
@@ -12,7 +12,7 @@ const CH = H - PT - PB;  // 212
 const COLOR_OUTSIDE = "#3b82f6";
 const COLOR_INSIDE  = "#f97316";
 
-// ── Formatting helpers ─────────────────────────────────────────────────────
+// -- Formatting helpers -----------------------------------------------------
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleString();
@@ -34,7 +34,7 @@ function mean(vals: number[]): number {
   return vals.reduce((s, v) => s + v, 0) / vals.length;
 }
 
-// ── Histogram builder ──────────────────────────────────────────────────────
+// -- Histogram builder ------------------------------------------------------
 
 type HistBin = { inside: number; outside: number; startMs: number };
 
@@ -67,7 +67,7 @@ function buildHistogram(
   return { bins, binWidthMs, maxCount };
 }
 
-// ── SVG helpers ────────────────────────────────────────────────────────────
+// -- SVG helpers ------------------------------------------------------------
 
 function xScale(relMs: number, durationMs: number): number {
   return PL + (relMs / Math.max(durationMs, 1)) * CW;
@@ -81,7 +81,7 @@ function yScaleRssi(rssi: number, rssiMin: number, rssiMax: number): number {
   return PT + ((rssiMax - rssi) / Math.max(rssiMax - rssiMin, 1)) * CH;
 }
 
-// ── Histogram SVG ──────────────────────────────────────────────────────────
+// -- Histogram SVG ----------------------------------------------------------
 
 const HistogramChart: Component<{
   inside: ProcessedEventScan[];
@@ -214,7 +214,7 @@ const HistogramChart: Component<{
   );
 };
 
-// ── RSSI Scatter SVG ───────────────────────────────────────────────────────
+// -- RSSI Scatter SVG -------------------------------------------------------
 
 const RssiScatterChart: Component<{
   inside: ProcessedEventScan[];
@@ -368,7 +368,7 @@ const RssiScatterChart: Component<{
   );
 };
 
-// ── Main modal component ────────────────────────────────────────────────────
+// -- Main modal component ----------------------------------------------------
 
 interface EventDetailModalProps {
   onClose: () => void;
@@ -411,12 +411,12 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
           <span class={styles.title}>
             <Show when={detail()} fallback="Event Detail">
               {(d: Accessor<ProcessedEventDetail>) =>
-                `${d().event.algorithmId === "temporal_centroid" ? "Temporal" : d().event.algorithmId === "rssi_weighted_centroid" ? "RSSI" : "Manual"} — ${d().event.direction === "in" ? "→ Entry" : d().event.direction === "out" ? "← Exit" : "Unknown"}`
+                `${d().event.algorithmId === "temporal_centroid" ? "Temporal" : d().event.algorithmId === "rssi_weighted_centroid" ? "RSSI" : "Manual"} - ${d().event.direction === "in" ? "-> Entry" : d().event.direction === "out" ? "<- Exit" : "Unknown"}`
               }
             </Show>
           </span>
           <button class={styles.closeBtn} onClick={props.onClose}>
-            ✕
+            X
           </button>
         </div>
 
@@ -435,13 +435,13 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
         {/* Body */}
         <div class={styles.body}>
           <Show when={loading()}>
-            <div class={styles.loadingState}>Loading event detail…</div>
+            <div class={styles.loadingState}>Loading event detail...</div>
           </Show>
 
           <Show when={detail()}>
             {(d: Accessor<ProcessedEventDetail>) => (
               <>
-                {/* ── OVERVIEW TAB ── */}
+                {/* -- OVERVIEW TAB -- */}
                 <Show when={activeTab() === "overview"}>
                   {/* Key-value grid */}
                   <div class={styles.grid}>
@@ -457,9 +457,9 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                         }
                       >
                         {d().event.direction === "in"
-                          ? "→ Entry"
+                          ? "-> Entry"
                           : d().event.direction === "out"
-                            ? "← Exit"
+                            ? "<- Exit"
                             : "? Unknown"}
                       </span>
                     </div>
@@ -505,7 +505,7 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                     <div class={styles.kvRow}>
                       <span class={styles.kvLabel}>Cluster span</span>
                       <span class={styles.kvValue}>
-                        {fmtTime(d().event.clusterStartedAt)} →{" "}
+                        {fmtTime(d().event.clusterStartedAt)} ->{" "}
                         {fmtTime(d().event.clusterEndedAt)} (
                         {fmtDuration(
                           new Date(d().event.clusterEndedAt).getTime() -
@@ -541,7 +541,7 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                           </div>
                         </Show>
                         <span class={styles.factorValue}>
-                          {value !== null ? `${Math.round((value as number) * 100)}%` : "—"}
+                          {value !== null ? `${Math.round((value as number) * 100)}%` : "-"}
                         </span>
                       </div>
                     ))}
@@ -553,28 +553,28 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                       <div class={styles.companion}>
                         <span>
                           Also analyzed by{" "}
-                          <strong>{algoFull(comp().algorithmId)}</strong> →{" "}
+                          <strong>{algoFull(comp().algorithmId)}</strong> ->{" "}
                           confidence {Math.round(comp().confidence * 100)}%
                         </span>
                         <button
                           class={styles.companionBtn}
                           onClick={() => handleCompanionClick(comp().id)}
                         >
-                          View companion →
+                          View companion ->
                         </button>
                       </div>
                     )}
                   </Show>
                 </Show>
 
-                {/* ── RAW SCANS TAB ── */}
+                {/* -- RAW SCANS TAB -- */}
                 <Show when={activeTab() === "scans"}>
                   {(["inside", "outside"] as const).map((side) => {
                     const lhScans = d().scans[side];
                     return (
                       <div class={styles.scanSection}>
                         <p class={styles.scanSectionTitle}>
-                          {side === "inside" ? "Inside" : "Outside"} —{" "}
+                          {side === "inside" ? "Inside" : "Outside"} -{" "}
                           {lhScans.lighthouseName || "No lighthouse"} (
                           {lhScans.scans.length} scans)
                         </p>
@@ -587,7 +587,7 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                           <table class={styles.scanTable}>
                             <thead>
                               <tr>
-                                <th>Δ from start</th>
+                                <th>Delta from start</th>
                                 <th>RSSI (dBm)</th>
                                 <th>Antenna</th>
                                 <th>Frequency</th>
@@ -602,9 +602,9 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                                     <td class={styles.mono}>
                                       {relMs(scan.timestamp, d().event.clusterStartedAt)}
                                     </td>
-                                    <td>{scan.rssiDbm ?? "—"}</td>
-                                    <td>{scan.antennaId ?? "—"}</td>
-                                    <td>{scan.frequency ?? "—"}</td>
+                                    <td>{scan.rssiDbm ?? "-"}</td>
+                                    <td>{scan.antennaId ?? "-"}</td>
+                                    <td>{scan.frequency ?? "-"}</td>
                                     <td>{scan.source}</td>
                                     <td>{scan.timeBasis}</td>
                                   </tr>
@@ -618,12 +618,12 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                   })}
                 </Show>
 
-                {/* ── TIMELINE TAB ── */}
+                {/* -- TIMELINE TAB -- */}
                 <Show when={activeTab() === "timeline"}>
                   <Show
                     when={d().event.algorithmId !== "manual"}
                     fallback={
-                      <p class={styles.noData}>Manual event — no scan data to visualize.</p>
+                      <p class={styles.noData}>Manual event - no scan data to visualize.</p>
                     }
                   >
                     {(() => {
@@ -659,7 +659,7 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                                   style={{ background: COLOR_OUTSIDE }}
                                 />
                                 <span>
-                                  Outside — {d().scans.outside.lighthouseName || "Unknown"}
+                                  Outside - {d().scans.outside.lighthouseName || "Unknown"}
                                 </span>
                               </div>
                               <div class={styles.legendItem}>
@@ -668,7 +668,7 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                                   style={{ background: COLOR_INSIDE }}
                                 />
                                 <span>
-                                  Inside — {d().scans.inside.lighthouseName || "Unknown"}
+                                  Inside - {d().scans.inside.lighthouseName || "Unknown"}
                                 </span>
                               </div>
                               <div class={styles.legendItem}>

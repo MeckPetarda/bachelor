@@ -1,16 +1,16 @@
 import type { PartitionedCluster, AlgorithmResult, ScanData } from "./types";
 import { CONFIDENCE_FACTOR_FLOOR } from "./types";
 
-// ─── RSSI weighting ───────────────────────────────────────────────────────────
+// --- RSSI weighting -----------------------------------------------------------
 
 /**
  * Convert an RSSI reading to a centroid weight.
  *
- *   null    → 1.0  (no reading; treated as neutral full weight)
- *   -40 dBm → 1.0  (very strong)
- *   -90 dBm → 0.1  (very weak)
+ *   null    -> 1.0  (no reading; treated as neutral full weight)
+ *   -40 dBm -> 1.0  (very strong)
+ *   -90 dBm -> 0.1  (very weak)
  *
- * Formula: clamp(1.0 − (|rssiDbm| − 40) / 50, 0.1, 1.0)
+ * Formula: clamp(1.0 - (|rssiDbm| - 40) / 50, 0.1, 1.0)
  */
 function rssiWeight(rssiDbm: number | null): number {
   if (rssiDbm === null) return 1.0;
@@ -31,16 +31,16 @@ function weightedCentroid(scans: ScanData[]): number {
   return sumTW / sumW;
 }
 
-// ─── Linear regression ────────────────────────────────────────────────────────
+// --- Linear regression --------------------------------------------------------
 
 interface Trend {
   slope: number; // dBm per ms (cluster-relative)
-  r2: number; // coefficient of determination ∈ [0, 1]
+  r2: number; // coefficient of determination in [0, 1]
 }
 
 /**
  * Ordinary least-squares linear regression on (x, y) pairs.
- * Returns slope and R² (clamped to [0, 1]).
+ * Returns slope and R^2 (clamped to [0, 1]).
  */
 function linearRegression(pairs: Array<[number, number]>): Trend {
   const n = pairs.length;
@@ -93,14 +93,14 @@ function computeTrend(scans: ScanData[], clusterStartMs: number): Trend | null {
   return linearRegression(pairs);
 }
 
-// ─── Trend consistency scoring ────────────────────────────────────────────────
+// --- Trend consistency scoring ------------------------------------------------
 
 type TrendClass = "agree" | "inconclusive" | "contradict";
 
 /**
  * Classify a single lighthouse's RSSI trend relative to the expected direction.
  *
- * A slope is "significant" when R² ≥ 0.1.  If R² < 0.1 the slope is treated
+ * A slope is "significant" when R^2 >= 0.1.  If R^2 < 0.1 the slope is treated
  * as inconclusive regardless of its sign.
  */
 function classifyTrend(
@@ -141,8 +141,8 @@ function rssiConsistencyFactor(
   if (direction === "unknown") return 0.5;
   if (outsideScanCount < 3 || insideScanCount < 3) return 0.5;
 
-  // "in"  → outside weakens (neg slope), inside strengthens (pos slope)
-  // "out" → inside weakens  (neg slope), outside strengthens (pos slope)
+  // "in"  -> outside weakens (neg slope), inside strengthens (pos slope)
+  // "out" -> inside weakens  (neg slope), outside strengthens (pos slope)
   const outsideExpectedNeg = direction === "in";
   const insideExpectedNeg = direction === "out";
 
@@ -160,13 +160,14 @@ function rssiConsistencyFactor(
     (oc === "contradict" && ic === "agree")
   )
     return 0.4;
-  if (oc === "contradict" && ic === "contradict") return CONFIDENCE_FACTOR_FLOOR;
+  if (oc === "contradict" && ic === "contradict")
+    return CONFIDENCE_FACTOR_FLOOR;
 
-  // Both inconclusive, or one contradict + one inconclusive → neutral
+  // Both inconclusive, or one contradict + one inconclusive -> neutral
   return 0.5;
 }
 
-// ─── Main algorithm ───────────────────────────────────────────────────────────
+// --- Main algorithm -----------------------------------------------------------
 
 /** Clamp to [CONFIDENCE_FACTOR_FLOOR, 1.0]. */
 function clamp(value: number): number {
@@ -174,7 +175,7 @@ function clamp(value: number): number {
 }
 
 /**
- * Algorithm 2 — RSSI-Weighted Centroid + Trend.
+ * Algorithm 2 - RSSI-Weighted Centroid + Trend.
  *
  * Pure function: no DB access, no side effects.
  *
@@ -183,8 +184,8 @@ function clamp(value: number): number {
  *   2. Running a linear regression on RSSI-vs-time per lighthouse and
  *      multiplying in an `rssiTrendConsistencyFactor`.
  *
- * Confidence = centroidSeparationFactor × clusterSizeFactor
- *            × bilateralCoverageFactor × rssiTrendConsistencyFactor
+ * Confidence = centroidSeparationFactor * clusterSizeFactor
+ *            * bilateralCoverageFactor * rssiTrendConsistencyFactor
  */
 export function analyzeRssiWeightedCentroid(
   cluster: PartitionedCluster,
@@ -195,13 +196,13 @@ export function analyzeRssiWeightedCentroid(
   const clusterStartMs = clusterStartedAt.getTime();
   const clusterDurationMs = clusterEndedAt.getTime() - clusterStartMs;
 
-  // ── Weighted centroids ─────────────────────────────────────────────────────
+  // -- Weighted centroids -----------------------------------------------------
 
   const outsideCentroidMs = weightedCentroid(outsideScans);
   const insideCentroidMs = weightedCentroid(insideScans);
   const centroidDeltaMs = Math.abs(outsideCentroidMs - insideCentroidMs);
 
-  // ── Direction (same logic as Algorithm 1, applied to weighted centroids) ───
+  // -- Direction (same logic as Algorithm 1, applied to weighted centroids) ---
 
   let direction: "in" | "out" | "unknown";
   if (centroidDeltaMs <= 1) {
@@ -221,7 +222,7 @@ export function analyzeRssiWeightedCentroid(
     timestamp = new Date((outsideCentroidMs + insideCentroidMs) / 2);
   }
 
-  // ── Shared confidence factors (same formulae as Algorithm 1) ──────────────
+  // -- Shared confidence factors (same formulae as Algorithm 1) --------------
 
   const centroidSeparationFactor =
     clusterDurationMs === 0
@@ -237,7 +238,7 @@ export function analyzeRssiWeightedCentroid(
     Math.min(insideCount, outsideCount) / Math.max(insideCount, outsideCount),
   );
 
-  // ── RSSI trend analysis ────────────────────────────────────────────────────
+  // -- RSSI trend analysis ----------------------------------------------------
 
   const outsideTrend = computeTrend(outsideScans, clusterStartMs);
   const insideTrend = computeTrend(insideScans, clusterStartMs);
@@ -256,7 +257,7 @@ export function analyzeRssiWeightedCentroid(
     bilateralCoverageFactor *
     trendFactor;
 
-  // ── Metadata ───────────────────────────────────────────────────────────────
+  // -- Metadata ---------------------------------------------------------------
 
   return {
     algorithmId: "rssi_weighted_centroid",

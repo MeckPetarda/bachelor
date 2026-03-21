@@ -24,7 +24,7 @@
   flex-shrink: 0;
 }
 
-.input:checked~.track {
+.input:checked ~ .track {
   background: var(--color-primary, #4f7cff);
 }
 
@@ -40,11 +40,11 @@
   transition: transform 0.2s ease;
 }
 
-.input:checked~.track .thumb {
+.input:checked ~ .track .thumb {
   transform: translateX(18px);
 }
 
-.input:focus-visible~.track {
+.input:focus-visible ~ .track {
   outline: 2px solid var(--color-primary, #4f7cff);
   outline-offset: 2px;
 }

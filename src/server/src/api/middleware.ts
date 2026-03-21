@@ -28,14 +28,14 @@ export async function requestLogger(c: Context, next: Next) {
   const method = c.req.method;
   const path = c.req.path;
 
-  logger.info(`→ ${method} ${path}`);
+  logger.info(`-> ${method} ${path}`);
 
   await next();
 
   const duration = (performance.now() - start).toFixed(2);
   const status = c.res.status;
 
-  logger.info(`← ${method} ${path} ${status} (${duration}ms)`);
+  logger.info(`<- ${method} ${path} ${status} (${duration}ms)`);
 }
 
 /**

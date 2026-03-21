@@ -34,7 +34,11 @@ const App: Component<AppProps> = (props) => {
           <A href="/users" class={styles.navLink} activeClass={styles.active}>
             Users
           </A>
-          <A href="/processed" class={styles.navLink} activeClass={styles.active}>
+          <A
+            href="/processed"
+            class={styles.navLink}
+            activeClass={styles.active}
+          >
             Processed Events
           </A>
         </div>

@@ -48,7 +48,7 @@ export const UsersTable: Component<Props> = (props) => {
                   <td class={styles.email}>
                     <Show
                       when={user.email}
-                      fallback={<span class={styles.implied}>—</span>}
+                      fallback={<span class={styles.implied}>-</span>}
                     >
                       {user.email}
                     </Show>

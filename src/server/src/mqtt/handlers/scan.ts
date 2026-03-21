@@ -135,8 +135,8 @@ export async function handleScanMessage(
     const lighthouseName = lighthouses[0].name;
 
     // Determine timestamp based on timeBasis field.
-    // - "synced": timestampMs is a real Unix timestamp → use it directly.
-    // - "estimated" / "relative": timestampMs is boot-relative → fall back to
+    // - "synced": timestampMs is a real Unix timestamp -> use it directly.
+    // - "estimated" / "relative": timestampMs is boot-relative -> fall back to
     //   server receipt time so the database never stores epoch-relative junk.
     // - undefined (legacy firmware, no timeBasis field): treat as "synced" for
     //   backward compatibility during the rollout period.
@@ -150,7 +150,7 @@ export async function handleScanMessage(
         scanTimestamp = new Date(Number(scanData.timestampMs));
       }
     } else {
-      // Boot-relative timestamp — use server receipt time as the best estimate.
+      // Boot-relative timestamp - use server receipt time as the best estimate.
       scanTimestamp = new Date();
     }
 
@@ -203,7 +203,6 @@ export async function handleScanMessage(
         eventEmitter!.emit("newScan", eventData);
       });
     }
-
   } catch (error) {
     logger.error(`Failed to store scan from ${macAddress}:`, error);
     // Don't rethrow - we don't want to crash the broker for a single failed insert

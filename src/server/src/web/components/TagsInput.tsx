@@ -44,13 +44,13 @@ export const TagsInput: Component<Props> = (props) => {
               onClick={() => removeTag(i())}
               title="Remove tag"
             >
-              ×
+              *
             </button>
           </div>
         )}
       </For>
 
-      {/* New-tag row — + is decorative, entry is committed when the field loses focus */}
+      {/* New-tag row - + is decorative, entry is committed when the field loses focus */}
       <div class={styles.tagRow}>
         <span class={`${styles.tagDot} ${styles.tagDotAdd}`} />
         <input
@@ -59,7 +59,7 @@ export const TagsInput: Component<Props> = (props) => {
           value={draft()}
           onInput={(e) => setDraft(e.currentTarget.value)}
           onBlur={commitDraft}
-          placeholder="Add EPC string…"
+          placeholder="Add EPC string..."
         />
         <span class={`${styles.removeBtn} ${styles.addIcon}`}>+</span>
       </div>

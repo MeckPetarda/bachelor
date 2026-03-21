@@ -1,6 +1,17 @@
 import { Hono } from "hono";
 import { getDatabase, schema } from "../../database/client";
-import { and, asc, desc, eq, gte, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  sql,
+} from "drizzle-orm";
 import { createLogger } from "../../utils/logger";
 import { resolveTagUser } from "../../services/tag-resolver";
 
@@ -20,13 +31,22 @@ router.get("/events", async (c) => {
   const q = c.req.query();
 
   if (!q.algorithmId) {
-    return c.json({ error: "Missing required query parameter: algorithmId" }, 400);
+    return c.json(
+      { error: "Missing required query parameter: algorithmId" },
+      400,
+    );
   }
 
-  const validAlgorithms = ["temporal_centroid", "rssi_weighted_centroid", "manual"];
+  const validAlgorithms = [
+    "temporal_centroid",
+    "rssi_weighted_centroid",
+    "manual",
+  ];
   if (!validAlgorithms.includes(q.algorithmId)) {
     return c.json(
-      { error: `Invalid algorithmId. Must be one of: ${validAlgorithms.join(", ")}` },
+      {
+        error: `Invalid algorithmId. Must be one of: ${validAlgorithms.join(", ")}`,
+      },
       400,
     );
   }
@@ -40,10 +60,7 @@ router.get("/events", async (c) => {
   type Direction = "in" | "out" | "unknown";
 
   const conditions = [
-    eq(
-      schema.processedEvents.algorithmId,
-      q.algorithmId as AlgorithmId,
-    ),
+    eq(schema.processedEvents.algorithmId, q.algorithmId as AlgorithmId),
   ];
 
   if (q.groupId) {
@@ -53,7 +70,9 @@ router.get("/events", async (c) => {
   if (q.userId) conditions.push(eq(schema.processedEvents.userId, q.userId));
   if (q.tagEpc) conditions.push(eq(schema.processedEvents.tagEpc, q.tagEpc));
   if (q.direction) {
-    conditions.push(eq(schema.processedEvents.direction, q.direction as Direction));
+    conditions.push(
+      eq(schema.processedEvents.direction, q.direction as Direction),
+    );
   }
   if (q.from) {
     const from = new Date(q.from);
@@ -94,10 +113,12 @@ router.get("/events", async (c) => {
         groupId: schema.processedEvents.groupId,
         groupLabel: schema.lighthouseGroups.label,
         confidence: schema.processedEvents.confidence,
-        centroidSeparationFactor: schema.processedEvents.centroidSeparationFactor,
+        centroidSeparationFactor:
+          schema.processedEvents.centroidSeparationFactor,
         clusterSizeFactor: schema.processedEvents.clusterSizeFactor,
         bilateralCoverageFactor: schema.processedEvents.bilateralCoverageFactor,
-        rssiTrendConsistencyFactor: schema.processedEvents.rssiTrendConsistencyFactor,
+        rssiTrendConsistencyFactor:
+          schema.processedEvents.rssiTrendConsistencyFactor,
         timestamp: schema.processedEvents.timestamp,
         clusterStartedAt: schema.processedEvents.clusterStartedAt,
         clusterEndedAt: schema.processedEvents.clusterEndedAt,
@@ -120,7 +141,10 @@ router.get("/events", async (c) => {
         )`,
       })
       .from(schema.processedEvents)
-      .leftJoin(schema.users, eq(schema.processedEvents.userId, schema.users.id))
+      .leftJoin(
+        schema.users,
+        eq(schema.processedEvents.userId, schema.users.id),
+      )
       .innerJoin(
         schema.lighthouseGroups,
         eq(schema.processedEvents.groupId, schema.lighthouseGroups.id),
@@ -175,7 +199,10 @@ router.get("/events/unresolved", async (c) => {
   const rawOffset = parseInt(q.offset ?? "0", 10);
   const offset = isNaN(rawOffset) ? 0 : rawOffset;
 
-  type OrphanReason = "insufficient_data" | "misconfigured_group" | "unsyncable";
+  type OrphanReason =
+    | "insufficient_data"
+    | "misconfigured_group"
+    | "unsyncable";
 
   const conditions = [
     isNotNull(schema.rawScans.orphanedAt),
@@ -187,7 +214,9 @@ router.get("/events/unresolved", async (c) => {
     if (!isNaN(gid)) conditions.push(eq(schema.lighthouses.groupId, gid));
   }
   if (q.orphanReason) {
-    conditions.push(eq(schema.rawScans.orphanReason, q.orphanReason as OrphanReason));
+    conditions.push(
+      eq(schema.rawScans.orphanReason, q.orphanReason as OrphanReason),
+    );
   }
   if (q.tagEpc) conditions.push(eq(schema.rawScans.epc, q.tagEpc));
   if (q.from) {
@@ -282,7 +311,8 @@ router.get("/events/:id", async (c) => {
       centroidSeparationFactor: schema.processedEvents.centroidSeparationFactor,
       clusterSizeFactor: schema.processedEvents.clusterSizeFactor,
       bilateralCoverageFactor: schema.processedEvents.bilateralCoverageFactor,
-      rssiTrendConsistencyFactor: schema.processedEvents.rssiTrendConsistencyFactor,
+      rssiTrendConsistencyFactor:
+        schema.processedEvents.rssiTrendConsistencyFactor,
       timestamp: schema.processedEvents.timestamp,
       clusterStartedAt: schema.processedEvents.clusterStartedAt,
       clusterEndedAt: schema.processedEvents.clusterEndedAt,
@@ -333,8 +363,12 @@ router.get("/events/:id", async (c) => {
     .orderBy(asc(schema.rawScans.timestamp));
 
   // 3. Group scans by lighthouse placement
-  const insideScans = scanRows.filter((s) => s.lighthousePlacement === "INSIDE");
-  const outsideScans = scanRows.filter((s) => s.lighthousePlacement === "OUTSIDE");
+  const insideScans = scanRows.filter(
+    (s) => s.lighthousePlacement === "INSIDE",
+  );
+  const outsideScans = scanRows.filter(
+    (s) => s.lighthousePlacement === "OUTSIDE",
+  );
 
   const mapScan = (s: (typeof scanRows)[0]) => ({
     id: s.id.toString(),
@@ -487,7 +521,9 @@ router.post("/events/manual", async (c) => {
     return c.json({ error: "Failed to create event" }, 500);
   }
 
-  logger.info(`Manual event created for EPC ${body.tagEpc} (${body.direction})`);
+  logger.info(
+    `Manual event created for EPC ${body.tagEpc} (${body.direction})`,
+  );
 
   return c.json(
     {

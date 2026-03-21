@@ -1,6 +1,10 @@
 import { createStore } from "solid-js/store";
 import * as api from "../api";
-import type { ProcessedEvent, ProcessedEventDetail, ProcessedEventsFilter } from "../types";
+import type {
+  ProcessedEvent,
+  ProcessedEventDetail,
+  ProcessedEventsFilter,
+} from "../types";
 import { showToast } from "./toast";
 
 interface ProcessedEventsState {
@@ -37,7 +41,8 @@ export async function fetchEvents(filters?: Partial<ProcessedEventsFilter>) {
     const res = await api.getProcessedEvents(state.filters);
     setState({ events: res.data, total: res.total, loading: false });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to fetch events";
+    const message =
+      err instanceof Error ? err.message : "Failed to fetch events";
     setState({ error: message, loading: false });
     showToast(message, "error");
   }
@@ -49,7 +54,8 @@ export async function fetchEventDetail(id: string) {
     const detail = await api.getProcessedEventDetail(id);
     setState({ selectedEventDetail: detail, detailLoading: false });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to fetch event detail";
+    const message =
+      err instanceof Error ? err.message : "Failed to fetch event detail";
     setState({ detailLoading: false });
     showToast(message, "error");
   }

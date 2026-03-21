@@ -225,7 +225,7 @@ export function broadcastPendingDevice(deviceId: string): void {
   broadcast("device:pending", payload);
 }
 
-// ─── Traversal / orphan event payloads ───────────────────────────────────────
+// --- Traversal / orphan event payloads ---------------------------------------
 
 export interface TraversalEventPayload {
   id: string;

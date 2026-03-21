@@ -27,13 +27,13 @@ export interface AlgorithmResult {
   clusterSizeFactor: number;
   bilateralCoverageFactor: number;
   rssiTrendConsistencyFactor: number | null;
-  timestamp: Date;           // canonical event timestamp (entry-side centroid)
+  timestamp: Date; // canonical event timestamp (entry-side centroid)
   metadata: Record<string, unknown>;
 }
 
 /**
  * Minimum value for any confidence factor.
  * Prevents any single factor from zeroing out the product.
- * TUNABLE — adjust after collecting real traversal data.
+ * TUNABLE - adjust after collecting real traversal data.
  */
 export const CONFIDENCE_FACTOR_FLOOR = 0.1;

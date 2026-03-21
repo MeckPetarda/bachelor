@@ -4,7 +4,7 @@
   gap: 1rem;
 }
 
-/* ── Filter bar ─────────────────────────────────────────────────── */
+/* -- Filter bar --------------------------------------------------- */
 .filters {
   display: flex;
   gap: 1rem;
@@ -38,7 +38,9 @@
   border: none;
   border-right: 1px solid var(--color-border);
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .toggleBtn:last-child {
@@ -54,7 +56,7 @@
   color: white;
 }
 
-/* ── New events banner ──────────────────────────────────────────── */
+/* -- New events banner -------------------------------------------- */
 .banner {
   display: flex;
   align-items: center;
@@ -78,7 +80,7 @@
   font-size: 0.875rem;
 }
 
-/* ── Table ──────────────────────────────────────────────────────── */
+/* -- Table -------------------------------------------------------- */
 .tableWrap {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -123,7 +125,7 @@
   border-bottom: none;
 }
 
-/* ── Confidence colors ──────────────────────────────────────────── */
+/* -- Confidence colors -------------------------------------------- */
 .confHigh {
   color: var(--color-success);
   font-weight: 600;
@@ -139,7 +141,7 @@
   font-weight: 600;
 }
 
-/* ── Direction cell ─────────────────────────────────────────────── */
+/* -- Direction cell ----------------------------------------------- */
 .dirIn {
   color: var(--color-success);
   font-weight: 600;
@@ -159,7 +161,7 @@
   font-size: 0.8125rem;
 }
 
-/* ── Empty / loading states ─────────────────────────────────────── */
+/* -- Empty / loading states --------------------------------------- */
 .emptyState,
 .loadingState {
   padding: 3rem;
@@ -167,7 +169,7 @@
   color: var(--color-text-muted);
 }
 
-/* ── Pagination ─────────────────────────────────────────────────── */
+/* -- Pagination --------------------------------------------------- */
 .pagination {
   display: flex;
   justify-content: center;

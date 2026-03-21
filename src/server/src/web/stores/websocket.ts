@@ -18,7 +18,9 @@ import type {
 } from "../types";
 
 // Tracks algorithm IDs of processed events that arrived since last refresh
-const [pendingEventsAlgorithms, setPendingEventsAlgorithms] = createSignal<string[]>([]);
+const [pendingEventsAlgorithms, setPendingEventsAlgorithms] = createSignal<
+  string[]
+>([]);
 
 export function resetPendingEventsAlgorithms() {
   setPendingEventsAlgorithms([]);

@@ -155,11 +155,20 @@ export const processedEvents = pgTable(
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    index("idx_processed_events_tag_timestamp").on(table.tagEpc, table.timestamp),
-    index("idx_processed_events_user_timestamp").on(table.userId, table.timestamp),
+    index("idx_processed_events_tag_timestamp").on(
+      table.tagEpc,
+      table.timestamp,
+    ),
+    index("idx_processed_events_user_timestamp").on(
+      table.userId,
+      table.timestamp,
+    ),
     index("idx_processed_events_timestamp").on(table.timestamp),
     index("idx_processed_events_synced").on(table.syncedToIntegration),
-    index("idx_processed_events_algorithm").on(table.algorithmId, table.timestamp),
+    index("idx_processed_events_algorithm").on(
+      table.algorithmId,
+      table.timestamp,
+    ),
     index("idx_processed_events_group").on(table.groupId, table.timestamp),
   ],
 );
@@ -198,8 +207,7 @@ export const tagAssignments = pgTable(
   "tag_assignments",
   {
     id: uuid().primaryKey().defaultRandom(),
-    userId: uuid()
-      .references(() => users.id, { onDelete: "set null" }),
+    userId: uuid().references(() => users.id, { onDelete: "set null" }),
     tagEpc: varchar({ length: 96 }).notNull(),
     assignedAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
     deactivatedAt: timestamp({ withTimezone: true }),
