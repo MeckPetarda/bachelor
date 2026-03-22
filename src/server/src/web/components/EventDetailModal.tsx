@@ -560,7 +560,7 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                           class={styles.companionBtn}
                           onClick={() => handleCompanionClick(comp().id)}
                         >
-                          View companion ->
+                        {"View companion ->"}
                         </button>
                       </div>
                     )}
