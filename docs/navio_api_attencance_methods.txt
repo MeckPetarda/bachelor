@@ -1,0 +1,542 @@
+---------------------------------------------------------------------------
+attendance/calendar
+
+
+	description: Get complete calendar data (attendance, leaves, expected attendace) for user and date range. Also references like projects and allocations are attached
+
+	input:
+		OBJECT com.navigo3.api.defs.attendance.GetCalendarEndpoint$EmployeeAndDateRange
+			DATE dateFromIncl
+			DATE dateToIncl
+			NUMBER userId
+
+	output:
+		OBJECT com.navigo3.api.defs.attendance.GetCalendarEndpoint$CalendarData
+			[] allocations
+				OBJECT com.navigo3.api.types.allocation.SimpleAllocationData
+					NUMBER assignedUserId
+					NUMBER assignerUserId
+					NUMBER id
+					STRING name
+					(?) workType
+						NUMBER
+			[] dailyAttendances
+				OBJECT com.navigo3.api.types.attendance.SimpleDailyAttendance
+					NUMBER attendanceHours
+					DATE date
+			[] firms
+				OBJECT com.navigo3.api.types.firm.SimpleFirmData
+					NUMBER id
+					STRING name
+			[] leaveTypes
+				OBJECT com.navigo3.api.defs.leave.ListLeaveTypesEndpoint$LeaveTypeOutputData
+					BOOL approving
+					NUMBER id
+					BOOL influencesFund
+					BOOL influencesWorkload
+					STRING name
+					STRING systemName
+			[] leaves
+				OBJECT com.navigo3.db.generated.public_.tables.pojos.Leaves
+					STRING comment
+					NUMBER countryId
+					DATE dateFromIncl
+					DATE dateToIncl
+					NUMBER durationHours
+					NUMBER id
+					NUMBER leaveTypeId
+					TIME timeFrom
+					NUMBER userId
+			[] projects
+				OBJECT com.navigo3.api.types.project.SimpleProjectData
+					NUMBER firmId
+					NUMBER id
+					BOOL isFinished
+					BOOL isRealization
+					STRING name
+					(?) ownNumber
+						STRING
+					NUMBER responsibleUserId
+			[] users
+				OBJECT com.navigo3.api.defs.topics.users.structures.UserDescription
+					DATE courseValidFrom
+					STRING email
+					STRING formattedName
+					STRING formattedNameRev
+					NUMBER id
+					STRING jobTitle
+					STRING name
+					OBJECT com.navigo3.api.defs.topics.organizational_units.structures.OrganizationalUnitDescription organizationalUnit
+						BOOL active
+						NUMBER id
+						STRING label
+					STRING phone
+					ENUMERABLE[ACTIVE, SUSPENDED, TERMINATED] state
+					STRING surname
+					ENUMERABLE[API, EMPLOYEE, SURVEILLANCE] type
+					STRING workplace
+			[] workReports
+				OBJECT com.navigo3.api.types.work.SimpleReportData
+					(?) allocation
+						NUMBER
+					STRING comment
+					DATE date
+					STRING description
+					NUMBER id
+					NUMBER projectId
+					(?) startTime
+						TIME
+					NUMBER units
+					NUMBER unitsAsTimeHoursPart
+					NUMBER unitsAsTimeMinutesPart
+					NUMBER userId
+					NUMBER workType
+			[] workTypes
+				OBJECT com.navigo3.api.types.work.SimpleWorkTypeData
+					NUMBER id
+					STRING name
+
+	authorization:
+		can see work reports of user
+			or
+				logged user is same as edited
+				logged user has any of rights CAN_SEE_ALL_WORKSHEETS
+				and
+					logged user has any of rights CAN_SEE_WORKSHEETS_OF_SUBALTERNS
+					User is subaltern
+				can edit work reports of user
+					or
+						logged user is same as edited
+						logged user has any of rights CAN_EDIT_ACTIONS
+						logged user has any of rights CAN_EDIT_OLD_ACTIONS
+						and
+							or
+								logged user has any of rights CAN_CHANGE_ACTIONS_OF_SUBALTERNS
+								logged user has any of rights CAN_CHANGE_OLD_ACTIONS_OF_SUBALTERNS
+							User is subaltern
+
+---------------------------------------------------------------------------
+attendance/embedded/default
+
+
+	description: Get default attendance data for list of requests
+
+	input:
+		OBJECT com.navigo3.api.defs.attendance.GetSimpleDefaultAttendanceEndpoint$DefaultAttendanceInput
+			DATE date
+			(?) typeId
+				NUMBER
+			(?) userId
+				NUMBER
+
+	output:
+		OBJECT com.navigo3.api.defs.attendance.GetSimpleAttendanceEndpoint$ExtendedAttendance
+			BOOL canCreate
+			OBJECT com.navigo3.db.generated.public_.tables.pojos.Attendance data
+				NUMBER changedBy
+				STRING comment
+				DATETIME createdFrom
+				DATETIME createdTo
+				DATE day
+				NUMBER id
+				TIME timeFrom
+				TIME timeTo
+				NUMBER typeId
+				NUMBER userId
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/delete
+
+
+	description: Delete attendance entry
+
+	input:
+		OBJECT com.navigo3.api.defs.structures.IdParam
+			NUMBER id
+
+	output:
+		OBJECT com.navigo3.api.defs.structures.VoidParam
+
+	authorization:
+		can edit attendance events of user
+			or
+				can edit all simple attendances
+					logged user has any of rights CAN_EDIT_ALL_ATTENDANCES
+				and
+					User is subaltern of current user
+					can edit simple attendances of subalterns
+						or
+							can edit all simple attendances
+								logged user has any of rights CAN_EDIT_ALL_ATTENDANCES
+							logged user has any of rights CAN_EDIT_SUBALTERNS_ATTENDANCES
+				dynamically evaluate on parameter USER: Edits own record
+
+---------------------------------------------------------------------------
+attendance/embedded/get
+
+
+	description: Get attendance data for list of requests
+
+	input:
+		OBJECT com.navigo3.api.defs.structures.IdParam
+			NUMBER id
+
+	output:
+		OBJECT com.navigo3.api.defs.attendance.GetSimpleAttendanceEndpoint$ExtendedAttendance
+			BOOL canCreate
+			OBJECT com.navigo3.db.generated.public_.tables.pojos.Attendance data
+				NUMBER changedBy
+				STRING comment
+				DATETIME createdFrom
+				DATETIME createdTo
+				DATE day
+				NUMBER id
+				TIME timeFrom
+				TIME timeTo
+				NUMBER typeId
+				NUMBER userId
+
+	authorization:
+		can see attendance event
+			or
+				can see all simple attendances
+					or
+						logged user has any of rights CAN_SEE_ALL_ATTENDANCES
+						can edit all simple attendances
+							logged user has any of rights CAN_EDIT_ALL_ATTENDANCES
+				and
+					User is subaltern of current user
+					can see simple attendances of subalterns
+						or
+							can see all simple attendances
+								or
+									logged user has any of rights CAN_SEE_ALL_ATTENDANCES
+									can edit all simple attendances
+										logged user has any of rights CAN_EDIT_ALL_ATTENDANCES
+							can edit simple attendances of subalterns
+								or
+									can edit all simple attendances
+										logged user has any of rights CAN_EDIT_ALL_ATTENDANCES
+									logged user has any of rights CAN_EDIT_SUBALTERNS_ATTENDANCES
+							logged user has any of rights CAN_SEE_SUBALTERNS_ATTENDANCES
+				logged user is same as edited
+
+---------------------------------------------------------------------------
+attendance/embedded/get-filter
+
+
+	description: Get filter for simple attendance
+
+	input:
+		OBJECT com.navigo3.api.defs.structures.FilterSelector
+			(?) filterName
+				STRING
+			{STRING} options
+				STRING
+			ENUMERABLE[DEFAULT, EMPTY, NAMED] selectorType
+
+	output:
+		OBJECT com.navigo3.api.defs.structures.FilterAndDefault<com.navigo3.api.types.attendance.SimpleAttendanceFilter>
+			OBJECT com.navigo3.api.types.attendance.SimpleAttendanceFilter defaultFilter
+				NUMBER userId
+			OBJECT com.navigo3.api.types.attendance.SimpleAttendanceFilter filter
+				NUMBER userId
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/list
+
+
+	description: Get list of attendance entries for logged user
+
+	input:
+		OBJECT com.navigo3.api.types.attendance.SimpleAttendanceFilter
+			NUMBER userId
+
+	output:
+		OBJECT com.navigo3.api.defs.attendance.ListSimpleAttendanceEndpoint$AttendanceResponseData
+			BOOL canEdit
+			[] data
+				OBJECT com.navigo3.api.defs.attendance.ListSimpleAttendanceEndpoint$AttendanceDayData
+					DATE date
+					BOOL isWeekend
+					[] items
+						OBJECT com.navigo3.api.defs.attendance.ListSimpleAttendanceEndpoint$AttendanceItemData
+							STRING changedByLabel
+							(?) durationMinutes
+								NUMBER
+							OBJECT com.navigo3.db.generated.public_.tables.pojos.Attendance item
+								NUMBER changedBy
+								STRING comment
+								DATETIME createdFrom
+								DATETIME createdTo
+								DATE day
+								NUMBER id
+								TIME timeFrom
+								TIME timeTo
+								NUMBER typeId
+								NUMBER userId
+							STRING typeLabel
+
+	authorization:
+		can see attendance event
+			or
+				can see all simple attendances
+					or
+						logged user has any of rights CAN_SEE_ALL_ATTENDANCES
+						can edit all simple attendances
+							logged user has any of rights CAN_EDIT_ALL_ATTENDANCES
+				and
+					User is subaltern of current user
+					can see simple attendances of subalterns
+						or
+							can see all simple attendances
+								or
+									logged user has any of rights CAN_SEE_ALL_ATTENDANCES
+									can edit all simple attendances
+										logged user has any of rights CAN_EDIT_ALL_ATTENDANCES
+							can edit simple attendances of subalterns
+								or
+									can edit all simple attendances
+										logged user has any of rights CAN_EDIT_ALL_ATTENDANCES
+									logged user has any of rights CAN_EDIT_SUBALTERNS_ATTENDANCES
+							logged user has any of rights CAN_SEE_SUBALTERNS_ATTENDANCES
+				logged user is same as edited
+
+---------------------------------------------------------------------------
+attendance/embedded/start
+
+
+	description: Mark start of work
+
+	input:
+		OBJECT com.navigo3.api.defs.attendance.StartAttendanceEndpoint$AttendanceStartData
+			STRING comment
+			(?) time
+				DATETIME
+			NUMBER typeId
+			(?) userId
+				NUMBER
+
+	output:
+		OBJECT com.navigo3.api.defs.structures.VoidParam
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/state
+
+
+	description: Get state of attendance for logged user
+
+	input:
+		OBJECT com.navigo3.api.defs.structures.VoidParam
+
+	output:
+		OBJECT com.navigo3.api.defs.attendance.GetSimpleAttendanceStateEndpoint$AttendanceState
+			BOOL isBlocked
+			(?) lastRecord
+				OBJECT com.navigo3.db.generated.public_.tables.pojos.Attendance
+					NUMBER changedBy
+					STRING comment
+					DATETIME createdFrom
+					DATETIME createdTo
+					DATE day
+					NUMBER id
+					TIME timeFrom
+					TIME timeTo
+					NUMBER typeId
+					NUMBER userId
+			[] presentUsers
+				OBJECT com.navigo3.api.defs.attendance.GetSimpleAttendanceStateEndpoint$PresentEmployee
+					(?) comment
+						STRING
+					NUMBER id
+					STRING name
+					BOOL present
+					(?) since
+						DATETIME
+					(?) typeLabel
+						STRING
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/stop
+
+
+	description: Mark stop of work
+
+	input:
+		OBJECT com.navigo3.api.defs.attendance.StopAttendanceEndpoint$AttendanceStopData
+			STRING comment
+			(?) time
+				DATETIME
+			(?) userId
+				NUMBER
+
+	output:
+		OBJECT com.navigo3.api.defs.structures.VoidParam
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/types
+
+
+	description: List attendance types
+
+	input:
+		OBJECT com.navigo3.api.defs.structures.VoidParam
+
+	output:
+		[]
+			OBJECT com.navigo3.api.defs.attendance.ListSimpleAttendanceTypesEndpoint$AttendanceTypeEntry
+				NUMBER id
+				STRING name
+				STRING systemName
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/upsert
+
+
+	description: Upsert attendance entry
+
+	input:
+		OBJECT com.navigo3.db.generated.public_.tables.pojos.Attendance
+			NUMBER changedBy
+			STRING comment
+			DATETIME createdFrom
+			DATETIME createdTo
+			DATE day
+			NUMBER id
+			TIME timeFrom
+			TIME timeTo
+			NUMBER typeId
+			NUMBER userId
+
+	output:
+		OBJECT com.navigo3.api.defs.structures.IdParam
+			NUMBER id
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/get
+
+
+	description: Get attendance data for list of requests
+
+	input:
+		[]
+			OBJECT com.navigo3.api.types.attendance.SimpleAttendanceRequest
+				DATE fromIncluded
+				BOOL onlyUseRealAttendance
+				DATE toIncluded
+				NUMBER userId
+
+	output:
+		[]
+			OBJECT com.navigo3.api.types.attendance.AttendanceData
+				[] attendances
+					OBJECT com.navigo3.db.generated.public_.tables.pojos.Attendance
+						NUMBER changedBy
+						STRING comment
+						DATETIME createdFrom
+						DATETIME createdTo
+						DATE day
+						NUMBER id
+						TIME timeFrom
+						TIME timeTo
+						NUMBER typeId
+						NUMBER userId
+				[] detailedAttendance
+					OBJECT com.navigo3.api.types.attendance.AttendanceOutputDayData
+						DATE date
+						NUMBER hours
+						NUMBER overtimeHours
+				DATE fromIncluded
+				NUMBER hours
+				[] leaves
+					OBJECT com.navigo3.api.types.attendance.LeaveData
+						STRING comment
+						(?) countryId
+							NUMBER
+						(?) durationHours
+							NUMBER
+						(?) from
+							TIME
+						NUMBER id
+						STRING systemName
+						(?) totalApprovalState
+							ENUMERABLE[APPROVED, CANCELLED, CONCEPT, FAILED, PENDING]
+						STRING type
+						NUMBER typeId
+						(?) userId
+							NUMBER
+				DATETIME loadTimestamp
+				BOOL notYetLoaded
+				NUMBER overtimeHours
+				BOOL realAttendanceMissing
+				DATE toIncluded
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/list
+
+
+	description: Get history of user hour overheads
+
+	input:
+		OBJECT com.navigo3.api.defs.attendance.ListActionsEndpoint$AttendanceFilter
+			(?) projectId
+				NUMBER
+
+	output:
+		[]
+			OBJECT com.navigo3.db.generated.public_.tables.pojos.DbDActions
+				BOOL additionalCost
+				NUMBER allocationId
+				NUMBER amountOfUnits
+				NUMBER changedBy
+				STRING comment
+				NUMBER costPerUnit
+				NUMBER currencyId
+				STRING description
+				NUMBER duration
+				NUMBER expensePricePerUnit
+				NUMBER expenseSystemOverheadPerUnit
+				NUMBER groupId
+				NUMBER id
+				NUMBER jobId
+				BOOL legacyExpense
+				NUMBER organizationalUnitId
+				NUMBER outgoingInvoiceId
+				NUMBER overheadCostPerUnit
+				NUMBER overheadCurrencyId
+				STRING ownNumber
+				NUMBER performedBy
+				DATETIME time
+				BOOL timeIncluded
+				DATETIME timeOfChange
+				NUMBER typeId
+				STRING unitType
+
+	authorization:
+		and
+			logged user is superuser
+			this instance is test or development server
