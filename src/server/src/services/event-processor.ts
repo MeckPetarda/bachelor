@@ -13,6 +13,7 @@ import {
   broadcastTraversalEvent,
   type TraversalEventPayload,
 } from "../api/websocket";
+import { isNavigo3Enabled, pushEvent } from "./navigo3/navigo3Service";
 
 const logger = createLogger("EventProcessor");
 
@@ -173,6 +174,20 @@ export async function processCluster(
       cluster,
       scanIds.length,
     );
+
+    if (isNavigo3Enabled()) {
+      const navAlgoId = process.env.NAVIGO3_ALGORITHM_ID;
+      if (result1.algorithmId === navAlgoId) {
+        pushEvent(eventId1).catch((err) =>
+          logger.warn(`Navigo3 pushEvent failed for event ${eventId1}:`, err),
+        );
+      }
+      if (result2.algorithmId === navAlgoId) {
+        pushEvent(eventId2).catch((err) =>
+          logger.warn(`Navigo3 pushEvent failed for event ${eventId2}:`, err),
+        );
+      }
+    }
   });
 
   return { processed: true };

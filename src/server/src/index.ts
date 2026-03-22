@@ -14,6 +14,11 @@ import {
   stopRetentionScheduler,
 } from "./database/cleanup";
 import { startEventSweeper, stopEventSweeper } from "./services/event-sweeper";
+import { initNavigo3Service } from "./services/navigo3/navigo3Service";
+import {
+  startNavigo3Poller,
+  stopNavigo3Poller,
+} from "./services/navigo3Poller";
 import { app } from "./api/routes";
 import { getConfig } from "./config";
 import { createLogger } from "./utils/logger";
@@ -59,6 +64,9 @@ async function gracefulShutdown(signal: string) {
 
     // Stop retention cleanup scheduler
     stopRetentionScheduler();
+
+    // Stop Navigo3 poller
+    stopNavigo3Poller();
 
     // Stop event sweeper (wait for any in-progress cycle)
     await stopEventSweeper();
@@ -132,6 +140,10 @@ async function startup() {
     // Start event sweeper (background poller for closed RFID clusters)
     startEventSweeper();
     logger.info("Event sweeper started");
+
+    // Initialise Navigo3 integration (no-op if env vars absent)
+    await initNavigo3Service();
+    startNavigo3Poller();
 
     // Start HTTP server with WebSocket support
     const config = getConfig();

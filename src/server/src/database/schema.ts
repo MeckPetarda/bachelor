@@ -153,6 +153,7 @@ export const processedEvents = pgTable(
     metadata: jsonb(),
     syncedToIntegration: boolean().default(false),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
+    navigo3RecordId: integer(),
   },
   (table) => [
     index("idx_processed_events_tag_timestamp").on(

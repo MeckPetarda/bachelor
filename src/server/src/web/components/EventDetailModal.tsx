@@ -1,16 +1,35 @@
-import { type Accessor, type Component, For, Show, createSignal, onMount, onCleanup } from "solid-js";
-import { processedEventsState, fetchEventDetail } from "../stores/processedEvents";
-import type { CompanionEvent, ProcessedEventDetail, ProcessedEventScan } from "../types";
+import {
+  type Accessor,
+  type Component,
+  For,
+  Show,
+  createSignal,
+  onMount,
+  onCleanup,
+} from "solid-js";
+import {
+  processedEventsState,
+  fetchEventDetail,
+} from "../stores/processedEvents";
+import type {
+  CompanionEvent,
+  ProcessedEventDetail,
+  ProcessedEventScan,
+} from "../types";
 import styles from "./EventDetailModal.module.css";
 
 // -- SVG constants ----------------------------------------------------------
-const W = 700, H = 280;
-const PL = 52, PR = 20, PT = 24, PB = 44;
-const CW = W - PL - PR;  // 628
-const CH = H - PT - PB;  // 212
+const W = 700,
+  H = 280;
+const PL = 52,
+  PR = 20,
+  PT = 24,
+  PB = 44;
+const CW = W - PL - PR; // 628
+const CH = H - PT - PB; // 212
 
 const COLOR_OUTSIDE = "#3b82f6";
-const COLOR_INSIDE  = "#f97316";
+const COLOR_INSIDE = "#f97316";
 
 // -- Formatting helpers -----------------------------------------------------
 
@@ -56,7 +75,10 @@ function buildHistogram(
 
   const addScan = (scan: ProcessedEventScan, side: "inside" | "outside") => {
     const relMs = new Date(scan.timestamp).getTime() - startMs;
-    const idx = Math.max(0, Math.min(numBins - 1, Math.floor(relMs / binWidthMs)));
+    const idx = Math.max(
+      0,
+      Math.min(numBins - 1, Math.floor(relMs / binWidthMs)),
+    );
     bins[idx]![side]++;
   };
 
@@ -93,7 +115,12 @@ const HistogramChart: Component<{
   label: string;
 }> = (props) => {
   const hist = () =>
-    buildHistogram(props.inside, props.outside, props.startMs, props.durationMs);
+    buildHistogram(
+      props.inside,
+      props.outside,
+      props.startMs,
+      props.durationMs,
+    );
 
   const barW = () =>
     Math.max(2, (hist().binWidthMs / Math.max(props.durationMs, 1)) * CW - 1);
@@ -108,8 +135,22 @@ const HistogramChart: Component<{
   return (
     <svg viewBox={`0 0 ${W} ${H}`} class={styles.chartSvg}>
       {/* Axes */}
-      <line x1={PL} y1={PT} x2={PL} y2={PT + CH} stroke="#e2e8f0" stroke-width="1" />
-      <line x1={PL} y1={PT + CH} x2={PL + CW} y2={PT + CH} stroke="#e2e8f0" stroke-width="1" />
+      <line
+        x1={PL}
+        y1={PT}
+        x2={PL}
+        y2={PT + CH}
+        stroke="#e2e8f0"
+        stroke-width="1"
+      />
+      <line
+        x1={PL}
+        y1={PT + CH}
+        x2={PL + CW}
+        y2={PT + CH}
+        stroke="#e2e8f0"
+        stroke-width="1"
+      />
 
       {/* Y-axis ticks */}
       {[0, 0.5, 1].map((frac) => {
@@ -117,8 +158,21 @@ const HistogramChart: Component<{
         const y = yScaleCount(count, hist().maxCount);
         return (
           <>
-            <line x1={PL - 4} y1={y} x2={PL} y2={y} stroke="#94a3b8" stroke-width="1" />
-            <text x={PL - 7} y={y + 4} text-anchor="end" font-size="9" fill="#94a3b8">
+            <line
+              x1={PL - 4}
+              y1={y}
+              x2={PL}
+              y2={y}
+              stroke="#94a3b8"
+              stroke-width="1"
+            />
+            <text
+              x={PL - 7}
+              y={y + 4}
+              text-anchor="end"
+              font-size="9"
+              fill="#94a3b8"
+            >
               {count}
             </text>
           </>
@@ -131,8 +185,21 @@ const HistogramChart: Component<{
         const ms = Math.round(frac * props.durationMs);
         return (
           <>
-            <line x1={x} y1={PT + CH} x2={x} y2={PT + CH + 4} stroke="#94a3b8" stroke-width="1" />
-            <text x={x} y={PT + CH + 16} text-anchor="middle" font-size="9" fill="#94a3b8">
+            <line
+              x1={x}
+              y1={PT + CH}
+              x2={x}
+              y2={PT + CH + 4}
+              stroke="#94a3b8"
+              stroke-width="1"
+            />
+            <text
+              x={x}
+              y={PT + CH + 16}
+              text-anchor="middle"
+              font-size="9"
+              fill="#94a3b8"
+            >
               {ms}ms
             </text>
           </>
@@ -242,7 +309,9 @@ const RssiScatterChart: Component<{
   ): [number, number, number, number] | null => {
     const valid = scans.filter((s) => s.rssiDbm !== null);
     if (valid.length < 2) return null;
-    const mxVals = valid.map((s) => new Date(s.timestamp).getTime() - props.startMs);
+    const mxVals = valid.map(
+      (s) => new Date(s.timestamp).getTime() - props.startMs,
+    );
     const myVals = valid.map((s) => s.rssiDbm as number);
     const mx = mean(mxVals);
     const my = mean(myVals);
@@ -253,7 +322,8 @@ const RssiScatterChart: Component<{
 
   const xAxisTicks = () => [0, 0.25, 0.5, 0.75, 1.0];
   const yAxisTicks = () => {
-    const min = rssiMin(), max = rssiMax();
+    const min = rssiMin(),
+      max = rssiMax();
     const step = Math.ceil((max - min) / 4);
     const ticks: number[] = [];
     for (let v = Math.ceil(min); v <= max; v += step) ticks.push(v);
@@ -263,16 +333,43 @@ const RssiScatterChart: Component<{
   return (
     <svg viewBox={`0 0 ${W} ${H}`} class={styles.chartSvg}>
       {/* Axes */}
-      <line x1={PL} y1={PT} x2={PL} y2={PT + CH} stroke="#e2e8f0" stroke-width="1" />
-      <line x1={PL} y1={PT + CH} x2={PL + CW} y2={PT + CH} stroke="#e2e8f0" stroke-width="1" />
+      <line
+        x1={PL}
+        y1={PT}
+        x2={PL}
+        y2={PT + CH}
+        stroke="#e2e8f0"
+        stroke-width="1"
+      />
+      <line
+        x1={PL}
+        y1={PT + CH}
+        x2={PL + CW}
+        y2={PT + CH}
+        stroke="#e2e8f0"
+        stroke-width="1"
+      />
 
       {/* Y-axis ticks (RSSI dBm) */}
       {yAxisTicks().map((val) => {
         const y = sy(val);
         return (
           <>
-            <line x1={PL - 4} y1={y} x2={PL} y2={y} stroke="#94a3b8" stroke-width="1" />
-            <text x={PL - 7} y={y + 4} text-anchor="end" font-size="9" fill="#94a3b8">
+            <line
+              x1={PL - 4}
+              y1={y}
+              x2={PL}
+              y2={y}
+              stroke="#94a3b8"
+              stroke-width="1"
+            />
+            <text
+              x={PL - 7}
+              y={y + 4}
+              text-anchor="end"
+              font-size="9"
+              fill="#94a3b8"
+            >
               {val}
             </text>
           </>
@@ -285,8 +382,21 @@ const RssiScatterChart: Component<{
         const ms = Math.round(frac * props.durationMs);
         return (
           <>
-            <line x1={x} y1={PT + CH} x2={x} y2={PT + CH + 4} stroke="#94a3b8" stroke-width="1" />
-            <text x={x} y={PT + CH + 16} text-anchor="middle" font-size="9" fill="#94a3b8">
+            <line
+              x1={x}
+              y1={PT + CH}
+              x2={x}
+              y2={PT + CH + 4}
+              stroke="#94a3b8"
+              stroke-width="1"
+            />
+            <text
+              x={x}
+              y={PT + CH + 16}
+              text-anchor="middle"
+              font-size="9"
+              fill="#94a3b8"
+            >
               {ms}ms
             </text>
           </>
@@ -312,8 +422,10 @@ const RssiScatterChart: Component<{
         const [x1, y1, x2, y2] = pts;
         return (
           <line
-            x1={x1} y1={Math.max(PT, Math.min(PT + CH, y1))}
-            x2={x2} y2={Math.max(PT, Math.min(PT + CH, y2))}
+            x1={x1}
+            y1={Math.max(PT, Math.min(PT + CH, y1))}
+            x2={x2}
+            y2={Math.max(PT, Math.min(PT + CH, y2))}
             stroke={COLOR_OUTSIDE}
             stroke-width="1.5"
             stroke-dasharray="6,3"
@@ -329,8 +441,10 @@ const RssiScatterChart: Component<{
         const [x1, y1, x2, y2] = pts;
         return (
           <line
-            x1={x1} y1={Math.max(PT, Math.min(PT + CH, y1))}
-            x2={x2} y2={Math.max(PT, Math.min(PT + CH, y2))}
+            x1={x1}
+            y1={Math.max(PT, Math.min(PT + CH, y1))}
+            x2={x2}
+            y2={Math.max(PT, Math.min(PT + CH, y2))}
             stroke={COLOR_INSIDE}
             stroke-width="1.5"
             stroke-dasharray="6,3"
@@ -375,9 +489,9 @@ interface EventDetailModalProps {
 }
 
 export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
-  const [activeTab, setActiveTab] = createSignal<"overview" | "scans" | "timeline">(
-    "overview",
-  );
+  const [activeTab, setActiveTab] = createSignal<
+    "overview" | "scans" | "timeline"
+  >("overview");
 
   const detail = () => processedEventsState.selectedEventDetail;
   const loading = () => processedEventsState.detailLoading;
@@ -388,7 +502,9 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const doc = (globalThis as any).document as { addEventListener: Function; removeEventListener: Function } | undefined;
+  const doc = (globalThis as any).document as
+    | { addEventListener: Function; removeEventListener: Function }
+    | undefined;
   onMount(() => doc?.addEventListener("keydown", onKey));
   onCleanup(() => doc?.removeEventListener("keydown", onKey));
 
@@ -427,7 +543,11 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
               class={`${styles.tab} ${activeTab() === tab ? styles.tabActive : ""}`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab === "overview" ? "Overview" : tab === "scans" ? "Raw Scans" : "Timeline"}
+              {tab === "overview"
+                ? "Overview"
+                : tab === "scans"
+                  ? "Raw Scans"
+                  : "Timeline"}
             </button>
           ))}
         </div>
@@ -494,12 +614,16 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
 
                     <div class={styles.kvRow}>
                       <span class={styles.kvLabel}>Algorithm</span>
-                      <span class={styles.kvValue}>{algoFull(d().event.algorithmId)}</span>
+                      <span class={styles.kvValue}>
+                        {algoFull(d().event.algorithmId)}
+                      </span>
                     </div>
 
                     <div class={styles.kvRow}>
                       <span class={styles.kvLabel}>Timestamp</span>
-                      <span class={styles.kvValue}>{fmtTime(d().event.timestamp)}</span>
+                      <span class={styles.kvValue}>
+                        {fmtTime(d().event.timestamp)}
+                      </span>
                     </div>
 
                     <div class={styles.kvRow}>
@@ -521,9 +645,15 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                   <div class={styles.factorBars}>
                     {(
                       [
-                        ["Centroid separation", d().event.centroidSeparationFactor],
+                        [
+                          "Centroid separation",
+                          d().event.centroidSeparationFactor,
+                        ],
                         ["Cluster size", d().event.clusterSizeFactor],
-                        ["Bilateral coverage", d().event.bilateralCoverageFactor],
+                        [
+                          "Bilateral coverage",
+                          d().event.bilateralCoverageFactor,
+                        ],
                         ["RSSI trend", d().event.rssiTrendConsistencyFactor],
                       ] as [string, number | null][]
                     ).map(([label, value]) => (
@@ -541,7 +671,9 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                           </div>
                         </Show>
                         <span class={styles.factorValue}>
-                          {value !== null ? `${Math.round((value as number) * 100)}%` : "-"}
+                          {value !== null
+                            ? `${Math.round((value as number) * 100)}%`
+                            : "-"}
                         </span>
                       </div>
                     ))}
@@ -553,14 +685,15 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                       <div class={styles.companion}>
                         <span>
                           Also analyzed by{" "}
-                          <strong>{algoFull(comp().algorithmId)}</strong> {"-> "}
+                          <strong>{algoFull(comp().algorithmId)}</strong>{" "}
+                          {"-> "}
                           confidence {Math.round(comp().confidence * 100)}%
                         </span>
                         <button
                           class={styles.companionBtn}
                           onClick={() => handleCompanionClick(comp().id)}
                         >
-                        {"View companion ->"}
+                          {"View companion ->"}
                         </button>
                       </div>
                     )}
@@ -581,7 +714,9 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                         <Show
                           when={lhScans.scans.length > 0}
                           fallback={
-                            <p class={styles.scanEmpty}>No scans on this side.</p>
+                            <p class={styles.scanEmpty}>
+                              No scans on this side.
+                            </p>
                           }
                         >
                           <table class={styles.scanTable}>
@@ -600,7 +735,10 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                                 {(scan) => (
                                   <tr>
                                     <td class={styles.mono}>
-                                      {relMs(scan.timestamp, d().event.clusterStartedAt)}
+                                      {relMs(
+                                        scan.timestamp,
+                                        d().event.clusterStartedAt,
+                                      )}
                                     </td>
                                     <td>{scan.rssiDbm ?? "-"}</td>
                                     <td>{scan.antennaId ?? "-"}</td>
@@ -623,23 +761,35 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                   <Show
                     when={d().event.algorithmId !== "manual"}
                     fallback={
-                      <p class={styles.noData}>Manual event - no scan data to visualize.</p>
+                      <p class={styles.noData}>
+                        Manual event - no scan data to visualize.
+                      </p>
                     }
                   >
                     {(() => {
-                      const startMs = new Date(d().event.clusterStartedAt).getTime();
-                      const endMs = new Date(d().event.clusterEndedAt).getTime();
+                      const startMs = new Date(
+                        d().event.clusterStartedAt,
+                      ).getTime();
+                      const endMs = new Date(
+                        d().event.clusterEndedAt,
+                      ).getTime();
                       const durationMs = Math.max(endMs - startMs, 1);
-                      const meta = d().event.metadata as Record<string, unknown>;
-                      const outsideCentroidMs = (meta.outsideCentroidMs as number) ?? startMs;
-                      const insideCentroidMs = (meta.insideCentroidMs as number) ?? endMs;
+                      const meta = d().event.metadata as Record<
+                        string,
+                        unknown
+                      >;
+                      const outsideCentroidMs =
+                        (meta.outsideCentroidMs as number) ?? startMs;
+                      const insideCentroidMs =
+                        (meta.insideCentroidMs as number) ?? endMs;
 
                       return (
                         <>
                           {/* Histogram chart */}
                           <div class={styles.chartSection}>
                             <p class={styles.chartTitle}>
-                              {d().event.algorithmId === "rssi_weighted_centroid"
+                              {d().event.algorithmId ===
+                              "rssi_weighted_centroid"
                                 ? "RSSI-Weighted Scan Timing"
                                 : "Scan Timing Histogram"}
                             </p>
@@ -659,7 +809,9 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                                   style={{ background: COLOR_OUTSIDE }}
                                 />
                                 <span>
-                                  Outside - {d().scans.outside.lighthouseName || "Unknown"}
+                                  Outside -{" "}
+                                  {d().scans.outside.lighthouseName ||
+                                    "Unknown"}
                                 </span>
                               </div>
                               <div class={styles.legendItem}>
@@ -668,7 +820,8 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                                   style={{ background: COLOR_INSIDE }}
                                 />
                                 <span>
-                                  Inside - {d().scans.inside.lighthouseName || "Unknown"}
+                                  Inside -{" "}
+                                  {d().scans.inside.lighthouseName || "Unknown"}
                                 </span>
                               </div>
                               <div class={styles.legendItem}>
@@ -691,19 +844,28 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                           {/* RSSI scatter (algorithm 2 only) */}
                           <Show
                             when={
-                              d().event.algorithmId === "rssi_weighted_centroid" &&
-                              (d().scans.inside.scans.some((s) => s.rssiDbm !== null) ||
-                                d().scans.outside.scans.some((s) => s.rssiDbm !== null))
+                              d().event.algorithmId ===
+                                "rssi_weighted_centroid" &&
+                              (d().scans.inside.scans.some(
+                                (s) => s.rssiDbm !== null,
+                              ) ||
+                                d().scans.outside.scans.some(
+                                  (s) => s.rssiDbm !== null,
+                                ))
                             }
                           >
                             {(() => {
-                              const rssiMeta = meta.rssiTrend as {
-                                outside: { slope: number; r2: number };
-                                inside: { slope: number; r2: number };
-                              } | undefined;
+                              const rssiMeta = meta.rssiTrend as
+                                | {
+                                    outside: { slope: number; r2: number };
+                                    inside: { slope: number; r2: number };
+                                  }
+                                | undefined;
                               return (
                                 <div class={styles.chartSection}>
-                                  <p class={styles.chartTitle}>RSSI Over Time</p>
+                                  <p class={styles.chartTitle}>
+                                    RSSI Over Time
+                                  </p>
                                   <RssiScatterChart
                                     inside={d().scans.inside.scans}
                                     outside={d().scans.outside.scans}
