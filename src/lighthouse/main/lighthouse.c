@@ -6,17 +6,19 @@
  *   - RFID: Y300 UHF RFID reader for contactless tag detection
  *
  * GPIO Pin Assignments:
- *   - GPIO4:  WiFi status LED (moved from GPIO5)
+ *   - GPIO4:  LED1 — WiFi+MQTT combined indicator (green)
  *   - GPIO5:  RFID reader power control (S9013 transistor base)
- *   - GPIO22: RFID power rail sense (moved from GPIO2 strapping pin)
- *   - GPIO18: Scanning LED
- *   - GPIO19: Activity LED
- *   - GPIO23: MQTT status LED
- *   - GPIO34: Button 1 (Start/Stop scanning)
- *   - GPIO35: Button 2 (Statistics / WiFi setup)
+ *   - GPIO18: LED3 — Active scan indicator (red)
+ *   - GPIO19: LED4 — Tag activity / battery (yellow)
+ *   - GPIO22: RFID power rail sense
+ *   - GPIO23: LED2 — IR mode / AP provisioning indicator (green)
+ *   - GPIO34: Button 1 — Scan mode control (input-only, external pull-up)
+ *   - GPIO35: Button 2 — Status msg / WiFi setup (input-only, external pull-up)
  *
- * Press BUTTON1 to start/stop RFID scanning
- * Press BUTTON2 to show statistics
+ * Scan Modes:
+ *   IR Mode (default): IR sensor drives RFID on/off. LED2 solid on.
+ *   Manual Mode: Button 1 short-press toggles RFID. LED2 off.
+ *   Hold Button 1 for 3 s to toggle between modes.
  *
  * DATASHEET REFERENCES:
  * - ESP32 Datasheet: Section 4.8.1 (GPIO Interface)
@@ -51,18 +53,22 @@
 // GPIO CONFIGURATION
 // ============================================================================
 
-// NOTE: GPIO5 was moved to RFID reader power control (uart_reader.c)
-// WiFi status LED relocated to GPIO4 per tasks/reader_power_task.md
-#define WIFI_STATUS_LED     GPIO_NUM_21  // WiFi connection status (ON = connected)
-#define MQTT_STATUS_LED     GPIO_NUM_4 // MQTT broker status (ON = connected)
-#define ACTIVITY_LED        GPIO_NUM_25 // Tag detection activity (flashes on detection)
-#define SCANNING_LED        GPIO_NUM_26 // RFID scanning active (ON = scanning)
-#define BUTTON1_PIN         GPIO_NUM_23 // Start/Stop RFID scanning
-#define BUTTON2_PIN         GPIO_NUM_22 // Show statistics
-#define IR_SENSOR_PIN       GPIO_NUM_19
+// LED assignments — see task: io_improvement_task.md
+#define LED1_PIN     GPIO_NUM_4  // WiFi+MQTT combined indicator (green)
+#define LED2_PIN     GPIO_NUM_21 // IR mode / AP provisioning indicator (green)
+#define SCANNING_LED GPIO_NUM_26 // LED3 — Active scan indicator (red, unchanged)
+#define ACTIVITY_LED GPIO_NUM_25 // LED4 — Tag detection / battery (yellow, unchanged)
+
+// Button assignments — GPIO34/35 are input-only pins, external pull-ups required
+// Reference: ESP32 Datasheet v5.2, Section 4.8.1
+#define BUTTON1_PIN GPIO_NUM_22         // Scan mode control
+#define BUTTON2_PIN GPIO_NUM_23         // Status msg / WiFi setup (unchanged)
+
+#define IR_SENSOR_PIN       GPIO_NUM_19 // IR presence sensor (input-only)
 #define IR_SCAN_DURATION_MS 5000        // Duration of IR-triggered scan burst (ms)
 
 #define DEBOUNCE_TIME_MS 50
+#define HOLD_3S_MS       3000           // 3-second hold threshold for Button 1
 
 static const char *TAG = "MAIN";
 
@@ -84,6 +90,22 @@ static bool           mqtt_initialized = false;
 static volatile bool ir_trigger_pending  = false; // Set in ISR, cleared in main loop
 static bool          ir_scan_active      = false; // true = current scan was IR-initiated
 static uint32_t      ir_scan_end_time_ms = 0;     // Tick timestamp when burst should stop
+
+// ============================================================================
+// SCAN MODE STATE MACHINE
+// ============================================================================
+
+typedef enum
+{
+    SCAN_MODE_IR,                            // default; IR sensor drives RFID on/off, LED2 solid on
+    SCAN_MODE_MANUAL,                        // button short-press drives RFID on/off, LED2 off
+} scan_mode_t;
+
+static scan_mode_t scan_mode = SCAN_MODE_IR; // default on boot
+
+// LED1 blink state for WiFi-no-MQTT condition
+static uint32_t led1_last_toggle_ms = 0;
+static uint8_t  led1_blink_state    = 0;
 
 // ============================================================================
 // MQTT CONFIGURATION CALLBACK
@@ -445,8 +467,7 @@ static void gpio_init(void)
 
     // Configure LEDs (output)
     gpio_config_t led_config = {
-        .pin_bit_mask =
-            (1ULL << WIFI_STATUS_LED) | (1ULL << MQTT_STATUS_LED) | (1ULL << ACTIVITY_LED) | (1ULL << SCANNING_LED),
+        .pin_bit_mask = (1ULL << LED1_PIN) | (1ULL << LED2_PIN) | (1ULL << ACTIVITY_LED) | (1ULL << SCANNING_LED),
         .mode         = GPIO_MODE_OUTPUT,
         .pull_up_en   = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -454,7 +475,8 @@ static void gpio_init(void)
     };
     gpio_config(&led_config);
 
-    // Configure buttons (input-only pins)
+    // Configure buttons — GPIO34/35 are input-only, no internal pull resistors
+    // External pull-ups required (ESP32 DS v5.2 Section 4.8.1)
     gpio_config_t button_config = {
         .pin_bit_mask = (1ULL << BUTTON1_PIN) | (1ULL << BUTTON2_PIN),
         .mode         = GPIO_MODE_INPUT,
@@ -464,7 +486,7 @@ static void gpio_init(void)
     };
     gpio_config(&button_config);
 
-    // Configure IR sensor (GPIO26 input with pull-down, rising-edge interrupt)
+    // Configure IR sensor (input-only pin, pull-down, rising-edge interrupt)
     gpio_config_t ir_config = {
         .pin_bit_mask = (1ULL << IR_SENSOR_PIN),
         .mode         = GPIO_MODE_INPUT,
@@ -477,17 +499,17 @@ static void gpio_init(void)
     gpio_install_isr_service(0);
     gpio_isr_handler_add(IR_SENSOR_PIN, ir_sensor_isr_handler, NULL);
 
-    // Initialize LED states (all OFF at startup)
-    gpio_set_level(WIFI_STATUS_LED, 0);
-    gpio_set_level(MQTT_STATUS_LED, 0);
+    // Initialize LED states — LED2 on (default IR mode), rest off
+    gpio_set_level(LED1_PIN, 0);
+    gpio_set_level(LED2_PIN, 1); // IR mode active by default
     gpio_set_level(ACTIVITY_LED, 0);
     gpio_set_level(SCANNING_LED, 0);
 
     ESP_LOGI(TAG, "GPIO initialized");
-    ESP_LOGI(TAG, "  WiFi Status LED: GPIO %d", WIFI_STATUS_LED);
-    ESP_LOGI(TAG, "  MQTT Status LED: GPIO %d", MQTT_STATUS_LED);
-    ESP_LOGI(TAG, "  Activity LED: GPIO %d", ACTIVITY_LED);
-    ESP_LOGI(TAG, "  Scanning LED: GPIO %d", SCANNING_LED);
+    ESP_LOGI(TAG, "  LED1 (WiFi+MQTT): GPIO %d", LED1_PIN);
+    ESP_LOGI(TAG, "  LED2 (IR mode):   GPIO %d", LED2_PIN);
+    ESP_LOGI(TAG, "  LED3 (Scanning):  GPIO %d", SCANNING_LED);
+    ESP_LOGI(TAG, "  LED4 (Activity):  GPIO %d", ACTIVITY_LED);
     ESP_LOGI(TAG, "  IR Sensor: GPIO %d (burst duration: %d ms)", IR_SENSOR_PIN, IR_SCAN_DURATION_MS);
 }
 
@@ -558,6 +580,65 @@ static void rfid_reader_start_inventory_wrapper(void)
 }
 
 // ============================================================================
+// SCAN MODE ENTRY HELPERS
+// ============================================================================
+
+/**
+ * Stop RFID scanning if currently active and power off reader.
+ * Shared by mode-transition helpers.
+ */
+static void stop_rfid_if_active(void)
+{
+    if (rfid_scanning)
+    {
+        rfid_reader_stop_inventory();
+        rfid_reader_power_off();
+        gpio_set_level(SCANNING_LED, 0);
+        rfid_scanning       = false;
+        ir_scan_active      = false;
+        ir_scan_end_time_ms = 0;
+        ESP_LOGI(TAG, "RFID stopped for mode transition");
+    }
+}
+
+/**
+ * Enter IR auto-scan mode.
+ * 1. Stop RFID if active.
+ * 2. Set scan_mode = SCAN_MODE_IR.
+ * 3. Turn LED2 solid on.
+ * 4. Resume handling IR trigger events (ir_trigger_pending flag cleared).
+ */
+static void enter_ir_mode(void)
+{
+    stop_rfid_if_active();
+    scan_mode = SCAN_MODE_IR;
+    if (!wifi_provisioning_is_led2_controlled())
+    {
+        gpio_set_level(LED2_PIN, 1);
+    }
+    ir_trigger_pending = false; // discard stale events from manual-mode window
+    ESP_LOGI(TAG, "Scan mode: IR (auto)");
+}
+
+/**
+ * Enter manual scan mode.
+ * 1. Stop RFID if active.
+ * 2. Set scan_mode = SCAN_MODE_MANUAL.
+ * 3. Turn LED2 off.
+ * 4. IR trigger events will be ignored while in manual mode.
+ */
+static void enter_manual_mode(void)
+{
+    stop_rfid_if_active();
+    scan_mode = SCAN_MODE_MANUAL;
+    if (!wifi_provisioning_is_led2_controlled())
+    {
+        gpio_set_level(LED2_PIN, 0);
+    }
+    ESP_LOGI(TAG, "Scan mode: Manual");
+}
+
+// ============================================================================
 // BUTTON PROCESSING
 // ============================================================================
 
@@ -565,37 +646,69 @@ static void process_buttons(void)
 {
     uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
-    // BUTTON1: Start/Stop RFID scanning
+    // BUTTON1: Scan mode control
+    // IR mode:     short press = no-op; 3 s hold = enter manual mode
+    // Manual mode: short press = toggle RFID; 3 s hold = enter IR mode
     {
         uint32_t        level = gpio_get_level(BUTTON1_PIN);
         button_state_t *state = &button_states[0];
 
+        // Detect press start (falling edge)
         if (level == 0 && state->last_stable_state == 1)
         {
             if ((current_time - state->last_press_time) >= DEBOUNCE_TIME_MS)
             {
-                state->press_count++;
                 state->last_press_time = current_time;
+                state->press_count &= 0x7F; // clear hold-triggered flag
+            }
+        }
 
-                // Toggle RFID scanning
-                if (!rfid_scanning)
+        // Detect 3 s hold (while held)
+        if (level == 0 && state->last_stable_state == 0)
+        {
+            uint32_t press_duration = current_time - state->last_press_time;
+            if (press_duration >= HOLD_3S_MS && !(state->press_count & 0x80))
+            {
+                state->press_count |= 0x80; // mark hold triggered (fire once)
+                if (scan_mode == SCAN_MODE_IR)
                 {
-                    rfid_reader_start_inventory_wrapper();
+                    enter_manual_mode();
                 }
                 else
                 {
-                    ESP_LOGI(TAG, "Stopping RFID scan");
-                    rfid_reader_stop_inventory();
-                    gpio_set_level(SCANNING_LED, 0); // Turn off scanning indicator
-                    rfid_scanning       = false;
-                    ir_scan_active      = false;
-                    ir_scan_end_time_ms = 0;
-
-                    // Power off reader to conserve power when not scanning
-                    // Per YR300 datasheet: sleep mode <100µA
-                    rfid_reader_power_off();
+                    enter_ir_mode();
                 }
             }
+        }
+
+        // Detect release (rising edge) — handle short press
+        if (level == 1 && state->last_stable_state == 0)
+        {
+            uint32_t press_duration = current_time - state->last_press_time;
+            if (press_duration < HOLD_3S_MS && !(state->press_count & 0x80) && press_duration >= DEBOUNCE_TIME_MS)
+            {
+                // Short press
+                if (scan_mode == SCAN_MODE_MANUAL)
+                {
+                    // Toggle RFID on/off
+                    if (!rfid_scanning)
+                    {
+                        rfid_reader_start_inventory_wrapper();
+                    }
+                    else
+                    {
+                        ESP_LOGI(TAG, "Stopping RFID scan (manual mode)");
+                        rfid_reader_stop_inventory();
+                        gpio_set_level(SCANNING_LED, 0);
+                        rfid_scanning       = false;
+                        ir_scan_active      = false;
+                        ir_scan_end_time_ms = 0;
+                        rfid_reader_power_off();
+                    }
+                }
+                // In IR mode: short press is a no-op (ignored)
+            }
+            state->press_count = 0;
         }
 
         state->last_stable_state = level;
@@ -747,6 +860,13 @@ static void process_ir_sensor(void)
     {
         ir_trigger_pending = false;
 
+        // Ignore IR events while in manual mode
+        if (scan_mode == SCAN_MODE_MANUAL)
+        {
+            ESP_LOGD(TAG, "IR trigger: ignored (manual mode active)");
+            goto ir_burst_check;
+        }
+
         if (!rfid_scanning)
         {
             // No active scan — start one via poll-to-ready (no handshake on hot path)
@@ -772,6 +892,7 @@ static void process_ir_sensor(void)
         }
     }
 
+ir_burst_check:
     // --- Burst expiry check ---
     if (ir_scan_active && ir_scan_end_time_ms != 0 && current_time >= ir_scan_end_time_ms)
     {
@@ -874,8 +995,8 @@ static void battery_critical_shutdown(void)
     ESP_LOGW(TAG, "====================================");
 
     // Flash all LEDs as warning before shutdown
-    gpio_set_level(WIFI_STATUS_LED, 1);
-    gpio_set_level(MQTT_STATUS_LED, 1);
+    gpio_set_level(LED1_PIN, 1);
+    gpio_set_level(LED2_PIN, 1);
     gpio_set_level(SCANNING_LED, 1);
     gpio_set_level(ACTIVITY_LED, 1);
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -896,8 +1017,8 @@ static void battery_critical_shutdown(void)
     offline_logger_deinit();
 
     // All LEDs off before sleep
-    gpio_set_level(WIFI_STATUS_LED, 0);
-    gpio_set_level(MQTT_STATUS_LED, 0);
+    gpio_set_level(LED1_PIN, 0);
+    gpio_set_level(LED2_PIN, 0);
     gpio_set_level(SCANNING_LED, 0);
     gpio_set_level(ACTIVITY_LED, 0);
 
@@ -930,13 +1051,41 @@ static void main_task(void *arg)
         process_buttons();
         process_ir_sensor();
 
-        // Update WiFi status LED (check every iteration)
         bool wifi_connected = wifi_manager_is_connected();
-        gpio_set_level(WIFI_STATUS_LED, wifi_connected ? 1 : 0);
-
-        // Update MQTT status LED (check every iteration)
         bool mqtt_connected = mqtt_initialized && mqtt_client_is_connected();
-        gpio_set_level(MQTT_STATUS_LED, mqtt_connected ? 1 : 0);
+
+        // Update LED1: WiFi+MQTT combined indicator
+        // Off = no WiFi; blink 500ms = WiFi but no MQTT; solid = WiFi+MQTT
+        {
+
+            if (!wifi_connected)
+            {
+                gpio_set_level(LED1_PIN, 0);
+                led1_blink_state = 0;
+            }
+            else if (mqtt_connected)
+            {
+                gpio_set_level(LED1_PIN, 1);
+                led1_blink_state = 1;
+            }
+            else
+            {
+                // WiFi connected, MQTT not yet connected — blink at 500 ms
+                uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
+                if ((now - led1_last_toggle_ms) >= 500)
+                {
+                    led1_blink_state    = !led1_blink_state;
+                    led1_last_toggle_ms = now;
+                    gpio_set_level(LED1_PIN, led1_blink_state);
+                }
+            }
+        }
+
+        // Update LED2: IR mode indicator (only when wifi_provisioning is not controlling it)
+        if (!wifi_provisioning_is_led2_controlled())
+        {
+            gpio_set_level(LED2_PIN, scan_mode == SCAN_MODE_IR ? 1 : 0);
+        }
 
         // Publish health metrics every 60 seconds (if MQTT connected)
         health_publish_counter++;
@@ -978,7 +1127,7 @@ static void main_task(void *arg)
 esp_err_t init_wifi_provisioning()
 {
     ESP_LOGI(TAG, "Initializing WiFi provisioning system...");
-    esp_err_t ret = wifi_provisioning_init(WIFI_STATUS_LED, 10000); // 10s connection timeout
+    esp_err_t ret = wifi_provisioning_init(LED1_PIN, LED2_PIN, 10000); // 10s connection timeout
     if (ret != ESP_OK)
     {
         ESP_LOGW(TAG, "WiFi provisioning initialization failed: %s", esp_err_to_name(ret));
@@ -1035,8 +1184,9 @@ esp_err_t init_mqtt()
         return ESP_OK;
     }
 
-    // Turn on MQTT status LED
-    gpio_set_level(MQTT_STATUS_LED, 1);
+    // Notify provisioning system that MQTT is confirmed
+    // (clears LED2 provisioning-pending state if set)
+    wifi_provisioning_notify_mqtt_connected();
 
     ESP_LOGI(TAG, "════════════════════════════════════");
     ESP_LOGI(TAG, "  MQTT Connected Successfully!");
@@ -1080,9 +1230,8 @@ esp_err_t init_wifi()
                        // able to reconnect
     }
 
-    // Turn on WiFi status LED
-    gpio_set_level(WIFI_STATUS_LED, 1);
-
+    // LED1 will be set solid by main_task once MQTT also connects;
+    // interim: set it on now (WiFi connected, MQTT pending = blink in main loop)
     ESP_LOGI(TAG, "════════════════════════════════════");
     ESP_LOGI(TAG, "  WiFi Connected Successfully!");
 

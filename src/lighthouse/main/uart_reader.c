@@ -524,7 +524,7 @@ esp_err_t rfid_reader_init(void)
     {
 
         ESP_LOGI(TAG, "Correctly performed version handshake");
-        esp_err_t beeper_ret = rfid_reader_set_beeper_mode(R300_BEEPER_MODE_QUIET);
+        esp_err_t beeper_ret = rfid_reader_set_beeper_mode(R300_BEEPER_MODE_PER_TAG);
         if (beeper_ret != ESP_OK)
         {
             ESP_LOGW(TAG, "Failed to set beeper mode (non-fatal): %s", esp_err_to_name(beeper_ret));

@@ -71,17 +71,21 @@ typedef enum
  * Initializes NVS storage, checks configuration status, and
  * determines initial state.
  *
- * @param led_pin GPIO pin for WiFi status LED (LED1_PIN)
- *                LED blinks at 1s interval during AP mode
+ * @param led1_pin GPIO pin for LED1 (WiFi+MQTT combined indicator)
+ *                 Blinks during AP provisioning; goes solid when WiFi confirmed.
+ *                 In normal operation LED1 is driven by main loop via this module.
+ * @param led2_pin GPIO pin for LED2 (IR mode / AP provisioning indicator)
+ *                 Blinks during AP provisioning; goes solid when MQTT confirmed.
+ *                 After provisioning, controlled by main loop (scan mode).
  * @param connection_timeout_ms How long to wait for WiFi connection
  *                              Default: 10000 (10 seconds)
  *
  * @return ESP_OK on success
- *         ESP_ERR_INVALID_ARG if led_pin is invalid
+ *         ESP_ERR_INVALID_ARG if a LED pin is invalid
  *         ESP_ERR_NO_MEM if memory allocation fails
  *         ESP_FAIL on other errors (logged)
  */
-esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout_ms);
+esp_err_t wifi_provisioning_init(gpio_num_t led1_pin, gpio_num_t led2_pin, uint32_t connection_timeout_ms);
 
 /**
  * Report that BUTTON2 was held for 5 seconds
@@ -196,5 +200,32 @@ const char *wifi_provisioning_get_error_message(void);
  * Code after calling this function will NOT execute.
  */
 void wifi_provisioning_restart_device(void);
+
+/**
+ * Notify provisioning that MQTT has connected.
+ *
+ * Called from init_mqtt() after a successful MQTT connection.
+ * If LED2 is in "provisioning pending" state (blinking while awaiting
+ * MQTT confirmation after a fresh WiFi provisioning cycle), this call
+ * sets LED2 solid and releases LED2 control back to the main loop.
+ *
+ * Safe to call at any time; no-op if LED2 is not provisioning-pending.
+ */
+void wifi_provisioning_notify_mqtt_connected(void);
+
+/**
+ * Query whether wifi_provisioning is currently controlling LED2.
+ *
+ * Returns true when:
+ *   - Device is in AP provisioning mode (LED2 blinking), OR
+ *   - Device has just completed provisioning and LED2 is blinking
+ *     pending MQTT confirmation (led2_prov_pending flag).
+ *
+ * When true, the main loop must NOT drive LED2 directly to avoid
+ * conflicts.
+ *
+ * @return true if wifi_provisioning owns LED2; false otherwise.
+ */
+bool wifi_provisioning_is_led2_controlled(void);
 
 #endif // WIFI_PROVISIONING_H

@@ -39,16 +39,17 @@
 // ============================================================================
 
 #define RFID_UART_PORT   UART_NUM_2
-#define RFID_UART_TX_PIN 17              // ESP32 TX → Y300 RX
-#define RFID_UART_RX_PIN 16              // ESP32 RX → Y300 TX
-#define RFID_UART_BAUD   115200          // R300 default (section 1.1)
+#define RFID_UART_TX_PIN 17     // ESP32 TX → Y300 RX
+#define RFID_UART_RX_PIN 16     // ESP32 RX → Y300 TX
+#define RFID_UART_BAUD   115200 // R300 default (section 1.1)
 
 // Power control and sensing pins
 // GPIO2 was previously used but is a strapping pin that blocks firmware flashing
 // Migrated to GPIO22 (sensing) and GPIO5 (control) per tasks/reader_power_task.md
-#define RFID_POWER_CONTROL_PIN GPIO_NUM_5  // S9013 NPN transistor base (HIGH = reader ON)
-#define RFID_POWER_SENSE_PIN   GPIO_NUM_18 // 3.3V rail feedback from reader power supply
-#define RFID_POWER_STABILIZATION_MS 100    // Delay after power ON for reader stabilization
+// GPIO18 freed for SCANNING_LED per tasks/io_improvement_task.md
+#define RFID_POWER_CONTROL_PIN      GPIO_NUM_5  // S9013 NPN transistor base (HIGH = reader ON)
+#define RFID_POWER_SENSE_PIN        GPIO_NUM_22 // 3.3V rail feedback from reader power supply
+#define RFID_POWER_STABILIZATION_MS 100         // Delay after power ON for reader stabilization
 
 // ============================================================================
 // FREQUENCY REGIONS (section 2.1.9, page 13)
@@ -68,7 +69,7 @@
 // ============================================================================
 
 // Command byte for set beeper mode (cmd_name_set_beeper_mode)
-#define R300_CMD_SET_BEEPER_MODE   0x7A
+#define R300_CMD_SET_BEEPER_MODE 0x7A
 
 // Mode values persisted to internal flash on success (Section 2.1.11)
 #define R300_BEEPER_MODE_QUIET     0x00 // Silent — no beep on any event

@@ -53,6 +53,10 @@ static const char *TAG = "WIFI_PROV";
 // STATE MACHINE DATA
 // ============================================================================
 
+// NVS key persisted across reboot: set when WiFi provisioning completes,
+// cleared when MQTT connects for the first time after provisioning.
+#define MQTT_PEND_NVS_KEY "mqtt_pend"
+
 typedef struct
 {
     // Core state
@@ -63,11 +67,17 @@ typedef struct
     uint32_t state_enter_time_ms;
     uint32_t connection_timeout_ms;
 
-    // LED control
-    gpio_num_t led_pin;
+    // LED1 control (WiFi+MQTT combined indicator)
+    gpio_num_t led1_pin;
     uint32_t   led_blink_interval_ms;
     uint32_t   last_led_toggle_ms;
-    uint8_t    led_state;
+    uint8_t    led1_state;
+
+    // LED2 control (IR mode / AP provisioning indicator)
+    gpio_num_t led2_pin;
+    uint8_t    led2_state;
+    uint32_t   last_led2_toggle_ms;
+    bool       led2_prov_pending; // true = LED2 blinking pending MQTT confirm after provisioning
 
     // Pending credentials during setup (from HTTP form)
     char pending_ssid[32];
@@ -125,10 +135,14 @@ static void transition_to(wifi_state_t new_state)
     prov_state.current_state       = new_state;
     prov_state.state_enter_time_ms = get_time_ms();
 
-    // Reset LED state on transition
-    prov_state.last_led_toggle_ms = get_time_ms();
-    prov_state.led_state          = 0;
-    gpio_set_level(prov_state.led_pin, 0);
+    // Reset LED state on transition — both LEDs off until process_led drives them
+    uint32_t now                   = get_time_ms();
+    prov_state.last_led_toggle_ms  = now;
+    prov_state.last_led2_toggle_ms = now;
+    prov_state.led1_state          = 0;
+    prov_state.led2_state          = 0;
+    gpio_set_level(prov_state.led1_pin, 0);
+    gpio_set_level(prov_state.led2_pin, 0);
 }
 
 /**
@@ -205,26 +219,49 @@ static void clear_setup_requested(void)
 }
 
 /**
- * Process LED blinking for current state
- * Only blinks during AP_ACTIVE and CONNECTING states
+ * Process LED blinking for current provisioning state.
+ *
+ * Provisioning LED behaviour (sequential milestones):
+ *   AP_ACTIVE / CONNECTING:    LED1 blinks, LED2 blinks
+ *   AP_ACTIVE_CONNECTED:       LED1 solid (WiFi confirmed), LED2 continues blinking
+ *   After reboot (led2_prov_pending): LED2 blinks until MQTT confirmed
  */
 static void process_led(void)
 {
-    // Only blink during AP_ACTIVE and CONNECTING states
-    if (prov_state.current_state != WIFI_STATE_AP_ACTIVE && prov_state.current_state != WIFI_STATE_CONNECTING)
+    uint32_t now = get_time_ms();
+
+    bool in_ap_mode =
+        (prov_state.current_state == WIFI_STATE_AP_ACTIVE || prov_state.current_state == WIFI_STATE_CONNECTING);
+    bool wifi_confirmed = (prov_state.current_state == WIFI_STATE_AP_ACTIVE_CONNECTED);
+
+    // LED1: blink during AP mode; solid once WiFi confirmed
+    if (in_ap_mode)
     {
-        return;
+        uint32_t elapsed = now - prov_state.last_led_toggle_ms;
+        if (elapsed >= prov_state.led_blink_interval_ms)
+        {
+            prov_state.led1_state         = !prov_state.led1_state;
+            prov_state.last_led_toggle_ms = now;
+            gpio_set_level(prov_state.led1_pin, prov_state.led1_state);
+        }
+    }
+    else if (wifi_confirmed)
+    {
+        // WiFi milestone reached — LED1 solid on
+        gpio_set_level(prov_state.led1_pin, 1);
+        prov_state.led1_state = 1;
     }
 
-    uint32_t now     = get_time_ms();
-    uint32_t elapsed = now - prov_state.last_led_toggle_ms;
-
-    if (elapsed >= prov_state.led_blink_interval_ms)
+    // LED2: blink during AP mode and while led2_prov_pending (post-reboot until MQTT)
+    if (in_ap_mode || wifi_confirmed || prov_state.led2_prov_pending)
     {
-        // Toggle LED
-        prov_state.led_state = !prov_state.led_state;
-        gpio_set_level(prov_state.led_pin, prov_state.led_state);
-        prov_state.last_led_toggle_ms = now;
+        uint32_t elapsed2 = now - prov_state.last_led2_toggle_ms;
+        if (elapsed2 >= prov_state.led_blink_interval_ms)
+        {
+            prov_state.led2_state          = !prov_state.led2_state;
+            prov_state.last_led2_toggle_ms = now;
+            gpio_set_level(prov_state.led2_pin, prov_state.led2_state);
+        }
     }
 }
 
@@ -810,6 +847,16 @@ static void process_connecting(void)
 
             if (prov_state.connection_success)
             {
+                // Set NVS flag so that after reboot, LED2 blinks until MQTT confirms
+                nvs_handle_t nvs_h;
+                if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_h) == ESP_OK)
+                {
+                    nvs_set_u8(nvs_h, MQTT_PEND_NVS_KEY, 1);
+                    nvs_commit(nvs_h);
+                    nvs_close(nvs_h);
+                    ESP_LOGI(TAG, "mqtt_pend NVS flag set — LED2 will blink on next boot until MQTT confirms");
+                }
+
                 // Transition to CONNECTED - AP stays active for browser to show restart button
                 // Device will restart when user clicks restart button
                 transition_to(WIFI_STATE_AP_ACTIVE_CONNECTED);
@@ -843,13 +890,12 @@ static void process_connecting(void)
 
 /**
  * Process CONNECTED state
- * Successfully connected, waiting for restart
+ * Successfully connected, waiting for restart (provisioning flow only)
  */
 static void process_connected(void)
 {
-    // LED solid on to indicate connected
-    gpio_set_level(prov_state.led_pin, 1);
-
+    // LED1/LED2 in normal operation are driven by the main loop.
+    // During provisioning restart-pending, LED1 is set solid by process_led().
     // Device is ready - waiting for user to click restart
     // HTTP server will call wifi_provisioning_restart_device() when user clicks restart
 }
@@ -860,17 +906,14 @@ static void process_connected(void)
  */
 static void process_offline(void)
 {
-    // LED off to indicate offline
-    gpio_set_level(prov_state.led_pin, 0);
-
-    // Offline operation continues normally
+    // LED1/LED2 driven by main loop in normal operation.
 }
 
 // ============================================================================
 // PUBLIC API IMPLEMENTATION
 // ============================================================================
 
-esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout_ms)
+esp_err_t wifi_provisioning_init(gpio_num_t led1_pin, gpio_num_t led2_pin, uint32_t connection_timeout_ms)
 {
     if (prov_state.initialized)
     {
@@ -881,27 +924,27 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
     ESP_LOGI(TAG, "Initializing WiFi provisioning system");
 
     // Validate parameters
-    if (led_pin < 0 || led_pin >= GPIO_NUM_MAX)
+    if (led1_pin < 0 || led1_pin >= GPIO_NUM_MAX)
     {
-        ESP_LOGE(TAG, "Invalid LED pin: %d", led_pin);
+        ESP_LOGE(TAG, "Invalid LED1 pin: %d", led1_pin);
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (led2_pin < 0 || led2_pin >= GPIO_NUM_MAX)
+    {
+        ESP_LOGE(TAG, "Invalid LED2 pin: %d", led2_pin);
         return ESP_ERR_INVALID_ARG;
     }
 
     // Store configuration
-    prov_state.led_pin               = led_pin;
+    prov_state.led1_pin              = led1_pin;
+    prov_state.led2_pin              = led2_pin;
     prov_state.connection_timeout_ms = connection_timeout_ms;
     prov_state.led_blink_interval_ms = LED_BLINK_INTERVAL_MS;
 
-    // Configure LED GPIO (if not already configured by main app)
-    gpio_config_t led_config = {
-        .pin_bit_mask = (1ULL << led_pin),
-        .mode         = GPIO_MODE_OUTPUT,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&led_config);
-    gpio_set_level(led_pin, 0);
+    // LED GPIO is configured by gpio_init() in lighthouse.c before this call;
+    // ensure both LEDs start off.
+    gpio_set_level(led1_pin, 0);
+    gpio_set_level(led2_pin, 0);
 
     // Initialize default NVS partition (for provisioning flags)
     esp_err_t ret = nvs_flash_init();
@@ -924,6 +967,22 @@ esp_err_t wifi_provisioning_init(gpio_num_t led_pin, uint32_t connection_timeout
     {
         ESP_LOGW(TAG, "WiFi settings storage init failed: %s", settings_storage_error_to_string(storage_ret));
         // Continue anyway - device can still work in setup mode
+    }
+
+    // Check if we're in post-provisioning boot: LED2 should blink until MQTT confirms
+    {
+        nvs_handle_t nvs_h;
+        esp_err_t    nvs_ret = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_h);
+        if (nvs_ret == ESP_OK)
+        {
+            uint8_t mqtt_pend = 0;
+            if (nvs_get_u8(nvs_h, MQTT_PEND_NVS_KEY, &mqtt_pend) == ESP_OK && mqtt_pend == 1)
+            {
+                prov_state.led2_prov_pending = true;
+                ESP_LOGI(TAG, "Post-provisioning boot: LED2 will blink until MQTT confirmed");
+            }
+            nvs_close(nvs_h);
+        }
     }
 
     // Determine initial state
@@ -1187,4 +1246,36 @@ void wifi_provisioning_restart_device(void)
     esp_restart();
 
     // Code below never executes
+}
+
+void wifi_provisioning_notify_mqtt_connected(void)
+{
+    if (!prov_state.led2_prov_pending)
+    {
+        return; // nothing to do
+    }
+
+    ESP_LOGI(TAG, "MQTT confirmed — LED2 provisioning milestone complete");
+
+    // Clear the NVS persistence flag
+    nvs_handle_t nvs_h;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_h) == ESP_OK)
+    {
+        nvs_set_u8(nvs_h, MQTT_PEND_NVS_KEY, 0);
+        nvs_commit(nvs_h);
+        nvs_close(nvs_h);
+    }
+
+    // Set LED2 solid briefly to signal milestone, then release control to main loop
+    gpio_set_level(prov_state.led2_pin, 1);
+    prov_state.led2_state        = 1;
+    prov_state.led2_prov_pending = false;
+}
+
+bool wifi_provisioning_is_led2_controlled(void)
+{
+    bool in_ap_mode =
+        (prov_state.current_state == WIFI_STATE_AP_ACTIVE || prov_state.current_state == WIFI_STATE_CONNECTING ||
+         prov_state.current_state == WIFI_STATE_AP_ACTIVE_CONNECTED);
+    return in_ap_mode || prov_state.led2_prov_pending;
 }
