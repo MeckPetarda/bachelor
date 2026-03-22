@@ -20,6 +20,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 #include "offline_event_logger.h"
 #include "rfid_reader.h"
 #include "sdkconfig.h"
@@ -75,6 +76,15 @@ static char s_device_mac[MQTT_MAC_STR_LEN] = {0};
  * Size: base (22) + MAC (17) + "/" (1) + suffix (max ~20) + null = ~64 bytes, using 128 for safety
  */
 static char s_topic_buffer[128] = {0};
+
+/**
+ * Scan batch accumulator state
+ */
+static rfid_tag_event_t   s_batch_entries[MQTT_SCAN_BATCH_MAX_ENTRIES];
+static uint32_t           s_batch_count       = 0;
+static SemaphoreHandle_t  s_batch_mutex       = NULL;
+static esp_timer_handle_t s_batch_timer       = NULL;
+static uint32_t           s_batch_interval_ms = MQTT_SCAN_BATCH_INTERVAL_MS_DEFAULT;
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -175,7 +185,7 @@ static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t of
 
     char payload[512];
     int  len = snprintf(payload, sizeof(payload),
-                        "{"
+                        "[{"
                          "\"epc\":\"%s\","
                          "\"timestampMs\":%lld,"
                          "\"rssiDbm\":%d,"
@@ -185,7 +195,7 @@ static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t of
                          "\"offline\":true,"
                          "\"replayTime\":%llu,"
                          "\"timeBasis\":\"%s\""
-                         "}",
+                         "}]",
                         epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac,
                         replay_time_ms, time_basis);
 
@@ -206,6 +216,115 @@ static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t of
     ESP_LOGI(TAG, "Replayed offline event: %s timeBasis=%s ts=%lld (msg_id=%d)", epc_hex, time_basis, timestamp_ms,
              msg_id);
     return ESP_OK;
+}
+
+// ============================================================================
+// BATCH ACCUMULATOR
+// ============================================================================
+
+#define SCAN_BATCH_JSON_BUF_SIZE (MQTT_SCAN_BATCH_MAX_ENTRIES * 200 + 32)
+
+static void flush_scan_batch(void)
+{
+    static rfid_tag_event_t local_entries[MQTT_SCAN_BATCH_MAX_ENTRIES];
+    static char             json_buf[SCAN_BATCH_JSON_BUF_SIZE];
+
+    xSemaphoreTake(s_batch_mutex, portMAX_DELAY);
+
+    if (s_batch_count == 0)
+    {
+        xSemaphoreGive(s_batch_mutex);
+        return;
+    }
+
+    uint32_t count = s_batch_count;
+    memcpy(local_entries, s_batch_entries, count * sizeof(rfid_tag_event_t));
+    s_batch_count = 0;
+
+    xSemaphoreGive(s_batch_mutex);
+
+    // Compute timestamp and time basis once for the batch window
+    time_quality_t quality    = time_sync_get_quality();
+    const char    *time_basis = "relative";
+    int64_t        timestamp_ms;
+
+    if (quality == TIME_QUALITY_SYNCED)
+    {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        timestamp_ms = (int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000;
+        time_basis   = "synced";
+    }
+    else
+    {
+        timestamp_ms = (int64_t)(esp_timer_get_time() / 1000);
+        time_basis   = (quality == TIME_QUALITY_ESTIMATED) ? "estimated" : "relative";
+    }
+
+    // Build JSON array
+    int pos = 0;
+    pos += snprintf(json_buf + pos, sizeof(json_buf) - pos, "[");
+
+    uint32_t entries_written = 0;
+    for (uint32_t i = 0; i < count; i++)
+    {
+        char epc_hex[65];
+        epc_to_hex_string(local_entries[i].epc, local_entries[i].epc_len, epc_hex);
+        int rssi_dbm = rssi_to_dbm(local_entries[i].rssi);
+
+        char entry[200];
+        int  entry_len = snprintf(entry, sizeof(entry),
+                                  "%s{"
+                                   "\"epc\":\"%s\","
+                                   "\"timestampMs\":%lld,"
+                                   "\"rssiDbm\":%d,"
+                                   "\"antennaId\":%u,"
+                                   "\"frequency\":%u,"
+                                   "\"deviceId\":\"%s\","
+                                   "\"offline\":false,"
+                                   "\"timeBasis\":\"%s\""
+                                   "}",
+                                 i > 0 ? "," : "", epc_hex, timestamp_ms, rssi_dbm, local_entries[i].antenna_id,
+                                  local_entries[i].frequency, s_device_mac, time_basis);
+
+        // +2: closing "]" and null terminator
+        if (pos + entry_len + 2 > (int)sizeof(json_buf))
+        {
+            ESP_LOGW(TAG, "Scan batch JSON truncated at entry %lu/%lu", i, count);
+            break;
+        }
+
+        memcpy(json_buf + pos, entry, entry_len);
+        pos += entry_len;
+        entries_written++;
+    }
+
+    pos += snprintf(json_buf + pos, sizeof(json_buf) - pos, "]");
+
+    char scans_topic[128];
+    snprintf(scans_topic, sizeof(scans_topic), "%s%s/scans", MQTT_TOPIC_BASE, s_device_mac);
+
+    int msg_id = esp_mqtt_client_enqueue(s_mqtt_client, scans_topic, json_buf, pos, MQTT_QOS_TAG_EVENTS_LIVE, 0, true);
+
+    if (msg_id == -2)
+    {
+        ESP_LOGW(TAG, "MQTT outbox full - scan batch dropped (%lu entries)", entries_written);
+        s_stats.publish_errors++;
+    }
+    else if (msg_id < 0)
+    {
+        ESP_LOGE(TAG, "Failed to enqueue scan batch (%lu entries)", entries_written);
+        s_stats.publish_errors++;
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Published tag event batch: %lu entries (msg_id=%d)", entries_written, msg_id);
+    }
+}
+
+static void batch_timer_callback(void *arg)
+{
+    flush_scan_batch();
 }
 
 // ============================================================================
@@ -501,6 +620,44 @@ esp_err_t mqtt_client_init(void)
     memset(&s_stats, 0, sizeof(s_stats));
     s_stats.state = MQTT_STATE_CONNECTING;
 
+    // ========================================================================
+    // STEP 8: Initialize Scan Batch Timer
+    // ========================================================================
+
+    settings_storage_error_t batch_err = scan_batch_settings_load(&s_batch_interval_ms);
+    if (batch_err != SETTINGS_STORAGE_OK)
+    {
+        ESP_LOGW(TAG, "Failed to load scan batch interval, using default %d ms", MQTT_SCAN_BATCH_INTERVAL_MS_DEFAULT);
+        s_batch_interval_ms = MQTT_SCAN_BATCH_INTERVAL_MS_DEFAULT;
+    }
+    ESP_LOGI(TAG, "Scan batch interval: %lu ms", s_batch_interval_ms);
+
+    s_batch_mutex = xSemaphoreCreateMutex();
+    if (s_batch_mutex == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create batch mutex");
+        return ESP_FAIL;
+    }
+
+    esp_timer_create_args_t timer_args = {
+        .callback = batch_timer_callback,
+        .arg      = NULL,
+        .name     = "scan_batch",
+    };
+    ret = esp_timer_create(&timer_args, &s_batch_timer);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to create scan batch timer: %s", esp_err_to_name(ret));
+        return ESP_FAIL;
+    }
+
+    ret = esp_timer_start_periodic(s_batch_timer, (uint64_t)s_batch_interval_ms * 1000);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to start scan batch timer: %s", esp_err_to_name(ret));
+        return ESP_FAIL;
+    }
+
     ESP_LOGI(TAG, "MQTT client initialized successfully");
     ESP_LOGI(TAG, "Waiting for connection to broker...");
 
@@ -559,25 +716,42 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
         return ESP_FAIL;
     }
 
+    if (!offline)
+    {
+        // ====================================================================
+        // Live path: accumulate into batch buffer
+        // ====================================================================
+        xSemaphoreTake(s_batch_mutex, portMAX_DELAY);
+
+        if (s_batch_count == MQTT_SCAN_BATCH_MAX_ENTRIES)
+        {
+            // Buffer full — flush immediately before adding the new event
+            xSemaphoreGive(s_batch_mutex);
+            flush_scan_batch();
+            xSemaphoreTake(s_batch_mutex, portMAX_DELAY);
+        }
+
+        s_batch_entries[s_batch_count] = *event;
+        s_batch_count++;
+
+        xSemaphoreGive(s_batch_mutex);
+        return ESP_OK;
+    }
+
     // ========================================================================
-    // Format Tag Data as JSON
+    // Offline (replay) path: publish single-element array at QoS 2
     // ========================================================================
 
-    // Convert EPC to hex string
-    char epc_hex[65]; // Max 32 bytes * 2 + null terminator
+    char epc_hex[65];
     epc_to_hex_string(event->epc, event->epc_len, epc_hex);
-
-    // Convert RSSI to dBm
     int rssi_dbm = rssi_to_dbm(event->rssi);
 
-    // Determine timeBasis and timestampMs based on current time quality
     time_quality_t quality    = time_sync_get_quality();
     const char    *time_basis = "relative";
     int64_t        timestamp_ms;
 
     if (quality == TIME_QUALITY_SYNCED)
     {
-        // Wall-clock time is authoritative: use real Unix milliseconds
         struct timeval tv;
         gettimeofday(&tv, NULL);
         timestamp_ms = (int64_t)tv.tv_sec * 1000 + (int64_t)tv.tv_usec / 1000;
@@ -585,81 +759,45 @@ esp_err_t mqtt_client_publish_tag_event(const rfid_tag_event_t *event, bool offl
     }
     else
     {
-        // No authoritative time: use boot-relative milliseconds
         timestamp_ms = (int64_t)(esp_timer_get_time() / 1000);
         time_basis   = (quality == TIME_QUALITY_ESTIMATED) ? "estimated" : "relative";
     }
 
-    // Build JSON payload
-    char payload[512];
-    int  len;
+    uint64_t replay_time = (uint64_t)(esp_timer_get_time() / 1000);
+    char     payload[512];
+    int      len = snprintf(payload, sizeof(payload),
+                            "[{"
+                                 "\"epc\":\"%s\","
+                                 "\"timestampMs\":%lld,"
+                                 "\"rssiDbm\":%d,"
+                                 "\"antennaId\":%u,"
+                                 "\"frequency\":%u,"
+                                 "\"deviceId\":\"%s\","
+                                 "\"offline\":true,"
+                                 "\"replayTime\":%llu,"
+                                 "\"timeBasis\":\"%s\""
+                                 "}]",
+                            epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac, replay_time,
+                            time_basis);
 
-    if (offline)
+    if (len >= (int)sizeof(payload))
     {
-        // Include offline flag and replay timestamp
-        uint64_t replay_time = (uint64_t)(esp_timer_get_time() / 1000);
-        len                  = snprintf(payload, sizeof(payload),
-                                        "{"
-                                                         "\"epc\":\"%s\","
-                                                         "\"timestampMs\":%lld,"
-                                                         "\"rssiDbm\":%d,"
-                                                         "\"antennaId\":%u,"
-                                                         "\"frequency\":%u,"
-                                                         "\"deviceId\":\"%s\","
-                                                         "\"offline\":true,"
-                                                         "\"replayTime\":%llu,"
-                                                         "\"timeBasis\":\"%s\""
-                                                         "}",
-                                        epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac, replay_time,
-                                        time_basis);
-    }
-    else
-    {
-        // Real-time event (offline = false)
-        len = snprintf(payload, sizeof(payload),
-                       "{"
-                       "\"epc\":\"%s\","
-                       "\"timestampMs\":%lld,"
-                       "\"rssiDbm\":%d,"
-                       "\"antennaId\":%u,"
-                       "\"frequency\":%u,"
-                       "\"deviceId\":\"%s\","
-                       "\"offline\":false,"
-                       "\"timeBasis\":\"%s\""
-                       "}",
-                       epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac, time_basis);
+        ESP_LOGW(TAG, "Offline replay payload truncated");
     }
 
-    if (len >= sizeof(payload))
+    char scans_topic[128];
+    snprintf(scans_topic, sizeof(scans_topic), "%s%s/scans", MQTT_TOPIC_BASE, s_device_mac);
+
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, scans_topic, payload, 0, MQTT_QOS_TAG_EVENTS, 0);
+    if (msg_id < 0)
     {
-        ESP_LOGW(TAG, "Payload truncated");
-    }
-
-    // ========================================================================
-    // Publish to MQTT Broker with QoS 2
-    // ========================================================================
-
-    const char *scans_topic = mqtt_client_get_topic("scans");
-    int         msg_id      = esp_mqtt_client_enqueue(s_mqtt_client, scans_topic, payload,
-                                                      0,                   // Use default length
-                                                      MQTT_QOS_TAG_EVENTS, // QoS 2
-                                                      0,                   // Don't retain
-                                                      true);               // Store in outbox
-
-    if (msg_id == -2)
-    {
-        ESP_LOGW(TAG, "MQTT outbox full - cannot enqueue tag event");
+        ESP_LOGE(TAG, "Failed to publish offline replay event");
         s_stats.publish_errors++;
         return ESP_FAIL;
     }
-    else if (msg_id < 0)
-    {
-        ESP_LOGE(TAG, "Failed to enqueue tag event");
-        s_stats.publish_errors++;
-        return ESP_FAIL;
-    }
-    ESP_LOGI(TAG, "Published tag event: %s (msg_id=%d)", epc_hex, msg_id);
 
+    ESP_LOGI(TAG, "Published offline replay event: %s timeBasis=%s ts=%lld (msg_id=%d)", epc_hex, time_basis,
+             timestamp_ms, msg_id);
     return ESP_OK;
 }
 

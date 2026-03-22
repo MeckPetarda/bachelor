@@ -13,26 +13,27 @@ export function createLogger(
   minLevel: LogLevel = LogLevel.INFO,
 ) {
   const shouldLog = (level: LogLevel) => level >= minLevel;
+  const ts = () => new Date().toLocaleTimeString("en-GB");
 
   return {
     debug: (message: string, ...args: unknown[]) => {
       if (shouldLog(LogLevel.DEBUG) && getConfig().nodeEnv === "development") {
-        console.log(`[${namespace}] DEBUG: ${message}`, ...args);
+        console.log(`[${ts()}] [${namespace}] DEBUG: ${message}`, ...args);
       }
     },
     info: (message: string, ...args: unknown[]) => {
       if (shouldLog(LogLevel.INFO)) {
-        console.log(`[${namespace}] ${message}`, ...args);
+        console.log(`[${ts()}] [${namespace}] ${message}`, ...args);
       }
     },
     warn: (message: string, ...args: unknown[]) => {
       if (shouldLog(LogLevel.WARN)) {
-        console.warn(`[${namespace}] WARN: ${message}`, ...args);
+        console.warn(`[${ts()}] [${namespace}] WARN: ${message}`, ...args);
       }
     },
     error: (message: string, ...args: unknown[]) => {
       if (shouldLog(LogLevel.ERROR)) {
-        console.error(`[${namespace}] ERROR: ${message}`, ...args);
+        console.error(`[${ts()}] [${namespace}] ERROR: ${message}`, ...args);
       }
     },
   };

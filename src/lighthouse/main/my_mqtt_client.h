@@ -64,8 +64,12 @@
  * Per thesis requirement: QoS 2 for attendance events (guaranteed delivery)
  */
 #define MQTT_QOS_TAG_EVENTS      2 // QoS 2: Exactly Once
+#define MQTT_QOS_TAG_EVENTS_LIVE 1 // QoS 1: At Least Once (live scan path only)
 #define MQTT_QOS_HEALTH_METRICS  0 // QoS 0: At Most Once
 #define MQTT_QOS_CONFIG_COMMANDS 1 // QoS 1: At Least Once
+
+#define MQTT_SCAN_BATCH_INTERVAL_MS_DEFAULT 150
+#define MQTT_SCAN_BATCH_MAX_ENTRIES         64
 
 // ============================================================================
 // DATA STRUCTURES

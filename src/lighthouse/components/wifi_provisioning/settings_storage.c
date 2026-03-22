@@ -30,8 +30,9 @@ static const char *TAG = "SETTINGS_STORAGE";
 #define NVS_SSID_KEY       "ssid_enc"
 #define NVS_PASSWORD_KEY   "pass_enc"
 
-#define NVS_BROKER_IP_KEY   "mqtt_ip"
-#define NVS_BROKER_PORT_KEY "mqtt_port"
+#define NVS_BROKER_IP_KEY     "mqtt_ip"
+#define NVS_BROKER_PORT_KEY   "mqtt_port"
+#define NVS_SCAN_BATCH_MS_KEY "scan_batch_ms"
 
 #define SSID_MAX_LEN     31 // 32 with null terminator
 #define PASSWORD_MIN_LEN 8  // WPA2 requirement
@@ -524,6 +525,80 @@ settings_storage_error_t mqtt_settings_save(const char *broker_ip, uint16_t brok
 
     ESP_LOGI(TAG, "MQTT config saved: %s:%u", broker_ip, broker_port);
 
+    return SETTINGS_STORAGE_OK;
+}
+
+settings_storage_error_t scan_batch_settings_load(uint32_t *batch_ms)
+{
+    if (!batch_ms)
+    {
+        return SETTINGS_STORAGE_INVALID_PARAM;
+    }
+
+    if (!nvs_initialized)
+    {
+        *batch_ms = MQTT_DEFAULT_SCAN_BATCH_MS;
+        return SETTINGS_STORAGE_OK;
+    }
+
+    uint32_t  value = 0;
+    esp_err_t ret   = nvs_get_u32(settings_storage_nvs_handle, NVS_SCAN_BATCH_MS_KEY, &value);
+    if (ret == ESP_ERR_NVS_NOT_FOUND)
+    {
+        *batch_ms = MQTT_DEFAULT_SCAN_BATCH_MS;
+        return SETTINGS_STORAGE_OK;
+    }
+    else if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to read scan batch ms: %s", esp_err_to_name(ret));
+        *batch_ms = MQTT_DEFAULT_SCAN_BATCH_MS;
+        return SETTINGS_STORAGE_OK;
+    }
+
+    if (value < 50)
+    {
+        ESP_LOGW(TAG, "scan_batch_ms %lu below minimum, clamping to 50", value);
+        value = 50;
+    }
+    else if (value > 2000)
+    {
+        ESP_LOGW(TAG, "scan_batch_ms %lu above maximum, clamping to 2000", value);
+        value = 2000;
+    }
+
+    *batch_ms = value;
+    return SETTINGS_STORAGE_OK;
+}
+
+settings_storage_error_t scan_batch_settings_save(uint32_t batch_ms)
+{
+    if (batch_ms < 50 || batch_ms > 2000)
+    {
+        ESP_LOGE(TAG, "scan_batch_ms %lu out of range (50-2000)", batch_ms);
+        return SETTINGS_STORAGE_INVALID_PARAM;
+    }
+
+    if (!nvs_initialized)
+    {
+        ESP_LOGE(TAG, "NVS not initialized");
+        return SETTINGS_STORAGE_WRITE_ERROR;
+    }
+
+    esp_err_t ret = nvs_set_u32(settings_storage_nvs_handle, NVS_SCAN_BATCH_MS_KEY, batch_ms);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to write scan_batch_ms: %s", esp_err_to_name(ret));
+        return SETTINGS_STORAGE_WRITE_ERROR;
+    }
+
+    ret = nvs_commit(settings_storage_nvs_handle);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to commit scan_batch_ms: %s", esp_err_to_name(ret));
+        return SETTINGS_STORAGE_WRITE_ERROR;
+    }
+
+    ESP_LOGI(TAG, "Saved scan_batch_ms: %lu", batch_ms);
     return SETTINGS_STORAGE_OK;
 }
 

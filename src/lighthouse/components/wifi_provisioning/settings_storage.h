@@ -32,8 +32,9 @@ typedef enum
 // CONFIGURATION DEFAULTS
 // ============================================================================
 
-#define MQTT_DEFAULT_BROKER_IP   "192.168.1.1"
-#define MQTT_DEFAULT_BROKER_PORT 1883
+#define MQTT_DEFAULT_BROKER_IP     "192.168.1.1"
+#define MQTT_DEFAULT_BROKER_PORT   1883
+#define MQTT_DEFAULT_SCAN_BATCH_MS 150
 
 #define MQTT_BROKER_IP_MAX_LEN 15 // "255.255.255.255"
 
@@ -173,6 +174,27 @@ settings_storage_error_t mqtt_settings_load(mqtt_broker_config_t *config);
  *         MQTT_STORAGE_WRITE_ERROR if write to NVS fails
  */
 settings_storage_error_t mqtt_settings_save(const char *broker_ip, uint16_t broker_port);
+
+/**
+ * Load scan batch interval from NVS
+ *
+ * Reads the batch interval in milliseconds. If the key doesn't exist,
+ * returns MQTT_DEFAULT_SCAN_BATCH_MS. Values are clamped to 50-2000ms.
+ *
+ * @param batch_ms Output: batch interval in milliseconds (must not be NULL)
+ * @return SETTINGS_STORAGE_OK on success
+ */
+settings_storage_error_t scan_batch_settings_load(uint32_t *batch_ms);
+
+/**
+ * Save scan batch interval to NVS
+ *
+ * @param batch_ms Batch interval in milliseconds (must be 50-2000)
+ * @return SETTINGS_STORAGE_OK on success
+ *         SETTINGS_STORAGE_INVALID_PARAM if out of range
+ *         SETTINGS_STORAGE_WRITE_ERROR if write fails
+ */
+settings_storage_error_t scan_batch_settings_save(uint32_t batch_ms);
 
 /**
  * Validate IPv4 address format

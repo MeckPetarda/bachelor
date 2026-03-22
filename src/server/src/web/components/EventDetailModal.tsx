@@ -505,7 +505,7 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                     <div class={styles.kvRow}>
                       <span class={styles.kvLabel}>Cluster span</span>
                       <span class={styles.kvValue}>
-                        {fmtTime(d().event.clusterStartedAt)} ->{" "}
+                        {fmtTime(d().event.clusterStartedAt)} {"-> "}
                         {fmtTime(d().event.clusterEndedAt)} (
                         {fmtDuration(
                           new Date(d().event.clusterEndedAt).getTime() -
@@ -553,7 +553,7 @@ export const EventDetailModal: Component<EventDetailModalProps> = (props) => {
                       <div class={styles.companion}>
                         <span>
                           Also analyzed by{" "}
-                          <strong>{algoFull(comp().algorithmId)}</strong> ->{" "}
+                          <strong>{algoFull(comp().algorithmId)}</strong> {"-> "}
                           confidence {Math.round(comp().confidence * 100)}%
                         </span>
                         <button
