@@ -34,11 +34,12 @@ static const char *TAG = "RFID";
 #define R300_CMD_INVENTORY_SINGLE 0x8B
 #define R300_CMD_STOP_INVENTORY   0x70
 
-#define DEFAULT_READ_INTERVAL_MS 250
-#define MIN_READ_INTERVAL_MS     50
-#define HANDSHAKE_TIMEOUT_MS     1000
-#define POWER_ON_GRACE_PERIOD_MS 500
-#define HEALTH_CHECK_INTERVAL_MS 60000
+#define DEFAULT_READ_INTERVAL_MS   10   // delay between 0x89 rounds
+#define MIN_READ_INTERVAL_MS       10   // 10ms minimum per DEVLOG_2025_12_17
+#define R300_REAL_TIME_CHANNEL_ALL 0xFF // All channels, fastest mode (30-50ms rounds)
+#define HANDSHAKE_TIMEOUT_MS       1000
+#define POWER_ON_GRACE_PERIOD_MS   500
+#define HEALTH_CHECK_INTERVAL_MS   60000
 
 #define R300_MAX_FRAME_SIZE        256
 #define UART_RX_TASK_STACK         4096
@@ -118,8 +119,8 @@ static esp_err_t send_command(uint8_t cmd, const uint8_t *data, uint8_t data_len
 }
 
 /**
- * Parse single inventory response
- * Per section 2.2.6 (command 0x8B):
+ * Parse real-time inventory tag detection packet
+ * Per section 2.2.8 (command 0x89):
  * [Head][Len][Address][Cmd][Freq_Ant][PC(2)][EPC(N)][RSSI][Check]
  *
  * Validation per R300 protocol V2.2:
@@ -127,7 +128,7 @@ static esp_err_t send_command(uint8_t cmd, const uint8_t *data, uint8_t data_len
  * - Minimum EPC length: 8 bytes (standard C1G2)
  * - EPC length is extracted from PC word bits 15-11 (word count)
  */
-static bool parse_inventory_response(const uint8_t *data, uint16_t len, rfid_tag_event_t *event)
+static bool parse_realtime_tag(const uint8_t *data, uint16_t len, rfid_tag_event_t *event)
 {
     // Minimum valid frame: Head(1) + Len(1) + Addr(1) + Cmd(1) +
     //                      Freq_Ant(1) + PC(2) + EPC(min 8) + RSSI(1) +
@@ -139,8 +140,8 @@ static bool parse_inventory_response(const uint8_t *data, uint16_t len, rfid_tag
         return false;
     }
 
-    // Verify header (accept both 0x8B and 0x89 for backwards compatibility)
-    if (data[0] != R300_FRAME_HEAD || (data[3] != R300_CMD_INVENTORY_SINGLE))
+    // Verify header
+    if (data[0] != R300_FRAME_HEAD || (data[3] != R300_CMD_REAL_TIME_INVENTORY))
     {
         ESP_LOGD(TAG, "Invalid header: 0x%02X or cmd: 0x%02X", data[0], data[3]);
         return false;
@@ -189,10 +190,7 @@ static bool parse_inventory_response(const uint8_t *data, uint16_t len, rfid_tag
     // Validate EPC length
     if (event->epc_len < 8 || event->epc_len > sizeof(event->epc))
     {
-        ESP_LOGW(TAG,
-                 "Invalid EPC length from PC: %d bytes (word count: %d, "
-                 "PC: 0x%04X)",
-                 event->epc_len, epc_word_count, pc_word);
+        ESP_LOGW(TAG, "Invalid EPC length from PC: %d bytes (PC: 0x%04X)", event->epc_len, pc_word);
         return false;
     }
 
@@ -244,19 +242,20 @@ static bool parse_inventory_response(const uint8_t *data, uint16_t len, rfid_tag
 }
 
 /**
- * Send single inventory command
- * Per section 2.2.6 (command 0x8B):
- * Performs a single read operation and returns the result
+ * Send real-time inventory command
+ * Per section 2.2.8 (command 0x89):
+ * Starts a single round that streams all detected tags with RSSI, then sends
+ * a round completion packet.
  */
 static void send_inventory_command(void)
 {
     if (rfid_state.inventory_active)
     {
-        // Single inventory command:
-        // [0xA0][0x06][0x01][0x8B][0x00][0x00][0x01][Check] Parameters:
-        // antenna mask (0x00), read time (0x00), Q value (0x01)
-        uint8_t params[3] = {0x00, 0x00, 0x01};
-        send_command(R300_CMD_INVENTORY_SINGLE, params, 3);
+        // Real-time inventory (cmd 0x89, §2.2.8, p.27)
+        // Channel=0xFF: all frequency hopping channels, fastest mode (30-50ms rounds)
+        // Tag data streamed in real time with RSSI, not buffered internally
+        uint8_t channel = R300_REAL_TIME_CHANNEL_ALL;
+        send_command(R300_CMD_REAL_TIME_INVENTORY, &channel, 1);
     }
 }
 
@@ -273,6 +272,16 @@ static void health_check_task(void *arg)
         // Wait for the health check interval
         vTaskDelay(pdMS_TO_TICKS(HEALTH_CHECK_INTERVAL_MS));
 
+        // Do not send commands on the shared UART while inventory is active.
+        // The 0x89 real-time inventory streams autonomously and any interleaved
+        // command (e.g. 0x72 firmware query) aborts the current round, causing
+        // round_in_progress to stay true permanently and killing the scan window.
+        if (rfid_state.inventory_active)
+        {
+            ESP_LOGD(TAG, "Health check skipped — inventory active");
+            continue;
+        }
+
         // Perform handshake to verify reader responsiveness
         ESP_LOGD(TAG, "Performing periodic health check...");
         rfid_reader_handshake(NULL, NULL);
@@ -287,14 +296,30 @@ static void uart_rx_task(void *arg)
 {
     uint8_t          rx_buf[R300_MAX_FRAME_SIZE];
     rfid_tag_event_t event;
-    uint32_t         last_read_time = 0;
+    uint32_t         last_read_time      = 0;
+    bool             round_in_progress   = false;
+    uint32_t         round_start_time_ms = 0;
 
-    ESP_LOGI(TAG, "RX task started (polling mode)");
+    ESP_LOGI(TAG, "RX task started (real-time inventory mode)");
 
     while (1)
     {
-        // Send inventory command at configured interval
-        if (rfid_state.inventory_active)
+        // Safety net: if a round has been "in progress" for >2s with no completion
+        // packet, the round was likely aborted or lost. Force-clear to allow retry.
+        if (round_in_progress)
+        {
+            uint32_t now = xTaskGetTickCount() * portTICK_PERIOD_MS;
+            if ((now - round_start_time_ms) > 2000)
+            {
+                ESP_LOGW(TAG, "Round timeout — no completion packet after 2000ms, resetting");
+                round_in_progress = false;
+            }
+        }
+
+        // Send 0x89 command at configured interval.
+        // Do not send while a round is in progress — 0x89 streams autonomously
+        // until the round completion packet arrives.
+        if (rfid_state.inventory_active && !round_in_progress)
         {
             uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
             uint32_t interval     = rfid_state.read_interval_ms;
@@ -302,87 +327,117 @@ static void uart_rx_task(void *arg)
             if ((current_time - last_read_time) >= interval)
             {
                 send_inventory_command();
-                last_read_time = current_time;
+                round_in_progress   = true;
+                round_start_time_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+                last_read_time      = current_time;
             }
         }
 
-        // Check for incoming data with longer timeout to get complete
-        // frames
+        // Read incoming data
         int len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(50));
 
         if (len > 0)
         {
-            // Log raw response for debugging
-            ESP_LOGD(TAG, "RX raw (%d bytes):", len);
+            ESP_LOGD(TAG, "RX raw (%d bytes)", len);
 
-            // Wait a bit more if we got a frame header but frame seems
-            // incomplete
-            if (len >= 2 && rx_buf[0] == R300_FRAME_HEAD)
+            // Multi-frame parser: each 0x89 round produces zero or more tag
+            // detection packets followed by one round completion packet.
+            // Total bytes per frame = rx_buf[offset+1] + 2.
+            int offset = 0;
+            while (offset < len)
             {
-                uint8_t expected_len = rx_buf[1] + 2; // Len field + Head + Len bytes
-                if (len < expected_len)
+                // Sync on frame header; skip garbage bytes
+                if (rx_buf[offset] != R300_FRAME_HEAD)
                 {
-                    ESP_LOGD(TAG,
-                             "Incomplete frame: got %d "
-                             "bytes, expected %d - "
-                             "waiting for "
-                             "more data",
-                             len, expected_len);
-                    vTaskDelay(pdMS_TO_TICKS(20));
-                    // Try to read remaining bytes
-                    int additional =
-                        uart_read_bytes(RFID_UART_PORT, &rx_buf[len], sizeof(rx_buf) - len, pdMS_TO_TICKS(30));
-                    if (additional > 0)
+                    offset++;
+                    continue;
+                }
+
+                // Need at least Head + Len bytes
+                if (offset + 2 > len)
+                    break;
+
+                uint8_t frame_len_field   = rx_buf[offset + 1];
+                int     frame_total_bytes = frame_len_field + 2;
+
+                // Incomplete frame — wait for more data
+                if (offset + frame_total_bytes > len)
+                    break;
+
+                // Minimum frame needs Head + Len + Addr + Cmd
+                if (frame_total_bytes < 4)
+                {
+                    offset++;
+                    continue;
+                }
+
+                // Validate checksum
+                uint8_t calc_check = r300_checksum(&rx_buf[offset], frame_total_bytes - 1);
+                if (calc_check != rx_buf[offset + frame_total_bytes - 1])
+                {
+                    ESP_LOGD(TAG, "Checksum mismatch at offset %d: calc=0x%02X recv=0x%02X", offset, calc_check,
+                             rx_buf[offset + frame_total_bytes - 1]);
+                    offset++;
+                    continue;
+                }
+
+                uint8_t cmd_byte = rx_buf[offset + 3];
+
+                if (cmd_byte == R300_CMD_REAL_TIME_INVENTORY)
+                {
+                    // Discard residual packets arriving after stop_inventory()
+                    if (!rfid_state.inventory_active)
                     {
-                        ESP_LOGD(TAG, "Read %d additional bytes", additional);
-                        len += additional;
-                        // Log updated frame
-                        ESP_LOGD(TAG, "RX complete (%d bytes):", len);
-                        printf("    ");
-                        for (int i = 0; i < len && i < 64; i++)
+                        if (frame_len_field == 0x08)
+                            round_in_progress = false;
+                        offset += frame_total_bytes;
+                        continue;
+                    }
+
+                    if (frame_len_field > 0x08)
+                    {
+                        // Tag detection packet
+                        if (parse_realtime_tag(&rx_buf[offset], frame_total_bytes, &event))
                         {
-                            printf("%02X ", rx_buf[i]);
+                            xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
+                            rfid_state.stats.total_reads++;
+                            xSemaphoreGive(rfid_state.mutex);
+
+                            if (rfid_state.tag_callback)
+                            {
+                                rfid_state.tag_callback(&event);
+                            }
+
+                            int rssi_dbm = event.rssi - 129;
+                            ESP_LOGI(TAG, "✓ Valid tag: EPC_len=%d, RSSI=%d (%d dBm), Ant=%d", event.epc_len,
+                                     event.rssi, rssi_dbm, event.antenna_id);
                         }
-                        if (len > 64)
+                        else
                         {
-                            printf("...");
+                            ESP_LOGD(TAG, "✗ Invalid tag response (filtered out)");
                         }
-                        printf("\n");
+                    }
+                    else if (frame_len_field == 0x08)
+                    {
+                        // Round completion packet:
+                        // [0xA0][0x08][Addr][0x89][Ant_ID][Total_Read(4)][Check]
+                        uint8_t  ant_id     = rx_buf[offset + 4];
+                        uint32_t total_read = ((uint32_t)rx_buf[offset + 5] << 24) |
+                                              ((uint32_t)rx_buf[offset + 6] << 16) |
+                                              ((uint32_t)rx_buf[offset + 7] << 8) | ((uint32_t)rx_buf[offset + 8]);
+                        round_in_progress = false;
+                        ESP_LOGD(TAG, "Round complete: Ant=%d TotalReads=%lu", ant_id, (unsigned long)total_read);
+                    }
+                    else if (frame_len_field == 0x05 && rx_buf[offset + 5] == 0x22)
+                    {
+                        // Antenna missing error:
+                        // [0xA0][0x05][Addr][0x89][Ant_ID][0x22][Check]
+                        round_in_progress = false;
+                        ESP_LOGE(TAG, "Antenna missing error (0x22) — check antenna connection");
                     }
                 }
-            }
 
-            // Process tag detection response
-            if (rfid_state.inventory_active && len >= 4 && rx_buf[0] == R300_FRAME_HEAD &&
-                (rx_buf[3] == R300_CMD_INVENTORY_SINGLE))
-            {
-                if (parse_inventory_response(rx_buf, len, &event))
-                {
-                    // Update stats
-                    xSemaphoreTake(rfid_state.mutex, portMAX_DELAY);
-                    rfid_state.stats.total_reads++;
-                    xSemaphoreGive(rfid_state.mutex);
-
-                    // Call user callback
-                    if (rfid_state.tag_callback)
-                    {
-                        rfid_state.tag_callback(&event);
-                    }
-
-                    // Convert RSSI to dBm for logging
-                    // Per R300 protocol: RSSI value range
-                    // 31-98 maps to -99 to -31 dBm
-                    int rssi_dbm = event.rssi - 129;
-                    ESP_LOGI(TAG,
-                             "✓ Valid tag: EPC_len=%d, "
-                             "RSSI=%d (%d dBm), Ant=%d",
-                             event.epc_len, event.rssi, rssi_dbm, event.antenna_id);
-                }
-                else
-                {
-                    ESP_LOGD(TAG, "✗ Invalid tag response "
-                                  "(filtered out)");
-                }
+                offset += frame_total_bytes;
             }
         }
 
@@ -846,21 +901,45 @@ esp_err_t rfid_reader_set_power(uint8_t power_dbm)
         return ESP_ERR_INVALID_STATE;
     }
 
-    // Clamp to valid range (20-33 dBm)
-    // Per section 2.1.7, page 12
+    // Clamp to hardware-validated range (20-25 dBm).
+    // The R300 spec allows 20-33 dBm but this hardware variant (YPD-R300)
+    // rejects values above 25 with error 0x48 (output_power_out_of_range).
     if (power_dbm < 20)
         power_dbm = 20;
-    if (power_dbm > 33)
-        power_dbm = 33;
+    if (power_dbm > 25)
+        power_dbm = 25;
+
+    // Flush RX buffer before sending to avoid stale data in response read
+    uart_flush(RFID_UART_PORT);
 
     esp_err_t ret = send_command(R300_CMD_SET_POWER, &power_dbm, 1);
+    if (ret != ESP_OK)
+        return ret;
 
-    if (ret == ESP_OK)
+    // Read response with 1-second timeout.
+    // Success: [0xA0][0x04][Addr][0x76][0x10][Check]
+    // Failure: [0xA0][0x04][Addr][0x76][Error_Code][Check]
+    // Known error codes: 0x25 (set_output_power_error),
+    //                    0x48 (output_power_out_of_range),
+    //                    0x54 (fail_to_achieve_desired_output_power)
+    uint8_t rx_buf[32];
+    int     len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+    if (len < 6 || rx_buf[0] != R300_FRAME_HEAD || rx_buf[3] != R300_CMD_SET_POWER)
     {
-        ESP_LOGI(TAG, "Set power to %d dBm", power_dbm);
+        ESP_LOGW(TAG, "Set power: no valid response (len=%d)", len);
+        return ESP_ERR_TIMEOUT;
     }
 
-    return ret;
+    uint8_t status = rx_buf[4];
+    if (status != 0x10)
+    {
+        ESP_LOGW(TAG, "Set power rejected by module: error_code=0x%02X (power=%d dBm)", status, power_dbm);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Power confirmed at %d dBm", power_dbm);
+    return ESP_OK;
 }
 
 esp_err_t rfid_reader_set_frequency_region(uint8_t region, uint8_t start_freq, uint8_t end_freq)
@@ -932,7 +1011,7 @@ esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t int
     }
     xSemaphoreGive(rfid_state.mutex);
 
-    ESP_LOGI(TAG, "Polling-based inventory started (interval=%lu ms)", interval_ms);
+    ESP_LOGI(TAG, "Real-time inventory started (interval=%lu ms between rounds)", interval_ms);
 
     // Send first command immediately
     send_inventory_command();
@@ -1052,8 +1131,12 @@ esp_err_t rfid_debug_get_frequency_region(void)
         uint8_t     region     = rx_buf[4];
         uint8_t     start_freq = rx_buf[5];
         uint8_t     end_freq   = rx_buf[6];
-        const char *region_str = (region == 0x01) ? "FCC" : (region == 0x02) ? "ETSI" : (region == 0x03) ? "CHN" : "UNKNOWN";
-        ESP_LOGI(TAG_DBG, "Frequency Region = %s (0x%02X), Start=0x%02X, End=0x%02X", region_str, region, start_freq, end_freq);
+        const char *region_str = (region == 0x01)   ? "FCC"
+                                 : (region == 0x02) ? "ETSI"
+                                 : (region == 0x03) ? "CHN"
+                                                    : "UNKNOWN";
+        ESP_LOGI(TAG_DBG, "Frequency Region = %s (0x%02X), Start=0x%02X, End=0x%02X", region_str, region, start_freq,
+                 end_freq);
         return ESP_OK;
     }
 
@@ -1135,7 +1218,8 @@ esp_err_t rfid_debug_set_ant_detector(bool enable)
         uint8_t     error_code  = rx_buf[4];
         const char *result_str  = (error_code == 0x10) ? "SUCCESS" : "FAIL";
         const char *enabled_str = enable ? "ENABLED" : "DISABLED";
-        ESP_LOGI(TAG_DBG, "Antenna Connection Detector SET to %s — result: %s (0x%02X)", enabled_str, result_str, error_code);
+        ESP_LOGI(TAG_DBG, "Antenna Connection Detector SET to %s — result: %s (0x%02X)", enabled_str, result_str,
+                 error_code);
         return (error_code == 0x10) ? ESP_OK : ESP_FAIL;
     }
 
@@ -1195,7 +1279,8 @@ void rfid_debug_continuous_rssi_inventory(uint8_t channel)
         int total_len = 0;
         while (1)
         {
-            int len = uart_read_bytes(RFID_UART_PORT, &rx_buf[total_len], sizeof(rx_buf) - total_len, pdMS_TO_TICKS(100));
+            int len =
+                uart_read_bytes(RFID_UART_PORT, &rx_buf[total_len], sizeof(rx_buf) - total_len, pdMS_TO_TICKS(100));
             if (len <= 0)
                 break;
             total_len += len;
@@ -1204,7 +1289,7 @@ void rfid_debug_continuous_rssi_inventory(uint8_t channel)
         }
 
         // Parse frame-by-frame using Len field to determine boundaries
-        int offset = 0;
+        int  offset     = 0;
         bool round_done = false;
         while (offset < total_len)
         {
@@ -1218,11 +1303,11 @@ void rfid_debug_continuous_rssi_inventory(uint8_t channel)
                 continue;
             }
 
-            uint8_t  frame_len_field  = rx_buf[offset + 1];
-            int      frame_total_bytes = frame_len_field + 2; // Len value + Head + Len byte
+            uint8_t frame_len_field   = rx_buf[offset + 1];
+            int     frame_total_bytes = frame_len_field + 2; // Len value + Head + Len byte
 
             if (offset + frame_total_bytes > total_len)
-                break; // Incomplete frame — stop parsing this round
+                break;                                       // Incomplete frame — stop parsing this round
 
             uint8_t cmd = rx_buf[offset + 3];
 
@@ -1262,8 +1347,8 @@ void rfid_debug_continuous_rssi_inventory(uint8_t channel)
                             pos += snprintf(&epc_str[pos], sizeof(epc_str) - pos, "%02X", epc_start[i]);
                         }
 
-                        ESP_LOGI(TAG_DBG, "TAG [%s] RSSI=0x%02X (%d dBm) Ant=%d Freq=0x%02X",
-                                 epc_str, rssi_raw, rssi_dbm, ant_id, freq_param);
+                        ESP_LOGI(TAG_DBG, "TAG [%s] RSSI=0x%02X (%d dBm) Ant=%d Freq=0x%02X", epc_str, rssi_raw,
+                                 rssi_dbm, ant_id, freq_param);
                     }
                 }
                 else if (frame_len_field == 0x08)
@@ -1271,10 +1356,8 @@ void rfid_debug_continuous_rssi_inventory(uint8_t channel)
                     // Inventory round completion packet
                     // §2.2.8: [Head][Len=0x08][Addr][Cmd][Ant_ID][Total_Read(4)][Check]
                     uint8_t  ant_id     = rx_buf[offset + 4];
-                    uint32_t total_read = ((uint32_t)rx_buf[offset + 5] << 24) |
-                                         ((uint32_t)rx_buf[offset + 6] << 16) |
-                                         ((uint32_t)rx_buf[offset + 7] << 8)  |
-                                         ((uint32_t)rx_buf[offset + 8]);
+                    uint32_t total_read = ((uint32_t)rx_buf[offset + 5] << 24) | ((uint32_t)rx_buf[offset + 6] << 16) |
+                                          ((uint32_t)rx_buf[offset + 7] << 8) | ((uint32_t)rx_buf[offset + 8]);
                     ESP_LOGI(TAG_DBG, "ROUND COMPLETE Ant=%d TotalReads=%lu", ant_id, (unsigned long)total_read);
                     round_done = true;
                 }
@@ -1310,8 +1393,8 @@ void rfid_debug_power_sweep(void)
     }
 
     static const char *DBG = "RFID_DBG";
-    uint8_t rx_buf[32];
-    int     len;
+    uint8_t            rx_buf[32];
+    int                len;
 
     // Test levels: 33 (max per spec), then descending to find actual ceiling
     uint8_t test_levels[] = {33, 30, 28, 26, 24, 22, 20};
@@ -1359,7 +1442,7 @@ void rfid_debug_power_sweep(void)
             if (len >= 5 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_SET_POWER)
             {
                 uint8_t     err  = rx_buf[4];
-                const char *desc = (err == 0x10) ? "SUCCESS"
+                const char *desc = (err == 0x10)   ? "SUCCESS"
                                    : (err == 0x25) ? "SET_OUTPUT_POWER_ERROR"
                                    : (err == 0x48) ? "OUTPUT_POWER_OUT_OF_RANGE"
                                    : (err == 0x54) ? "CANNOT_ACHIEVE_DESIRED_POWER"
@@ -1369,8 +1452,8 @@ void rfid_debug_power_sweep(void)
             }
             else
             {
-                ESP_LOGW(DBG, "  Unexpected frame format (head=0x%02X, cmd=0x%02X)",
-                         len > 0 ? rx_buf[0] : 0, len > 3 ? rx_buf[3] : 0);
+                ESP_LOGW(DBG, "  Unexpected frame format (head=0x%02X, cmd=0x%02X)", len > 0 ? rx_buf[0] : 0,
+                         len > 3 ? rx_buf[3] : 0);
             }
         }
         else
@@ -1394,8 +1477,7 @@ void rfid_debug_power_sweep(void)
 
         if (len >= 5 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_GET_POWER)
         {
-            ESP_LOGI(DBG, "  Readback: Output Power = %d dBm (0x%02X) %s",
-                     rx_buf[4], rx_buf[4],
+            ESP_LOGI(DBG, "  Readback: Output Power = %d dBm (0x%02X) %s", rx_buf[4], rx_buf[4],
                      (rx_buf[4] == power) ? "<-- CONFIRMED" : "<-- MISMATCH");
         }
         else

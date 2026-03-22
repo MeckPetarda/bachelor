@@ -628,7 +628,14 @@ static bool ir_trigger_start_scan(void)
         vTaskDelay(pdMS_TO_TICKS(1)); // Yield to avoid starving other tasks
     }
 
-    // Step 3: Rail confirmed — start inventory immediately, no handshake.
+    // Step 2.5: Wait for module RF subsystem to initialize after power-on.
+    // The power rail sense confirms voltage is present, but the R300 needs
+    // additional time to boot its internal firmware before it can process
+    // inventory commands. Without this delay, the first 0x89 may be silently
+    // dropped, causing a dead scan window.
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    // Step 3: Rail confirmed and stabilized — start inventory.
     esp_err_t ret = rfid_reader_start_inventory(tag_callback, 0);
     if (ret != ESP_OK)
     {

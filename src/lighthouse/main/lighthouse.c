@@ -43,10 +43,10 @@
 
 #include "battery_monitor.h"
 #include "esp_sleep.h"
-#include "nvs_flash.h"
 #include "esp_system.h"
 #include "io_controller.h"
 #include "my_mqtt_client.h"
+#include "nvs_flash.h"
 #include "offline_event_logger.h"
 #include "rfid_reader.h"
 #include "settings_storage.h"
@@ -806,10 +806,10 @@ esp_err_t init_rfid_reader()
 
     ESP_LOGI(TAG, "Configuring reader for maximum range...");
 
-    // Set maximum RF output power (33 dBm)
+    // Set maximum RF output power (25 dBm — hardware cap for YPD-R300 variant)
     // Per R300 protocol section 2.1.7, page 12
-    // Valid range: 20-33 dBm
-    uint8_t power_level = 33;
+    // Hardware valid range: 20-25 dBm (spec says 20-33 but >25 returns 0x48)
+    uint8_t power_level = 25;
 
     ret = rfid_reader_set_power(power_level);
     if (ret == ESP_OK)
@@ -875,13 +875,12 @@ void app_main(void)
     ESP_LOGI(TAG, "║  Running R300 RF diagnostics only            ║");
     ESP_LOGI(TAG, "╚══════════════════════════════════════════════╝");
 
-
     rfid_debug_power_sweep();
     vTaskDelay(pdMS_TO_TICKS(100));
 
     rfid_reader_set_power(25);
     vTaskDelay(pdMS_TO_TICKS(200));
-    rfid_debug_get_output_power();  // Should now read 33
+    rfid_debug_get_output_power(); // Should now read 33
     vTaskDelay(pdMS_TO_TICKS(100));
 
     rfid_debug_get_output_power();
@@ -894,11 +893,11 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(100));
     rfid_debug_get_ant_detector_status();
     vTaskDelay(pdMS_TO_TICKS(100));
-    rfid_debug_set_ant_detector(true);  // Enable detector before inventory
+    rfid_debug_set_ant_detector(true); // Enable detector before inventory
     vTaskDelay(pdMS_TO_TICKS(100));
 
     ESP_LOGI(TAG, "────────────────────────────────────────────────");
-    rfid_debug_continuous_rssi_inventory(0xFF);  // All channels, fastest mode
+    rfid_debug_continuous_rssi_inventory(0xFF); // All channels, fastest mode
     // Never returns
 #else
     ESP_LOGI(TAG, "════════════════════════════════════");

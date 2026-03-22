@@ -10,8 +10,8 @@
  *   - 0x76: Set output power (NEW)
  *   - 0x78: Set frequency region (NEW)
  *   - 0x7A: Set beeper mode (NEW)
- *   - 0x8B: Single inventory (polling-based tag detection)
- *   - 0x89: Real-time inventory (deprecated - not used)
+ *   - 0x89: Real-time inventory (PRIMARY scanning mode, §2.2.8)
+ *   - 0x8B: Single inventory (replaced by 0x89 for higher scan rate)
  *
  * Protocol Reference: R300_UHF_RFID_reader_module_protocol_.pdf
  *   - Section 1.2: Data Packet Definition
@@ -77,19 +77,19 @@
 
 // --- RF Debug Mode commands (R300 Protocol V2.2) ---
 // §2.1.8, p.13: Query current RF output power
-#define R300_CMD_GET_POWER              0x77
+#define R300_CMD_GET_POWER 0x77
 // §2.1.10, p.13: Query current RF frequency region
-#define R300_CMD_GET_FREQUENCY          0x79
+#define R300_CMD_GET_FREQUENCY 0x79
 // §2.1.6, p.11: Query current working antenna
-#define R300_CMD_GET_WORK_ANTENNA       0x75
+#define R300_CMD_GET_WORK_ANTENNA 0x75
 // §2.1.18, p.20: Query antenna connection detector status
-#define R300_CMD_GET_ANT_DETECTOR       0x63
+#define R300_CMD_GET_ANT_DETECTOR 0x63
 // §2.1.17, p.19: Set antenna connection detector on/off
-#define R300_CMD_SET_ANT_DETECTOR       0x62
+#define R300_CMD_SET_ANT_DETECTOR 0x62
 // §2.1.12, p.14: Query reader internal temperature
-#define R300_CMD_GET_TEMPERATURE        0x7B
+#define R300_CMD_GET_TEMPERATURE 0x7B
 // §2.2.8, p.27: Real-time inventory (streams tag data with RSSI)
-#define R300_CMD_REAL_TIME_INVENTORY    0x89
+#define R300_CMD_REAL_TIME_INVENTORY 0x89
 
 // Mode values persisted to internal flash on success (Section 2.1.11)
 #define R300_BEEPER_MODE_QUIET     0x00 // Silent — no beep on any event
@@ -289,12 +289,16 @@ esp_err_t rfid_reader_set_beeper_mode(uint8_t mode);
  * Set RF output power
  *
  * Configure transmit power for maximum range.
- * Valid range: 20-33 dBm (will be clamped if out of range)
+ * Valid range for this hardware variant: 20-25 dBm (will be clamped if out of range).
+ * Note: the R300 specification states 20-33 dBm, but the YPD-R300 variant used
+ * in this project rejects values above 25 with error 0x48 (output_power_out_of_range).
+ * This function reads the module response and returns ESP_FAIL if the module rejects
+ * the value, or ESP_ERR_TIMEOUT if no response is received.
  *
  * Per section 2.1.7, page 12.
  *
- * @param power_dbm Power level in dBm (20-33)
- * @return ESP_OK on success
+ * @param power_dbm Power level in dBm (20-25 for this hardware; clamped to range)
+ * @return ESP_OK on success, ESP_FAIL if module rejected value, ESP_ERR_TIMEOUT if no response
  */
 esp_err_t rfid_reader_set_power(uint8_t power_dbm);
 
@@ -314,21 +318,22 @@ esp_err_t rfid_reader_set_power(uint8_t power_dbm);
 esp_err_t rfid_reader_set_frequency_region(uint8_t region, uint8_t start_freq, uint8_t end_freq);
 
 /**
- * Start polling-based inventory (command-based tag detection)
+ * Start real-time inventory (streaming tag detection)
  *
- * Sends 0x8B command at a configurable interval to poll for tags.
- * Callback will be invoked for each tag detection.
- * Interval defaults to 250ms but can be configured.
+ * Sends 0x89 real-time inventory command (§2.2.8, p.27) with channel=0xFF.
+ * Each round streams all detected tags with RSSI, then emits a round completion
+ * packet. The callback is invoked for each valid tag detection.
+ * A new round is started after interval_ms delay following each completion packet.
  *
  * This is the PRIMARY MODE for attendance tracking.
  *
- * Per section 2.2.6:
- * - Single inventory command per poll
- * - Tag data retrieved after each read operation
+ * Per section 2.2.8:
+ * - Single 0x89 command starts one round; tags stream until round completion
+ * - 30-50ms per round with channel=0xFF (all frequency hopping channels)
  * - Continues until rfid_reader_stop_inventory() called
  *
- * @param callback Function to call when tag detected
- * @param interval_ms Polling interval in milliseconds (default: 250ms, min: 50ms)
+ * @param callback    Function to call when tag detected
+ * @param interval_ms Delay between rounds in milliseconds (default: 10ms, min: 10ms)
  * @return ESP_OK on success
  */
 esp_err_t rfid_reader_start_inventory(rfid_tag_callback_t callback, uint32_t interval_ms);
