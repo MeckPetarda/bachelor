@@ -75,6 +75,22 @@
 // Command byte for set beeper mode (cmd_name_set_beeper_mode)
 #define R300_CMD_SET_BEEPER_MODE 0x7A
 
+// --- RF Debug Mode commands (R300 Protocol V2.2) ---
+// §2.1.8, p.13: Query current RF output power
+#define R300_CMD_GET_POWER              0x77
+// §2.1.10, p.13: Query current RF frequency region
+#define R300_CMD_GET_FREQUENCY          0x79
+// §2.1.6, p.11: Query current working antenna
+#define R300_CMD_GET_WORK_ANTENNA       0x75
+// §2.1.18, p.20: Query antenna connection detector status
+#define R300_CMD_GET_ANT_DETECTOR       0x63
+// §2.1.17, p.19: Set antenna connection detector on/off
+#define R300_CMD_SET_ANT_DETECTOR       0x62
+// §2.1.12, p.14: Query reader internal temperature
+#define R300_CMD_GET_TEMPERATURE        0x7B
+// §2.2.8, p.27: Real-time inventory (streams tag data with RSSI)
+#define R300_CMD_REAL_TIME_INVENTORY    0x89
+
 // Mode values persisted to internal flash on success (Section 2.1.11)
 #define R300_BEEPER_MODE_QUIET     0x00 // Silent — no beep on any event
 #define R300_BEEPER_MODE_PER_ROUND 0x01 // Beep once per inventory round
@@ -343,5 +359,51 @@ esp_err_t rfid_reader_get_stats(rfid_stats_t *stats);
  * Clear statistics counters
  */
 void rfid_reader_clear_stats(void);
+
+// ============================================================================
+// RF DEBUG MODE API
+// ============================================================================
+
+/**
+ * RF Debug Mode diagnostic queries.
+ * These are intentionally simple request/response wrappers
+ * that log results directly — not designed for production use.
+ *
+ * All functions follow the same pattern:
+ *   1. Flush UART RX
+ *   2. send_command()
+ *   3. Read response with 1s timeout
+ *   4. Log the raw response and parsed value at INFO level
+ *   5. Return ESP_OK / ESP_ERR_TIMEOUT
+ */
+esp_err_t rfid_debug_get_output_power(void);
+esp_err_t rfid_debug_get_frequency_region(void);
+esp_err_t rfid_debug_get_work_antenna(void);
+esp_err_t rfid_debug_get_ant_detector_status(void);
+esp_err_t rfid_debug_set_ant_detector(bool enable);
+esp_err_t rfid_debug_get_temperature(void);
+
+/**
+ * Start real-time inventory with RSSI logging.
+ * Uses cmd 0x89 (§2.2.8) instead of the normal 0x8B single inventory.
+ * Logs every tag detection with EPC (hex), raw RSSI byte, decoded dBm,
+ * antenna ID, and frequency parameter.
+ *
+ * This function does NOT return — it loops sending 0x89 rounds and
+ * parsing responses until the device is power-cycled.
+ *
+ * @param channel  Frequency hopping channel count (0xFF = fastest/all)
+ */
+void rfid_debug_continuous_rssi_inventory(uint8_t channel);
+
+/**
+ * RF Debug: Power sweep diagnostic.
+ * Attempts to set power at 33, 30, 28, 26 dBm, logging the raw
+ * Error_Code from each set response (cmd 0x76, §2.1.7, p.12),
+ * then verifying with a readback (cmd 0x77, §2.1.8, p.13).
+ *
+ * Identifies the module's actual maximum supported power level.
+ */
+void rfid_debug_power_sweep(void);
 
 #endif // RFID_READER_H

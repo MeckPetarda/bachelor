@@ -997,3 +997,415 @@ void rfid_reader_clear_stats(void)
     rfid_state.stats.errors        = 0;
     xSemaphoreGive(rfid_state.mutex);
 }
+
+// ============================================================================
+// RF DEBUG MODE IMPLEMENTATION
+// ============================================================================
+
+static const char *TAG_DBG = "RFID_DBG";
+
+esp_err_t rfid_debug_get_output_power(void)
+{
+    if (!rfid_state.initialized)
+        return ESP_ERR_INVALID_STATE;
+
+    uart_flush(RFID_UART_PORT);
+
+    esp_err_t ret = send_command(R300_CMD_GET_POWER, NULL, 0);
+    if (ret != ESP_OK)
+        return ret;
+
+    // Expected: [0xA0][0x04][Addr][0x77][Output_Power][Check]
+    uint8_t rx_buf[32];
+    int     len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+    if (len >= 6 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_GET_POWER)
+    {
+        uint8_t power = rx_buf[4];
+        ESP_LOGI(TAG_DBG, "Output Power = %d dBm (raw: 0x%02X)", power, power);
+        if (power < 20 || power > 33)
+            ESP_LOGW(TAG_DBG, "Output power 0x%02X is outside valid range (20-33 dBm)", power);
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG_DBG, "No output power response (len=%d)", len);
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t rfid_debug_get_frequency_region(void)
+{
+    if (!rfid_state.initialized)
+        return ESP_ERR_INVALID_STATE;
+
+    uart_flush(RFID_UART_PORT);
+
+    esp_err_t ret = send_command(R300_CMD_GET_FREQUENCY, NULL, 0);
+    if (ret != ESP_OK)
+        return ret;
+
+    // Expected: [0xA0][Len][Addr][0x79][Region][StartFreq][EndFreq][Check]
+    uint8_t rx_buf[32];
+    int     len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+    if (len >= 8 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_GET_FREQUENCY)
+    {
+        uint8_t     region     = rx_buf[4];
+        uint8_t     start_freq = rx_buf[5];
+        uint8_t     end_freq   = rx_buf[6];
+        const char *region_str = (region == 0x01) ? "FCC" : (region == 0x02) ? "ETSI" : (region == 0x03) ? "CHN" : "UNKNOWN";
+        ESP_LOGI(TAG_DBG, "Frequency Region = %s (0x%02X), Start=0x%02X, End=0x%02X", region_str, region, start_freq, end_freq);
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG_DBG, "No frequency region response (len=%d)", len);
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t rfid_debug_get_work_antenna(void)
+{
+    if (!rfid_state.initialized)
+        return ESP_ERR_INVALID_STATE;
+
+    uart_flush(RFID_UART_PORT);
+
+    esp_err_t ret = send_command(R300_CMD_GET_WORK_ANTENNA, NULL, 0);
+    if (ret != ESP_OK)
+        return ret;
+
+    // Expected: [0xA0][0x04][Addr][0x75][Antenna_ID][Check]
+    uint8_t rx_buf[32];
+    int     len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+    if (len >= 6 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_GET_WORK_ANTENNA)
+    {
+        uint8_t antenna_id = rx_buf[4];
+        ESP_LOGI(TAG_DBG, "Working Antenna = Antenna %d (0x%02X)", antenna_id, antenna_id);
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG_DBG, "No working antenna response (len=%d)", len);
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t rfid_debug_get_ant_detector_status(void)
+{
+    if (!rfid_state.initialized)
+        return ESP_ERR_INVALID_STATE;
+
+    uart_flush(RFID_UART_PORT);
+
+    esp_err_t ret = send_command(R300_CMD_GET_ANT_DETECTOR, NULL, 0);
+    if (ret != ESP_OK)
+        return ret;
+
+    // Expected: [0xA0][0x04][Addr][0x63][DetectorStatus][Check]
+    uint8_t rx_buf[32];
+    int     len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+    if (len >= 6 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_GET_ANT_DETECTOR)
+    {
+        uint8_t     status     = rx_buf[4];
+        const char *status_str = (status == 0x01) ? "ENABLED" : "DISABLED";
+        ESP_LOGI(TAG_DBG, "Antenna Connection Detector = %s (0x%02X)", status_str, status);
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG_DBG, "No antenna detector status response (len=%d)", len);
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t rfid_debug_set_ant_detector(bool enable)
+{
+    if (!rfid_state.initialized)
+        return ESP_ERR_INVALID_STATE;
+
+    uart_flush(RFID_UART_PORT);
+
+    uint8_t   payload = enable ? 0x01 : 0x00;
+    esp_err_t ret     = send_command(R300_CMD_SET_ANT_DETECTOR, &payload, 1);
+    if (ret != ESP_OK)
+        return ret;
+
+    // Expected: [0xA0][0x04][Addr][0x62][Error_Code][Check]
+    uint8_t rx_buf[32];
+    int     len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+    if (len >= 6 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_SET_ANT_DETECTOR)
+    {
+        uint8_t     error_code  = rx_buf[4];
+        const char *result_str  = (error_code == 0x10) ? "SUCCESS" : "FAIL";
+        const char *enabled_str = enable ? "ENABLED" : "DISABLED";
+        ESP_LOGI(TAG_DBG, "Antenna Connection Detector SET to %s — result: %s (0x%02X)", enabled_str, result_str, error_code);
+        return (error_code == 0x10) ? ESP_OK : ESP_FAIL;
+    }
+
+    ESP_LOGW(TAG_DBG, "No antenna detector set response (len=%d)", len);
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t rfid_debug_get_temperature(void)
+{
+    if (!rfid_state.initialized)
+        return ESP_ERR_INVALID_STATE;
+
+    uart_flush(RFID_UART_PORT);
+
+    esp_err_t ret = send_command(R300_CMD_GET_TEMPERATURE, NULL, 0);
+    if (ret != ESP_OK)
+        return ret;
+
+    // Expected: [0xA0][0x04][Addr][0x7B][Temperature][Check]
+    uint8_t rx_buf[32];
+    int     len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+    if (len >= 6 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_GET_TEMPERATURE)
+    {
+        int8_t temp = (int8_t)rx_buf[4];
+        ESP_LOGI(TAG_DBG, "Module Temperature = %d °C (raw: 0x%02X)", temp, rx_buf[4]);
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG_DBG, "No temperature response (len=%d)", len);
+    return ESP_ERR_TIMEOUT;
+}
+
+void rfid_debug_continuous_rssi_inventory(uint8_t channel)
+{
+    if (!rfid_state.initialized)
+    {
+        ESP_LOGE(TAG_DBG, "Reader not initialized — cannot start continuous inventory");
+        return;
+    }
+
+    ESP_LOGI(TAG_DBG, "=== CONTINUOUS RSSI INVENTORY START (channel=0x%02X) ===", channel);
+    ESP_LOGI(TAG_DBG, "Format: [EPC_hex] RSSI=0xRR (-XX dBm) Ant=A Freq=0xFF");
+    ESP_LOGI(TAG_DBG, "Waiting for tags... (power cycle to stop)");
+
+    uint8_t rx_buf[R300_MAX_FRAME_SIZE];
+
+    while (1)
+    {
+        // Flush UART RX buffer
+        uart_flush(RFID_UART_PORT);
+
+        // Send real-time inventory command (§2.2.8) with channel parameter
+        send_command(R300_CMD_REAL_TIME_INVENTORY, &channel, 1);
+
+        // Poll for responses with 100ms timeout per read
+        int total_len = 0;
+        while (1)
+        {
+            int len = uart_read_bytes(RFID_UART_PORT, &rx_buf[total_len], sizeof(rx_buf) - total_len, pdMS_TO_TICKS(100));
+            if (len <= 0)
+                break;
+            total_len += len;
+            if (total_len >= (int)sizeof(rx_buf))
+                break;
+        }
+
+        // Parse frame-by-frame using Len field to determine boundaries
+        int offset = 0;
+        bool round_done = false;
+        while (offset < total_len)
+        {
+            // Need at least Head + Len
+            if (offset + 2 > total_len)
+                break;
+
+            if (rx_buf[offset] != R300_FRAME_HEAD)
+            {
+                offset++;
+                continue;
+            }
+
+            uint8_t  frame_len_field  = rx_buf[offset + 1];
+            int      frame_total_bytes = frame_len_field + 2; // Len value + Head + Len byte
+
+            if (offset + frame_total_bytes > total_len)
+                break; // Incomplete frame — stop parsing this round
+
+            uint8_t cmd = rx_buf[offset + 3];
+
+            if (cmd == R300_CMD_REAL_TIME_INVENTORY)
+            {
+                if (frame_len_field > 0x08)
+                {
+                    // Tag detection packet
+                    // §2.2.8 response: [Head][Len][Addr][Cmd][Freq_Ant][PC(2)][EPC(N)][RSSI][Check]
+                    uint8_t freq_ant   = rx_buf[offset + 4];
+                    uint8_t freq_param = (freq_ant >> 2) & 0x3F;
+                    uint8_t ant_id     = freq_ant & 0x03;
+
+                    // EPC length: Len - (Addr + Cmd + Freq_Ant + PC(2) + RSSI + Check) = Len - 7
+                    int epc_len = frame_len_field - 7;
+                    if (epc_len < 0)
+                        epc_len = 0;
+                    if (epc_len > 32)
+                        epc_len = 32;
+
+                    uint8_t *epc_start = &rx_buf[offset + 7];
+                    uint8_t  rssi_raw  = rx_buf[offset + 7 + epc_len];
+                    int      rssi_dbm  = rssi_raw - 129;
+
+                    // Check for antenna missing error (§3, p.39)
+                    if (rx_buf[offset + 4] == 0x22)
+                    {
+                        ESP_LOGW(TAG_DBG, "*** ANTENNA MISSING ERROR (0x22) on Ant=%d ***", ant_id);
+                    }
+                    else
+                    {
+                        // Format EPC as hex string
+                        char epc_str[96] = {0};
+                        int  pos         = 0;
+                        for (int i = 0; i < epc_len && pos < (int)sizeof(epc_str) - 3; i++)
+                        {
+                            pos += snprintf(&epc_str[pos], sizeof(epc_str) - pos, "%02X", epc_start[i]);
+                        }
+
+                        ESP_LOGI(TAG_DBG, "TAG [%s] RSSI=0x%02X (%d dBm) Ant=%d Freq=0x%02X",
+                                 epc_str, rssi_raw, rssi_dbm, ant_id, freq_param);
+                    }
+                }
+                else if (frame_len_field == 0x08)
+                {
+                    // Inventory round completion packet
+                    // §2.2.8: [Head][Len=0x08][Addr][Cmd][Ant_ID][Total_Read(4)][Check]
+                    uint8_t  ant_id     = rx_buf[offset + 4];
+                    uint32_t total_read = ((uint32_t)rx_buf[offset + 5] << 24) |
+                                         ((uint32_t)rx_buf[offset + 6] << 16) |
+                                         ((uint32_t)rx_buf[offset + 7] << 8)  |
+                                         ((uint32_t)rx_buf[offset + 8]);
+                    ESP_LOGI(TAG_DBG, "ROUND COMPLETE Ant=%d TotalReads=%lu", ant_id, (unsigned long)total_read);
+                    round_done = true;
+                }
+                else
+                {
+                    // Check for antenna missing error code in error responses
+                    if (frame_len_field >= 2 && rx_buf[offset + 4] == 0x22)
+                    {
+                        uint8_t ant_id = rx_buf[offset + 3 + 1]; // best effort
+                        ESP_LOGW(TAG_DBG, "*** ANTENNA MISSING ERROR (0x22) on Ant=%d ***", ant_id);
+                    }
+                }
+            }
+
+            offset += frame_total_bytes;
+        }
+
+        (void)round_done;
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+// ============================================================================
+// RF DEBUG: POWER SWEEP
+// ============================================================================
+
+void rfid_debug_power_sweep(void)
+{
+    if (!rfid_state.initialized)
+    {
+        ESP_LOGE("RFID_DBG", "Power sweep: reader not initialized");
+        return;
+    }
+
+    static const char *DBG = "RFID_DBG";
+    uint8_t rx_buf[32];
+    int     len;
+
+    // Test levels: 33 (max per spec), then descending to find actual ceiling
+    uint8_t test_levels[] = {33, 30, 28, 26, 24, 22, 20};
+    int     num_levels    = sizeof(test_levels) / sizeof(test_levels[0]);
+
+    ESP_LOGI(DBG, "=== POWER SWEEP START ===");
+    ESP_LOGI(DBG, "Testing set_power (cmd 0x76) with readback (cmd 0x77)");
+    ESP_LOGI(DBG, "Protocol ref: R300 V2.2, §2.1.7 p.12, §2.1.8 p.13");
+    ESP_LOGI(DBG, "Expected response: [0xA0][0x04][Addr][0x76][Error_Code][Check]");
+    ESP_LOGI(DBG, "  0x10 = command_success");
+    ESP_LOGI(DBG, "  0x25 = set_output_power_error");
+    ESP_LOGI(DBG, "  0x48 = output_power_out_of_range");
+    ESP_LOGI(DBG, "  0x54 = fail_to_achieve_desired_output_power");
+    ESP_LOGI(DBG, "");
+
+    for (int i = 0; i < num_levels; i++)
+    {
+        uint8_t power = test_levels[i];
+
+        // --- SET power ---
+        uart_flush(RFID_UART_PORT);
+        esp_err_t ret = send_command(R300_CMD_SET_POWER, &power, 1);
+        if (ret != ESP_OK)
+        {
+            ESP_LOGE(DBG, "SET_POWER(%d): send_command failed: %s", power, esp_err_to_name(ret));
+            vTaskDelay(pdMS_TO_TICKS(200));
+            continue;
+        }
+
+        len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+        // Log raw response bytes
+        if (len > 0)
+        {
+            // Build hex string for compact logging
+            char hex[96] = {0};
+            int  off     = 0;
+            for (int j = 0; j < len && off < (int)sizeof(hex) - 4; j++)
+            {
+                off += snprintf(hex + off, sizeof(hex) - off, "%02X ", rx_buf[j]);
+            }
+
+            ESP_LOGI(DBG, "SET_POWER(%d): response (%d bytes): %s", power, len, hex);
+
+            if (len >= 5 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_SET_POWER)
+            {
+                uint8_t     err  = rx_buf[4];
+                const char *desc = (err == 0x10) ? "SUCCESS"
+                                   : (err == 0x25) ? "SET_OUTPUT_POWER_ERROR"
+                                   : (err == 0x48) ? "OUTPUT_POWER_OUT_OF_RANGE"
+                                   : (err == 0x54) ? "CANNOT_ACHIEVE_DESIRED_POWER"
+                                   : (err == 0x11) ? "COMMAND_FAIL"
+                                                   : "UNKNOWN";
+                ESP_LOGI(DBG, "  Error_Code = 0x%02X (%s)", err, desc);
+            }
+            else
+            {
+                ESP_LOGW(DBG, "  Unexpected frame format (head=0x%02X, cmd=0x%02X)",
+                         len > 0 ? rx_buf[0] : 0, len > 3 ? rx_buf[3] : 0);
+            }
+        }
+        else
+        {
+            ESP_LOGW(DBG, "SET_POWER(%d): no response (timeout)", power);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(200));
+
+        // --- READBACK power ---
+        uart_flush(RFID_UART_PORT);
+        ret = send_command(R300_CMD_GET_POWER, NULL, 0);
+        if (ret != ESP_OK)
+        {
+            ESP_LOGE(DBG, "  GET_POWER: send_command failed");
+            vTaskDelay(pdMS_TO_TICKS(200));
+            continue;
+        }
+
+        len = uart_read_bytes(RFID_UART_PORT, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(1000));
+
+        if (len >= 5 && rx_buf[0] == R300_FRAME_HEAD && rx_buf[3] == R300_CMD_GET_POWER)
+        {
+            ESP_LOGI(DBG, "  Readback: Output Power = %d dBm (0x%02X) %s",
+                     rx_buf[4], rx_buf[4],
+                     (rx_buf[4] == power) ? "<-- CONFIRMED" : "<-- MISMATCH");
+        }
+        else
+        {
+            ESP_LOGW(DBG, "  Readback: no valid response (len=%d)", len);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(200));
+        ESP_LOGI(DBG, "");
+    }
+
+    ESP_LOGI(DBG, "=== POWER SWEEP COMPLETE ===");
+}

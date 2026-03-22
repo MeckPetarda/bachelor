@@ -26,6 +26,9 @@
  * - R300 Protocol: R300_UHF_RFID_reader_module_protocol_.pdf
  */
 
+// Uncomment to build RF debug firmware (replaces normal operation)
+// #define RF_DEBUG_MODE
+
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_log_level.h"
@@ -40,6 +43,7 @@
 
 #include "battery_monitor.h"
 #include "esp_sleep.h"
+#include "nvs_flash.h"
 #include "esp_system.h"
 #include "io_controller.h"
 #include "my_mqtt_client.h"
@@ -851,6 +855,52 @@ esp_err_t init_rfid_reader()
 
 void app_main(void)
 {
+#ifdef RF_DEBUG_MODE
+    // Initialize NVS (required by ESP-IDF)
+    esp_err_t nvs_ret = nvs_flash_init();
+    if (nvs_ret == ESP_ERR_NVS_NO_FREE_PAGES || nvs_ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
+        nvs_flash_erase();
+        nvs_flash_init();
+    }
+
+    rfid_reader_init();
+    rfid_reader_power_on();
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    ESP_LOGI(TAG, "╔══════════════════════════════════════════════╗");
+    ESP_LOGI(TAG, "║         LIGHTHOUSE RF DEBUG MODE             ║");
+    ESP_LOGI(TAG, "╠══════════════════════════════════════════════╣");
+    ESP_LOGI(TAG, "║  WiFi/MQTT/NTP/IR — DISABLED                ║");
+    ESP_LOGI(TAG, "║  Running R300 RF diagnostics only            ║");
+    ESP_LOGI(TAG, "╚══════════════════════════════════════════════╝");
+
+
+    rfid_debug_power_sweep();
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    rfid_reader_set_power(25);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    rfid_debug_get_output_power();  // Should now read 33
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    rfid_debug_get_output_power();
+    vTaskDelay(pdMS_TO_TICKS(100));
+    rfid_debug_get_frequency_region();
+    vTaskDelay(pdMS_TO_TICKS(100));
+    rfid_debug_get_work_antenna();
+    vTaskDelay(pdMS_TO_TICKS(100));
+    rfid_debug_get_temperature();
+    vTaskDelay(pdMS_TO_TICKS(100));
+    rfid_debug_get_ant_detector_status();
+    vTaskDelay(pdMS_TO_TICKS(100));
+    rfid_debug_set_ant_detector(true);  // Enable detector before inventory
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    ESP_LOGI(TAG, "────────────────────────────────────────────────");
+    rfid_debug_continuous_rssi_inventory(0xFF);  // All channels, fastest mode
+    // Never returns
+#else
     ESP_LOGI(TAG, "════════════════════════════════════");
     ESP_LOGI(TAG, "  ESP32 Attendance System");
     ESP_LOGI(TAG, "  with UHF RFID Reader + WiFi");
@@ -902,4 +952,5 @@ void app_main(void)
     io_start_battery_led_task();
 
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
+#endif // RF_DEBUG_MODE
 }
