@@ -25,7 +25,7 @@ export interface ScanEntry {
 }
 
 /**
- * Scan message payload — always an array of ScanEntry
+ * Scan message payload - always an array of ScanEntry
  */
 export type ScanPayload = ScanEntry[];
 
@@ -135,7 +135,7 @@ export async function handleScanMessage(
   );
 
   try {
-    // Look up lighthouse once per message — all entries share the same device
+    // Look up lighthouse once per message - all entries share the same device
     const db = getDatabase();
     const lighthouses = await db
       .select({ id: schema.lighthouses.id, name: schema.lighthouses.name })
@@ -156,7 +156,7 @@ export async function handleScanMessage(
 
       if (!validateEntry(scanData)) {
         logger.warn(
-          `Invalid scan entry at index ${i} from ${macAddress} — skipping`,
+          `Invalid scan entry at index ${i} from ${macAddress} - skipping`,
         );
         continue;
       }
@@ -239,7 +239,7 @@ export async function handleScanMessage(
 
 /**
  * Handle batch of scans (for efficiency when lighthouse sends multiple scans)
- * @deprecated Use handleScanMessage — it now accepts array payloads directly.
+ * @deprecated Use handleScanMessage - it now accepts array payloads directly.
  */
 export async function handleBatchScanMessage(
   topic: string,
