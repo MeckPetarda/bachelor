@@ -4,6 +4,16 @@
 	(generator_version "9.0")
 	(uuid "da06d120-025b-49b7-b01f-63d5447b528e")
 	(paper "A5")
+	(title_block
+		(title "UHF RFID reader")
+		(date "2026-03-25")
+		(rev "1")
+		(company "Brno University of Technology")
+		(comment 1 "Embedded Implementation of an Attendance System for Integration")
+		(comment 2 "into an Enterprise Application")
+		(comment 3 "Author: Jakub Hloušek")
+		(comment 4 "Supervisor: Ing. Michal Bastl, Ph.D")
+	)
 	(lib_symbols
 		(symbol "Device:Antenna_Shield"
 			(pin_numbers

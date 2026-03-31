@@ -4,6 +4,16 @@
 	(generator_version "9.0")
 	(uuid "db2f71e9-bb16-4313-bed5-ce9d92024494")
 	(paper "A5")
+	(title_block
+		(title "Charger submodule")
+		(date "2026-03-25")
+		(rev "1")
+		(company "Brno University of Technology")
+		(comment 1 "Embedded Implementation of an Attendance System for Integration")
+		(comment 2 "into an Enterprise Application")
+		(comment 3 "Author: Jakub Hloušek")
+		(comment 4 "Supervisor: Ing. Michal Bastl, Ph.D")
+	)
 	(lib_symbols
 		(symbol "Battery_Management:DW01A"
 			(exclude_from_sim no)
