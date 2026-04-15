@@ -1,0 +1,90 @@
+<svg viewBox="0 0 700 340" xmlns="http://www.w3.org/2000/svg" font-family="Georgia, serif" font-size="12">
+  <rect width="700" height="340" fill="#fff"/>
+  <text x="350" y="26" text-anchor="middle" font-size="14" font-weight="bold" fill="#111">Cluster Timeline — Tag Traversal Detection</text>
+
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0,8 3,0 6" fill="#374151"/>
+    </marker>
+  </defs>
+
+  <!-- Time axis -->
+  <line x1="80" y1="280" x2="660" y2="280" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="670" y="284" font-size="11" fill="#374151">time</text>
+
+  <!-- Time tick labels -->
+  <text x="80" y="296" text-anchor="middle" font-size="10" fill="#64748b">0 ms</text>
+  <text x="250" y="296" text-anchor="middle" font-size="10" fill="#64748b">1 000 ms</text>
+  <text x="420" y="296" text-anchor="middle" font-size="10" fill="#64748b">2 000 ms</text>
+  <text x="590" y="296" text-anchor="middle" font-size="10" fill="#64748b">3 000 ms</text>
+
+  <!-- Tick marks -->
+  <line x1="80" y1="278" x2="80" y2="284" stroke="#374151" stroke-width="1"/>
+  <line x1="250" y1="278" x2="250" y2="284" stroke="#374151" stroke-width="1"/>
+  <line x1="420" y1="278" x2="420" y2="284" stroke="#374151" stroke-width="1"/>
+  <line x1="590" y1="278" x2="590" y2="284" stroke="#374151" stroke-width="1"/>
+
+  <!-- Row labels -->
+  <text x="70" y="115" text-anchor="end" font-size="12" fill="#1d4ed8" font-weight="bold">Outside</text>
+  <text x="70" y="128" text-anchor="end" font-size="10" fill="#1d4ed8">(LH-A)</text>
+  <text x="70" y="195" text-anchor="end" font-size="12" fill="#15803d" font-weight="bold">Inside</text>
+  <text x="70" y="208" text-anchor="end" font-size="10" fill="#15803d">(LH-B)</text>
+
+  <!-- Row baselines -->
+  <line x1="80" y1="120" x2="650" y2="120" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="80" y1="200" x2="650" y2="200" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- Outside scans (blue ticks) — person approaches from outside, scanned first -->
+  <!-- Scans roughly 80ms–700ms -->
+  <line x1="120" y1="105" x2="120" y2="135" stroke="#1d4ed8" stroke-width="2"/>
+  <line x1="175" y1="105" x2="175" y2="135" stroke="#1d4ed8" stroke-width="2"/>
+  <line x1="215" y1="105" x2="215" y2="135" stroke="#1d4ed8" stroke-width="2"/>
+  <line x1="265" y1="105" x2="265" y2="135" stroke="#1d4ed8" stroke-width="2"/>
+  <line x1="310" y1="105" x2="310" y2="135" stroke="#1d4ed8" stroke-width="2"/>
+  <line x1="355" y1="105" x2="355" y2="135" stroke="#1d4ed8" stroke-width="2"/>
+  <line x1="395" y1="105" x2="395" y2="135" stroke="#1d4ed8" stroke-width="2"/>
+
+  <!-- Inside scans (green ticks) — person reaches inside sensor later -->
+  <!-- Scans roughly 600ms–1600ms -->
+  <line x1="330" y1="185" x2="330" y2="215" stroke="#15803d" stroke-width="2"/>
+  <line x1="375" y1="185" x2="375" y2="215" stroke="#15803d" stroke-width="2"/>
+  <line x1="420" y1="185" x2="420" y2="215" stroke="#15803d" stroke-width="2"/>
+  <line x1="465" y1="185" x2="465" y2="215" stroke="#15803d" stroke-width="2"/>
+  <line x1="510" y1="185" x2="510" y2="215" stroke="#15803d" stroke-width="2"/>
+  <line x1="555" y1="185" x2="555" y2="215" stroke="#15803d" stroke-width="2"/>
+  <line x1="595" y1="185" x2="595" y2="215" stroke="#15803d" stroke-width="2"/>
+
+  <!-- Cluster start marker -->
+  <line x1="120" y1="60" x2="120" y2="240" stroke="#374151" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="120" y="55" text-anchor="middle" font-size="10" fill="#374151">cluster start</text>
+
+  <!-- Cluster end marker (after last scan + activityTimeout) -->
+  <line x1="635" y1="60" x2="635" y2="240" stroke="#374151" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="635" y="55" text-anchor="middle" font-size="10" fill="#374151">cluster end</text>
+  <text x="635" y="44" text-anchor="middle" font-size="9" fill="#64748b">(+ activityTimeoutMs)</text>
+
+  <!-- Algorithm 1: temporal centroids (arithmetic mean) -->
+  <!-- Outside centroid ~253ms -->
+  <line x1="262" y1="90" x2="262" y2="145" stroke="#1d4ed8" stroke-width="2" stroke-dasharray="6,3"/>
+  <text x="262" y="87" text-anchor="middle" font-size="9" fill="#1d4ed8">C₁ outside</text>
+
+  <!-- Inside centroid ~490ms -->
+  <line x1="479" y1="170" x2="479" y2="225" stroke="#15803d" stroke-width="2" stroke-dasharray="6,3"/>
+  <text x="479" y="167" text-anchor="middle" font-size="9" fill="#15803d">C₁ inside</text>
+
+  <!-- Direction arrow -->
+  <line x1="262" y1="155" x2="470" y2="155" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="366" y="150" text-anchor="middle" font-size="10" fill="#374151">Δt = C₁_inside − C₁_outside → direction: IN</text>
+
+  <!-- Legend -->
+  <rect x="80" y="310" width="540" height="22" rx="3" fill="#f1f5f9" stroke="#d1d5db" stroke-width="1"/>
+  <line x1="95" y1="321" x2="115" y2="321" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="120" y="325" font-size="10" fill="#374151">Outside scans (LH-A)</text>
+  <line x1="225" y1="321" x2="245" y2="321" stroke="#15803d" stroke-width="2"/>
+  <text x="250" y="325" font-size="10" fill="#374151">Inside scans (LH-B)</text>
+  <line x1="360" y1="315" x2="380" y2="315" stroke="#374151" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="385" y="325" font-size="10" fill="#374151">Temporal centroid (Algorithm 1)</text>
+  <line x1="545" y1="315" x2="565" y2="315" stroke="#374151" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="570" y="325" font-size="10" fill="#374151">Cluster boundary</text>
+
+</svg>
