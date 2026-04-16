@@ -13,17 +13,17 @@
   employee entering a code on behalf of another); fully unsuitable for passive, hands-free operation
 - Biometric systems (fingerprint readers, facial recognition cameras) can eliminate deliberate user action but involve
   the collection and processing of sensitive personal data; classified as special category data under GDPR Article 9
-  (Regulation (EU) 2016/679); high unit cost; rejected on privacy and cost grounds `[REF: GDPR Article 9 — EUR-Lex]`
+  (Regulation (EU) 2016/679); high unit cost; rejected on privacy and cost grounds `[REF: GDPR Article 9 - EUR-Lex]`
 - Token-based systems use a physical tag or card carried by the employee; identification is passive from the employee's
   perspective; read range is the critical differentiating parameter between technologies:
-  - HF RFID (13.56 MHz, ISO 14443 / ISO 15693): 0–10 cm; requires deliberate card presentation at a reader — effectively
+  - HF RFID (13.56 MHz, ISO 14443 / ISO 15693): 0–10 cm; requires deliberate card presentation at a reader - effectively
     equivalent to PIN in user experience
   - UHF RFID (860–960 MHz, EPC Gen2 / ISO 18000-63): 1–12 m; passive tag, no battery, no user action; tag can be
     detected while carried in a bag or pocket at walking pace
 - **Conclusion:** UHF RFID is the only passive identification technology meeting the hands-free, 2–3 m range
   requirement; selected as the identification method for this system
 
-**Table 2.1-1** — Identification technology comparison
+**Table 2.1-1** - Identification technology comparison
 
 | Technology             | Read range     | User action | Sensitive data | Selected |
 | ---------------------- | -------------- | ----------- | -------------- | -------- |
@@ -32,35 +32,45 @@
 | Biometric              | Contact / ~1 m | No          | Yes            | No       |
 | UHF RFID (860–960 MHz) | 1–12 m         | No          | No             | **Yes**  |
 
-`[REF: GS1 EPC Gen2 / ISO 18000-63 standard — cite for UHF RFID protocol background]`
+`[REF: GS1 EPC Gen2 / ISO 18000-63 standard - cite for UHF RFID protocol background]`
 
 ---
 
 ## 2.2 direction detection methods
 
-- A single identification point can confirm that a person carrying a tag was present at a location, but cannot determine
-  which way they were travelling; for an attendance system distinguishing arrivals from departures, direction of
-  traversal through the portal must be established
-- The natural starting observation: if two spatially separated sensors are placed on opposite sides of a doorway, the
-  order in which they detect the same tag encodes the direction of travel — outside-first implies entry, inside-first
-  implies exit
-- This principle is technology-agnostic and applies to any detection modality (optical break-beams, pressure mats, IR
-  sensors, RFID readers); the challenge in UHF RFID specifically is that detection is probabilistic — a passive tag may
-  not respond on every interrogation cycle, so a single first-detection comparison is unreliable
-- A more robust approach is to collect all detections from both sensors over the duration of the traversal and compare
-  the temporal centre of mass (centroid) of each sensor's detection group; the sensor with the earlier centroid is the
-  one the person approached first
-- RSSI (Received Signal Strength Indicator) provides a complementary directional signal: as a person approaches a
-  reader, signal strength increases; as they move away, it decreases; the trend of RSSI over time therefore also encodes
-  direction and can be used to weight the centroid calculation or independently confirm the temporal result
-- Both approaches are well-established observations in RF sensing; this work applies them to UHF RFID portal detection
-  and implements both as parallel algorithms for empirical comparison
+- A single identification point confirms a tag was present at a location but cannot determine
+  direction of traversal; for an attendance system distinguishing arrivals from departures,
+  direction through the portal must be known
+- The fundamental principle: two spatially separated readers on opposite sides of a doorway
+  encode direction in the temporal sequence of their detections - outside-first implies entry,
+  inside-first implies exit
+- This principle is established in the literature on RFID gate systems; Oikawa (2009) proposes
+  and evaluates three temporal methods for direction estimation from two-antenna UHF RFID
+  gate data, without external sensors `[REF: Oikawa, Y. - Tag movement direction estimation
+  methods in an RFID gate system. IEEE ISWCS 2009, pp. 41–45]`
+- Naive first-read comparison (Oikawa Method 1) is unreliable: passive tags respond
+  probabilistically; occasional reads at RF null points or from reflected waves can invert the
+  apparent detection order - Oikawa demonstrates this failure mode experimentally
+- More robust: compare the temporal *centre of mass* of each antenna's full detection group
+  over the traversal window rather than a single first detection - Oikawa's Method 3 (read-count
+  weighted centroid) addresses the null-point inversion problem
+- The RSSI dimension adds a complementary signal: as a tag moves through a portal, RSSI at
+  each reader rises as the tag approaches, peaks at closest distance, then falls; the reader whose
+  RSSI peaks first is the reader the tag passed first - this relationship follows directly from the
+  Friis transmission equation `[REF: RF-Access - Jie et al., Applied Sciences 12(22), MDPI 2022
+  - Section 2.1, Eqs. 1–2]`
+- Two algorithmic families emerge from this literature: **temporal centroid** (comparison of
+  time-weighted detection centres) and **RSSI-weighted centroid** (comparison of
+  signal-strength-weighted detection centres); both are implemented and compared in this work
+  (detailed formulations in Section 3.4.3)
+- Collecting the full set of raw timestamped RSSI readings from both readers during the traversal
+  is a prerequisite for either algorithm - no data may be discarded or deduplicated at the device
+  level; this requirement drives the firmware and server data model design
 
-**[Figure 2.2-1: Diagram of a two-sensor portal — doorway cross-section; Lighthouse A (outside) and Lighthouse B
-(inside) on opposite sides; two traversal scenarios shown (entry and exit) with arrows; detection event sequences
-illustrated beneath each scenario]**
-
-`[REF: if a paper on RFID portal direction detection is found — cite here; otherwise note this section is based on first-principles reasoning from RF propagation fundamentals]`
+`[Figure 2.2-1: Conceptual diagram - two RSSI curves (one per Lighthouse) over time during a
+single traversal; temporal centroids C̄_out and C̄_in marked; direction arrow from outside to
+inside; illustrates both the centroid separation (Algorithm 1) and the RSSI peak ordering
+(Algorithm 2)]`
 
 ---
 
@@ -83,13 +93,44 @@ illustrated beneath each scenario]**
   architecture allows the WiFi/network stack to be isolated on Core 0 while application logic runs uninterrupted on Core
   1 `[REF: ESP32 TRM Section 1.1; Malý [3]]`
 - The ESP-IDF framework provides a complete, production-grade SDK: FreeRTOS kernel, WiFi stack, MQTT client, NVS,
-  LittleFS, SNTP, mbedTLS — all maintained by the silicon vendor; large community, extensive documentation, and low
+  LittleFS, SNTP, mbedTLS - all maintained by the silicon vendor; large community, extensive documentation, and low
   module cost (~$3–5) make it the clear choice
 - **Selected:** ESP32-WROOM-32 module
 
-### 2.3.2 UHF RFID reader modules
+## 2.3.2 UHF RFID reader modules
 
-*[pinned — to be completed separately]*
+- Commercial-grade UHF RFID readers (Impinj Speedway R420, Zebra FX9600) offer high
+  performance and enterprise support but are priced at several hundred to several thousand USD
+  per unit and expose only high-level host interfaces (LLRP over Ethernet); unsuitable for direct
+  embedded integration and exceed the project budget by an order of magnitude
+- The cost-effective embedded-integration tier consists of compact modules built around
+  dedicated UHF RFID reader ICs, exposing a UART or SPI interface and designed to be
+  controlled directly by a microcontroller; this tier was surveyed on the basis of three criteria:
+  UART interface with documented command protocol, 5 V supply compatibility, and availability
+  in the Czech/European market at reasonable unit cost
+- Four candidates were evaluated:
+
+**Table 2.3.2-1** - UHF RFID reader module comparison
+
+| Module                       | RF output                          | Supply  | Interface  | Antenna                | Price (approx.)  | Notes                                                                                                |
+| ---------------------------- | ---------------------------------- | ------- | ---------- | ---------------------- | ---------------- | ---------------------------------------------------------------------------------------------------- |
+| YPD-R200 (Yanpodo)           | 15–26 dBm                          | 3.3–5 V | UART / SPI | External, SMA          | ~300 CZK         | Lower-power sibling of R300; same protocol family; adequate for short-range use                      |
+| YPD-R200 integrated variant  | 15–26 dBm                          | 3.3–5 V | UART       | Integrated PCB antenna | ~300 CZK         | Eliminates antenna selection; rejected - no antenna modularity, limits experimentation               |
+| Yanpodo bare chip (R-series) | up to 30 dBm                       | 3.3 V   | SPI        | External               | ~1 200–2 500 CZK | Higher capability; requires custom RF front-end design; price and integration complexity unjustified |
+| **YPD-R300 (Yanpodo)**       | spec: up to 33 dBm; actual: 25 dBm | **5 V** | **UART**   | **External, SMA**      | **~800 CZK**     | **Selected**                                                                                         |
+
+- YPD-R300 selected on the following grounds:
+  - Dedicated 5 V supply rail matches the board's power architecture directly (no level shifting
+    required for the power path)
+  - UART protocol with a documented command set (R300 Protocol V2.2) enables direct
+    ESP32 integration without an intermediate host OS
+  - Higher nominal RF output than R200, supporting the 2–3 m target read range with
+    external high-gain antenna
+  - Unit cost of ~800 CZK per module (chip only) is within budget for a two-unit prototype
+- **Critical caveat on vendor specifications:** the datasheet-stated maximum RF output of
+  33 dBm was found to be incorrect during integration; the hardware power ceiling is 25 dBm -
+  `set_power(33)` returns error code `0x48` (parameter out of range); this was initially missed
+  because the response was not being read and validated; full details in Section 3.3.2
 
 ### 2.3.3 power supply and battery considerations
 
@@ -102,7 +143,7 @@ illustrated beneath each scenario]**
   via Schottky diode OR configuration) are well-defined sub-problems with established reference circuits; standard ICs
   exist for each function and were selected during hardware design (covered in Section 3.2)
 - Critical consideration: the UHF RFID reader draws significant peak current during active scan windows; the power
-  supply design must sustain transient loads without causing voltage rail collapse — a failure mode that manifests as
+  supply design must sustain transient loads without causing voltage rail collapse - a failure mode that manifests as
   device reset and was encountered during Board v2 bring-up
 
 `[REF: relevant IC datasheets cited in Section 3.2 hardware design]`
@@ -115,7 +156,7 @@ illustrated beneath each scenario]**
   insufficient
 - SNTP (Simple Network Time Protocol) synchronisation over WiFi is the standard approach for ESP32 timekeeping; ESP-IDF
   provides a built-in SNTP component; accuracy is adequate for attendance timestamping (sub-second error after sync)
-  `[REF: IETF RFC 4330 — SNTPv4]`
+  `[REF: IETF RFC 4330 - SNTPv4]`
 - The limitation of SNTP-only timekeeping is that time is lost when the device is powered off or loses network access; a
   `timeBasis` field (`synced` / `estimated` / `relative`) is declared on every event payload to communicate timestamp
   quality to the server, which can then apply appropriate handling
@@ -131,7 +172,7 @@ illustrated beneath each scenario]**
   gracefully, and not require a persistent open connection from the device side
 - Candidate protocols considered:
   - **HTTP/REST (polling or push):** Simple to implement; stateless; but each transmission requires a full TCP handshake
-    and HTTP request/response cycle — high overhead for frequent small messages from a battery-constrained embedded
+    and HTTP request/response cycle - high overhead for frequent small messages from a battery-constrained embedded
     device; no native push from server to device; rejected for the device-to-server path
   - **WebSocket:** Persistent full-duplex TCP connection; suitable for browser-to-server real-time updates (used for the
     dashboard); not ideal for embedded clients where maintaining a persistent connection consumes memory and complicates
@@ -148,8 +189,26 @@ illustrated beneath each scenario]**
 - LWT mechanism enables real-time device status monitoring: each Lighthouse registers an "offline" will message on
   connect; the broker publishes it automatically on abnormal disconnect, without any active polling
 - **Offline-first design:** events are written to local LittleFS storage before any network transmission; if the broker
-  is unreachable, the device queues events and replays them on reconnection — no event is ever discarded due to
+  is unreachable, the device queues events and replays them on reconnection - no event is ever discarded due to
   transient network unavailability
+- **Enterprise integration - REST:** the server-to-enterprise path has different characteristics
+  than the firmware-to-server path; attendance records are created once per traversal event
+  (low frequency, high importance); a stateless REST call is appropriate - simple to implement,
+  widely supported by enterprise software, and idempotent when designed correctly
+- **Navigo3:** the integration target is Navigo3, a Czech HR and project management platform
+  developed by Navigo Solutions s.r.o.; Navigo3 exposes a REST API built on the open-source
+  `dry-api` framework (typed, JSON-over-HTTP, API catalogue auto-generated from metadata)
+  `[REF: NavigoSolutions/dry-api - github.com/NavigoSolutions/dry-api]`
+  `[REF: Navigo3 API and integrations page - navigo3.com/cs/api-a-predchystane-integrace]`
+- The Navigo3 API documentation is accessible in full to any user with a licensed or test
+  instance; the attendance recording endpoints used by this project are extended with
+  parametrised `start`/`stop` overloads in the upcoming 2026.03 release, co-developed with
+  this thesis
+- **Idempotency and retry:** a `navigo3RecordId` field is stored on each processed event after
+  successful submission; on retry, the presence of this field prevents duplicate record creation
+  in Navigo3; this pattern is necessary because transient network failures between the server
+  and Navigo3 cannot be distinguished from submission failures without an acknowledgement
+  record
 
 ---
 
@@ -169,17 +228,17 @@ illustrated beneath each scenario]**
   alternative) for its better crash resilience and support for directories; used for the offline event cache
 - **mbedTLS (AES):** TLS and cryptographic library integrated into ESP-IDF; AES-128-ECB used for encrypting WiFi
   credentials stored in NVS; the ESP32 hardware AES accelerator is used transparently via the mbedTLS API, keeping
-  encryption overhead negligible `[REF: ESP32 TRM Section 14 — AES Accelerator]`
-- **WiFi provisioning approach:** the ESP-IDF `wifi_provisioning` component (BLE-based) was evaluated but rejected — it
+  encryption overhead negligible `[REF: ESP32 TRM Section 14 - AES Accelerator]`
+- **WiFi provisioning approach:** the ESP-IDF `wifi_provisioning` component (BLE-based) was evaluated but rejected - it
   requires a companion mobile application; a custom captive portal (SoftAP + DNS hijack + HTTP form served from SPIFFS)
   was implemented instead, working with any device browser regardless of OS
 
-**Table 2.5-1** — ESP-IDF components used and their role
+**Table 2.5-1** - ESP-IDF components used and their role
 
 | Component     | Role                                                      |
 | ------------- | --------------------------------------------------------- |
 | FreeRTOS      | Task scheduling, inter-task queues, event groups          |
-| esp_mqtt      | MQTT client — QoS 1/2, LWT, automatic reconnect           |
+| esp_mqtt      | MQTT client - QoS 1/2, LWT, automatic reconnect           |
 | nvs_flash     | Persistent key-value storage (credentials, config, state) |
 | esp_littlefs  | Offline event cache filesystem                            |
 | esp_sntp      | NTP time synchronisation                                  |
