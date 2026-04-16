@@ -38,39 +38,28 @@
 
 ## 2.2 direction detection methods
 
-- A single identification point confirms a tag was present at a location but cannot determine
-  direction of traversal; for an attendance system distinguishing arrivals from departures,
-  direction through the portal must be known
-- The fundamental principle: two spatially separated readers on opposite sides of a doorway
-  encode direction in the temporal sequence of their detections - outside-first implies entry,
+- A single reader confirms a tag was present at a location but cannot determine direction of
+  traversal; for an attendance system, arrival vs. departure must be distinguished
+- Fundamental principle: two spatially separated readers on opposite sides of a doorway encode
+  direction in the temporal sequence of their detections - outside-first implies entry,
   inside-first implies exit
-- This principle is established in the literature on RFID gate systems; Oikawa (2009) proposes
-  and evaluates three temporal methods for direction estimation from two-antenna UHF RFID
-  gate data, without external sensors `[REF: Oikawa, Y. - Tag movement direction estimation
-  methods in an RFID gate system. IEEE ISWCS 2009, pp. 41–45]`
-- Naive first-read comparison (Oikawa Method 1) is unreliable: passive tags respond
-  probabilistically; occasional reads at RF null points or from reflected waves can invert the
-  apparent detection order - Oikawa demonstrates this failure mode experimentally
-- More robust: compare the temporal *centre of mass* of each antenna's full detection group
-  over the traversal window rather than a single first detection - Oikawa's Method 3 (read-count
-  weighted centroid) addresses the null-point inversion problem
-- The RSSI dimension adds a complementary signal: as a tag moves through a portal, RSSI at
-  each reader rises as the tag approaches, peaks at closest distance, then falls; the reader whose
-  RSSI peaks first is the reader the tag passed first - this relationship follows directly from the
-  Friis transmission equation `[REF: RF-Access - Jie et al., Applied Sciences 12(22), MDPI 2022
-  - Section 2.1, Eqs. 1–2]`
-- Two algorithmic families emerge from this literature: **temporal centroid** (comparison of
-  time-weighted detection centres) and **RSSI-weighted centroid** (comparison of
-  signal-strength-weighted detection centres); both are implemented and compared in this work
-  (detailed formulations in Section 3.4.3)
-- Collecting the full set of raw timestamped RSSI readings from both readers during the traversal
-  is a prerequisite for either algorithm - no data may be discarded or deduplicated at the device
-  level; this requirement drives the firmware and server data model design
+- Naive first-read comparison is unreliable: passive UHF tags respond probabilistically;
+  occasional reads at RF null points or from reflected waves can invert the apparent detection
+  order - Oikawa (2009) demonstrates this failure mode experimentally and proposes comparing
+  the read-count-weighted temporal centroid of each antenna's full detection group instead
+  `[REF: Oikawa, Y. - Tag movement direction estimation methods in an RFID gate system.
+  IEEE ISWCS 2009, pp. 41–45]`
+- A complementary signal is available in RSSI: as a tag moves through a portal, RSSI at each
+  reader rises, peaks at closest approach, then falls; the reader whose RSSI peaks first is the
+  one the tag passed first - follows directly from the Friis transmission equation
+  `[REF: Jie et al. - RF-Access: Barrier-Free Access Control Systems with UHF RFID.
+  Applied Sciences 12(22), MDPI 2022 - Section 2.1, Eqs. 1–2]`
+- **Two algorithmic families** emerge from this literature: temporal centroid and RSSI-weighted
+  centroid; both require the full set of raw timestamped RSSI readings from both readers -
+  per-device deduplication would destroy the signal; detailed formulations in Section 3.4.3
 
-`[Figure 2.2-1: Conceptual diagram - two RSSI curves (one per Lighthouse) over time during a
-single traversal; temporal centroids C̄_out and C̄_in marked; direction arrow from outside to
-inside; illustrates both the centroid separation (Algorithm 1) and the RSSI peak ordering
-(Algorithm 2)]`
+`[Figure 2.2-1: Dual RSSI curves over time for a single traversal; temporal centroids C̄_out
+and C̄_in marked; RSSI peaks labelled; direction arrow outside -> inside]`
 
 ---
 
@@ -99,38 +88,26 @@ inside; illustrates both the centroid separation (Algorithm 1) and the RSSI peak
 
 ## 2.3.2 UHF RFID reader modules
 
-- Commercial-grade UHF RFID readers (Impinj Speedway R420, Zebra FX9600) offer high
-  performance and enterprise support but are priced at several hundred to several thousand USD
-  per unit and expose only high-level host interfaces (LLRP over Ethernet); unsuitable for direct
-  embedded integration and exceed the project budget by an order of magnitude
-- The cost-effective embedded-integration tier consists of compact modules built around
-  dedicated UHF RFID reader ICs, exposing a UART or SPI interface and designed to be
-  controlled directly by a microcontroller; this tier was surveyed on the basis of three criteria:
-  UART interface with documented command protocol, 5 V supply compatibility, and availability
-  in the Czech/European market at reasonable unit cost
-- Four candidates were evaluated:
+- The embedded-integration tier - compact modules with a UART interface, controlled directly
+  by a microcontroller - was surveyed; key selection criteria: documented UART command
+  protocol, 5 V supply compatibility, and unit cost suitable for small scope prototyping
 
-**Table 2.3.2-1** - UHF RFID reader module comparison
+**Table 2.3.2-1** - UHF RFID reader module candidates
 
-| Module                       | RF output                          | Supply  | Interface  | Antenna                | Price (approx.)  | Notes                                                                                                |
-| ---------------------------- | ---------------------------------- | ------- | ---------- | ---------------------- | ---------------- | ---------------------------------------------------------------------------------------------------- |
-| YPD-R200 (Yanpodo)           | 15–26 dBm                          | 3.3–5 V | UART / SPI | External, SMA          | ~300 CZK         | Lower-power sibling of R300; same protocol family; adequate for short-range use                      |
-| YPD-R200 integrated variant  | 15–26 dBm                          | 3.3–5 V | UART       | Integrated PCB antenna | ~300 CZK         | Eliminates antenna selection; rejected - no antenna modularity, limits experimentation               |
-| Yanpodo bare chip (R-series) | up to 30 dBm                       | 3.3 V   | SPI        | External               | ~1 200–2 500 CZK | Higher capability; requires custom RF front-end design; price and integration complexity unjustified |
-| **YPD-R300 (Yanpodo)**       | spec: up to 33 dBm; actual: 25 dBm | **5 V** | **UART**   | **External, SMA**      | **~800 CZK**     | **Selected**                                                                                         |
+| Module                              | RF output                   | Supply  | Interface  | Antenna           | Price (approx.)  | Decision                                                                                   |
+| ----------------------------------- | --------------------------- | ------- | ---------- | ----------------- | ---------------- | ------------------------------------------------------------------------------------------ |
+| YPD-R200                            | 15–26 dBm                   | 3.3–5 V | UART / SPI | External, SMA     | ~300 CZK         | Lower RF output; rejected                                                                  |
+| YPD-R200 integrated antenna variant | 15–26 dBm                   | 3.3–5 V | UART       | Integrated PCB    | ~300 CZK         | No antenna modularity; rejected                                                            |
+| Yanpodo bare chip (R-series)        | up to 30 dBm                | 3.3 V   | SPI        | External          | ~1 200–2 500 CZK | Requires custom RF front-end; cost and complexity unjustified at prototype stage; rejected |
+| **YPD-R300**                        | spec 33 dBm / actual 25 dBm | **5 V** | **UART**   | **External, SMA** | **~800 CZK**     | **Selected**                                                                               |
 
-- YPD-R300 selected on the following grounds:
-  - Dedicated 5 V supply rail matches the board's power architecture directly (no level shifting
-    required for the power path)
-  - UART protocol with a documented command set (R300 Protocol V2.2) enables direct
-    ESP32 integration without an intermediate host OS
-  - Higher nominal RF output than R200, supporting the 2–3 m target read range with
-    external high-gain antenna
-  - Unit cost of ~800 CZK per module (chip only) is within budget for a two-unit prototype
-- **Critical caveat on vendor specifications:** the datasheet-stated maximum RF output of
-  33 dBm was found to be incorrect during integration; the hardware power ceiling is 25 dBm -
-  `set_power(33)` returns error code `0x48` (parameter out of range); this was initially missed
-  because the response was not being read and validated; full details in Section 3.3.2
+- R300 selected over R200 for higher RF output (supporting the 2–3 m range requirement) and
+  native 5 V supply matching the board power rail; over the integrated-antenna variant for
+  external SMA connector enabling antenna substitution during range testing; over the bare chip
+  for its complete carrier board and documented command protocol requiring no custom RF design
+- **Vendor specification caveat:** the datasheet-stated 33 dBm ceiling is incorrect; hardware
+  cap is 25 dBm - `set_power(33)` returns error `0x48`; initially missed due to absent response
+  validation; a general caution on cost-tier module datasheets; full details in Section 3.3.2
 
 ### 2.3.3 power supply and battery considerations
 
@@ -167,48 +144,35 @@ inside; illustrates both the centroid separation (Algorithm 1) and the RSSI peak
 
 ## 2.4 communication protocols and enterprise integration
 
-- The Lighthouse units must transmit detection events to a server reliably, including in conditions of intermittent
-  network availability; the communication protocol must support constrained embedded clients, handle reconnection
-  gracefully, and not require a persistent open connection from the device side
-- Candidate protocols considered:
-  - **HTTP/REST (polling or push):** Simple to implement; stateless; but each transmission requires a full TCP handshake
-    and HTTP request/response cycle - high overhead for frequent small messages from a battery-constrained embedded
-    device; no native push from server to device; rejected for the device-to-server path
-  - **WebSocket:** Persistent full-duplex TCP connection; suitable for browser-to-server real-time updates (used for the
-    dashboard); not ideal for embedded clients where maintaining a persistent connection consumes memory and complicates
-    reconnection logic; rejected for firmware
-  - **AMQP:** Full-featured message queuing protocol; broker-heavy, complex handshake, no lightweight embedded client
-    libraries for ESP-IDF; rejected
-  - **MQTT (Message Queuing Telemetry Transport):** Publish-subscribe, minimal packet overhead, designed explicitly for
-    constrained devices on unreliable networks; persistent sessions, Last Will and Testament (LWT) for disconnect
-    detection, three QoS levels; mature ESP-IDF client component (`esp_mqtt`); selected
-    `[REF: OASIS MQTT 3.1.1 specification]`
-- MQTT QoS levels applied selectively: QoS 2 (exactly-once, four-way handshake) for offline event replay where
-  duplicates in the enterprise system must be prevented; QoS 1 (at-least-once) for live scan publishes during active
-  scan windows where publish frequency makes QoS 2 overhead unsustainable
-- LWT mechanism enables real-time device status monitoring: each Lighthouse registers an "offline" will message on
-  connect; the broker publishes it automatically on abnormal disconnect, without any active polling
-- **Offline-first design:** events are written to local LittleFS storage before any network transmission; if the broker
-  is unreachable, the device queues events and replays them on reconnection - no event is ever discarded due to
-  transient network unavailability
-- **Enterprise integration - REST:** the server-to-enterprise path has different characteristics
-  than the firmware-to-server path; attendance records are created once per traversal event
-  (low frequency, high importance); a stateless REST call is appropriate - simple to implement,
-  widely supported by enterprise software, and idempotent when designed correctly
-- **Navigo3:** the integration target is Navigo3, a Czech HR and project management platform
-  developed by Navigo Solutions s.r.o.; Navigo3 exposes a REST API built on the open-source
-  `dry-api` framework (typed, JSON-over-HTTP, API catalogue auto-generated from metadata)
-  `[REF: NavigoSolutions/dry-api - github.com/NavigoSolutions/dry-api]`
-  `[REF: Navigo3 API and integrations page - navigo3.com/cs/api-a-predchystane-integrace]`
-- The Navigo3 API documentation is accessible in full to any user with a licensed or test
-  instance; the attendance recording endpoints used by this project are extended with
-  parametrised `start`/`stop` overloads in the upcoming 2026.03 release, co-developed with
-  this thesis
-- **Idempotency and retry:** a `navigo3RecordId` field is stored on each processed event after
-  successful submission; on retry, the presence of this field prevents duplicate record creation
-  in Navigo3; this pattern is necessary because transient network failures between the server
-  and Navigo3 cannot be distinguished from submission failures without an acknowledgement
-  record
+- Two distinct communication paths exist in this system with different requirements: the
+  firmware-to-server path (frequent small messages from a constrained embedded device on an
+  unreliable network) and the server-to-enterprise path (low-frequency, high-importance
+  attendance records pushed to an HR system)
+
+**Table 2.4-1** — Device-to-server protocol candidates
+
+| Protocol  | Overhead                               | Embedded suitability                                          | Decision                                                    |
+| --------- | -------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
+| HTTP/REST | Full TCP + HTTP round-trip per message | Poor — too heavy for frequent small publishes; no server push | Rejected for firmware; used on server-to-enterprise path    |
+| WebSocket | Persistent full-duplex TCP             | Moderate — reconnection logic burdens constrained clients     | Rejected for firmware; used for dashboard real-time updates |
+| AMQP      | Broker-heavy, complex handshake        | Poor — no lightweight ESP-IDF client                          | Rejected                                                    |
+| **MQTT**  | Minimal fixed header, pub/sub          | **Designed for constrained devices on unreliable networks**   | **Selected** `[REF: OASIS MQTT 3.1.1]`                      |
+
+- MQTT features directly applied: QoS 1 for live scan publishes (at-least-once, tolerable
+  during high-frequency scan windows); QoS 2 for offline replay (exactly-once, prevents
+  duplicate attendance records); LWT for automatic device-offline detection without polling
+- **Offline-first:** events written to LittleFS before any transmission attempt; replayed on
+  reconnection — no event discarded due to transient network unavailability
+- **Server-to-enterprise path — REST:** attendance records created once per traversal event;
+  stateless REST appropriate — low frequency, widely supported by enterprise software,
+  idempotent by design
+- **Navigo3:** integration target; Czech HR and project management platform by Navigo
+  Solutions s.r.o.; REST API built on the open-source `dry-api` framework (typed
+  JSON-over-HTTP) `[REF: NavigoSolutions/dry-api — github.com/NavigoSolutions/dry-api]`
+  `[REF: navigo3.com/cs/api-a-predchystane-integrace]`; attendance recording endpoints
+  extended with parametrised `start`/`stop` overloads in release 2026.03, co-developed
+
+## With this thesis; implementation detail in section 3.4.5
 
 ---
 
