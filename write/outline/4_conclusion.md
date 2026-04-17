@@ -13,7 +13,7 @@
 - Lab validation confirmed end-to-end operation: tag traversal through the portal produces a correctly
   directed attendance record in Navigo3; detection range and direction detection accuracy measured and documented
   in Section 3.6.1
-- Both direction detection algorithms (Temporal Centroid C₁, RSSI-Weighted Centroid C₂) were implemented and
+- Both direction detection algorithms (Temporal Centroid C1, RSSI-Weighted Centroid C2) were implemented and
   evaluated; algorithm comparison findings and the deployment recommendation are in Section 3.6.3
 - Known limitations of the current prototype:
   - Absence of a hardware RTC on the ESP32 - timekeeping relies on SNTP; timestamp quality degrades during

@@ -16,11 +16,11 @@
   (Regulation (EU) 2016/679); high unit cost; rejected on privacy and cost grounds `[REF: GDPR Article 9 - EUR-Lex]`
 - Token-based systems use a physical tag or card carried by the employee; identification is passive from the employee's
   perspective; read range is the critical differentiating parameter between technologies:
-  - HF RFID (13.56 MHz, ISO 14443 / ISO 15693): 0–10 cm; requires deliberate card presentation at a reader - effectively
+  - HF RFID (13.56 MHz, ISO 14443 / ISO 15693): 0-10 cm; requires deliberate card presentation at a reader - effectively
     equivalent to PIN in user experience
-  - UHF RFID (860–960 MHz, EPC Gen2 / ISO 18000-63): 1–12 m; passive tag, no battery, no user action; tag can be
+  - UHF RFID (860-960 MHz, EPC Gen2 / ISO 18000-63): 1-12 m; passive tag, no battery, no user action; tag can be
     detected while carried in a bag or pocket at walking pace
-- **Conclusion:** UHF RFID is the only passive identification technology meeting the hands-free, 2–3 m range
+- **Conclusion:** UHF RFID is the only passive identification technology meeting the hands-free, 2-3 m range
   requirement; selected as the identification method for this system
 
 **Table 2.1-1** - Identification technology comparison
@@ -28,9 +28,9 @@
 | Technology             | Read range     | User action | Sensitive data | Selected |
 | ---------------------- | -------------- | ----------- | -------------- | -------- |
 | PIN code               | N/A            | Yes         | No             | No       |
-| HF RFID (13.56 MHz)    | 0–10 cm        | Yes         | No             | No       |
+| HF RFID (13.56 MHz)    | 0-10 cm        | Yes         | No             | No       |
 | Biometric              | Contact / ~1 m | No          | Yes            | No       |
-| UHF RFID (860–960 MHz) | 1–12 m         | No          | No             | **Yes**  |
+| UHF RFID (860-960 MHz) | 1-12 m         | No          | No             | **Yes**  |
 
 `[REF: GS1 EPC Gen2 / ISO 18000-63 standard - cite for UHF RFID protocol background]`
 
@@ -48,18 +48,18 @@
   order - Oikawa (2009) demonstrates this failure mode experimentally and proposes comparing
   the read-count-weighted temporal centroid of each antenna's full detection group instead
   `[REF: Oikawa, Y. - Tag movement direction estimation methods in an RFID gate system.
-  IEEE ISWCS 2009, pp. 41–45]`
+  IEEE ISWCS 2009, pp. 41-45]`
 - A complementary signal is available in RSSI: as a tag moves through a portal, RSSI at each
   reader rises, peaks at closest approach, then falls; the reader whose RSSI peaks first is the
   one the tag passed first - follows directly from the Friis transmission equation
   `[REF: Jie et al. - RF-Access: Barrier-Free Access Control Systems with UHF RFID.
-  Applied Sciences 12(22), MDPI 2022 - Section 2.1, Eqs. 1–2]`
+  Applied Sciences 12(22), MDPI 2022 - Section 2.1, Eqs. 1-2]`
 - **Two algorithmic families** emerge from this literature: temporal centroid and RSSI-weighted
   centroid; both require the full set of raw timestamped RSSI readings from both readers -
   per-device deduplication would destroy the signal; detailed formulations in Section 3.4.3
 
-`[Figure 2.2-1: Dual RSSI curves over time for a single traversal; temporal centroids C̄_out
-and C̄_in marked; RSSI peaks labelled; direction arrow outside -> inside]`
+`[Figure 2.2-1: Dual RSSI curves over time for a single traversal; temporal centroids C_out
+and C_in marked; RSSI peaks labelled; direction arrow outside -> inside]`
 
 ---
 
@@ -83,7 +83,7 @@ and C̄_in marked; RSSI peaks labelled; direction arrow outside -> inside]`
   1 `[REF: ESP32 TRM Section 1.1; Malý [3]]`
 - The ESP-IDF framework provides a complete, production-grade SDK: FreeRTOS kernel, WiFi stack, MQTT client, NVS,
   LittleFS, SNTP, mbedTLS - all maintained by the silicon vendor; large community, extensive documentation, and low
-  module cost (~$3–5) make it the clear choice
+  module cost (~$3-5) make it the clear choice
 - **Selected:** ESP32-WROOM-32 module
 
 ## 2.3.2 UHF RFID reader modules
@@ -96,12 +96,12 @@ and C̄_in marked; RSSI peaks labelled; direction arrow outside -> inside]`
 
 | Module                              | RF output                   | Supply  | Interface  | Antenna           | Price (approx.)  | Decision                                                                                   |
 | ----------------------------------- | --------------------------- | ------- | ---------- | ----------------- | ---------------- | ------------------------------------------------------------------------------------------ |
-| YPD-R200                            | 15–26 dBm                   | 3.3–5 V | UART / SPI | External, SMA     | ~300 CZK         | Lower RF output; rejected                                                                  |
-| YPD-R200 integrated antenna variant | 15–26 dBm                   | 3.3–5 V | UART       | Integrated PCB    | ~300 CZK         | No antenna modularity; rejected                                                            |
-| Yanpodo bare chip (R-series)        | up to 30 dBm                | 3.3 V   | SPI        | External          | ~1 200–2 500 CZK | Requires custom RF front-end; cost and complexity unjustified at prototype stage; rejected |
+| YPD-R200                            | 15-26 dBm                   | 3.3-5 V | UART / SPI | External, SMA     | ~300 CZK         | Lower RF output; rejected                                                                  |
+| YPD-R200 integrated antenna variant | 15-26 dBm                   | 3.3-5 V | UART       | Integrated PCB    | ~300 CZK         | No antenna modularity; rejected                                                            |
+| Yanpodo bare chip (R-series)        | up to 30 dBm                | 3.3 V   | SPI        | External          | ~1 200-2 500 CZK | Requires custom RF front-end; cost and complexity unjustified at prototype stage; rejected |
 | **YPD-R300**                        | spec 33 dBm / actual 25 dBm | **5 V** | **UART**   | **External, SMA** | **~800 CZK**     | **Selected**                                                                               |
 
-- R300 selected over R200 for higher RF output (supporting the 2–3 m range requirement) and
+- R300 selected over R200 for higher RF output (supporting the 2-3 m range requirement) and
   native 5 V supply matching the board power rail; over the integrated-antenna variant for
   external SMA connector enabling antenna substitution during range testing; over the bare chip
   for its complete carrier board and documented command protocol requiring no custom RF design
@@ -149,26 +149,26 @@ and C̄_in marked; RSSI peaks labelled; direction arrow outside -> inside]`
   unreliable network) and the server-to-enterprise path (low-frequency, high-importance
   attendance records pushed to an HR system)
 
-**Table 2.4-1** — Device-to-server protocol candidates
+**Table 2.4-1** - Device-to-server protocol candidates
 
 | Protocol  | Overhead                               | Embedded suitability                                          | Decision                                                    |
 | --------- | -------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
-| HTTP/REST | Full TCP + HTTP round-trip per message | Poor — too heavy for frequent small publishes; no server push | Rejected for firmware; used on server-to-enterprise path    |
-| WebSocket | Persistent full-duplex TCP             | Moderate — reconnection logic burdens constrained clients     | Rejected for firmware; used for dashboard real-time updates |
-| AMQP      | Broker-heavy, complex handshake        | Poor — no lightweight ESP-IDF client                          | Rejected                                                    |
+| HTTP/REST | Full TCP + HTTP round-trip per message | Poor - too heavy for frequent small publishes; no server push | Rejected for firmware; used on server-to-enterprise path    |
+| WebSocket | Persistent full-duplex TCP             | Moderate - reconnection logic burdens constrained clients     | Rejected for firmware; used for dashboard real-time updates |
+| AMQP      | Broker-heavy, complex handshake        | Poor - no lightweight ESP-IDF client                          | Rejected                                                    |
 | **MQTT**  | Minimal fixed header, pub/sub          | **Designed for constrained devices on unreliable networks**   | **Selected** `[REF: OASIS MQTT 3.1.1]`                      |
 
 - MQTT features directly applied: QoS 1 for live scan publishes (at-least-once, tolerable
   during high-frequency scan windows); QoS 2 for offline replay (exactly-once, prevents
   duplicate attendance records); LWT for automatic device-offline detection without polling
 - **Offline-first:** events written to LittleFS before any transmission attempt; replayed on
-  reconnection — no event discarded due to transient network unavailability
-- **Server-to-enterprise path — REST:** attendance records created once per traversal event;
-  stateless REST appropriate — low frequency, widely supported by enterprise software,
+  reconnection - no event discarded due to transient network unavailability
+- **Server-to-enterprise path - REST:** attendance records created once per traversal event;
+  stateless REST appropriate - low frequency, widely supported by enterprise software,
   idempotent by design
 - **Navigo3:** integration target; Czech HR and project management platform by Navigo
   Solutions s.r.o.; REST API built on the open-source `dry-api` framework (typed
-  JSON-over-HTTP) `[REF: NavigoSolutions/dry-api — github.com/NavigoSolutions/dry-api]`
+  JSON-over-HTTP) `[REF: NavigoSolutions/dry-api - github.com/NavigoSolutions/dry-api]`
   `[REF: navigo3.com/cs/api-a-predchystane-integrace]`; attendance recording endpoints
   extended with parametrised `start`/`stop` overloads in release 2026.03, co-developed
 

@@ -5,9 +5,9 @@
   interaction at a fixed point; friction, bottlenecks, buddy-punching
 - Concrete motivation: need at Navigo Solutions s.r.o. (Brno) - passive, zero-interaction attendance recording feeding
   directly into Navigo3 HR software
-- Core technical challenge: (1) passive identification at 2–3 m range through bags and pockets, (2) direction of
+- Core technical challenge: (1) passive identification at 2-3 m range through bags and pockets, (2) direction of
   traversal - arrival vs. departure - without physical gates
-- UHF RFID (860–960 MHz) - only commercially mature technology meeting the passive, hands-free range requirement
+- UHF RFID (860-960 MHz) - only commercially mature technology meeting the passive, hands-free range requirement
 - Direction detection requires two spatially separated units: a single reader cannot distinguish entry from exit;
   **portal model** - two Lighthouse units mounted on opposite sides of a doorway; raw RFID readings jointly analysed
   server-side; traversal direction inferred from temporal sequence
