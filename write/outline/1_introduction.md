@@ -17,5 +17,5 @@
 - Integration target: Navigo3; integration layer isolated behind a connector interface - extensible to other enterprise
   platforms without changes to the core pipeline
 
-*[Figure 1-1: System concept diagram - two Lighthouse units flanking a doorway, person walking through, MQTT to server,
+**[Figure 1-1: System concept diagram - two Lighthouse units flanking a doorway, person walking through, MQTT to server,
 server to Navigo3; simplified version of Figure 3.1-1]**
