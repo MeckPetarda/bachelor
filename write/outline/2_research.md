@@ -166,13 +166,11 @@ and C_in marked; RSSI peaks labelled; direction arrow outside -> inside]`
 - **Server-to-enterprise path - REST:** attendance records created once per traversal event;
   stateless REST appropriate - low frequency, widely supported by enterprise software,
   idempotent by design
-- **Navigo3:** integration target; Czech HR and project management platform by Navigo
-  Solutions s.r.o.; REST API built on the open-source `dry-api` framework (typed
-  JSON-over-HTTP) `[REF: NavigoSolutions/dry-api - github.com/NavigoSolutions/dry-api]`
-  `[REF: navigo3.com/cs/api-a-predchystane-integrace]`; attendance recording endpoints
-  extended with parametrised `start`/`stop` overloads in release 2026.03, co-developed
-
-## With this thesis; implementation detail in section 3.4.5
+- **Navigo3:** integration target; Czech HR and project management platform by Navigo Solutions s.r.o.; REST API built
+  on the open-source `dry-api` framework (typed JSON-over-HTTP)
+  `[REF: NavigoSolutions/dry-api - github.com/NavigoSolutions/dry-api]`
+  `[REF: navigo3.com/cs/api-a-predchystane-integrace]`; attendance recording endpoints extended with parametrised
+  `start`/`stop` overloads in release 2026.03, co-developed with this thesis; implementation detail in section 3.4.5
 
 ---
 

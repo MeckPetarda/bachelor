@@ -1,0 +1,50 @@
+<svg viewBox="0 0 580 400" xmlns="http://www.w3.org/2000/svg" font-family="Georgia, serif" font-size="12">
+  <rect width="580" height="400" fill="#fff"/>
+  <text x="290" y="26" text-anchor="middle" font-size="14" font-weight="bold" fill="#111">Scan Mode State Machine</text>
+
+  <defs>
+    <marker id="a" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#374151"/></marker>
+  </defs>
+
+  <!-- IR MODE (left) -->
+  <rect x="50" y="100" width="195" height="165" rx="8" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+  <rect x="50" y="100" width="195" height="30" rx="8" fill="#1d4ed8"/>
+  <rect x="50" y="122" width="195" height="8" fill="#1d4ed8"/>
+  <text x="147" y="121" text-anchor="middle" fill="#fff" font-weight="bold" font-size="13">IR Mode  (default)</text>
+  <text x="65" y="153" fill="#1e3a8a" font-size="10">• LED2: solid on</text>
+  <text x="65" y="169" fill="#1e3a8a" font-size="10">• IR sensor: active</text>
+  <text x="65" y="185" fill="#1e3a8a" font-size="10">• IR trigger → 5 s scan burst</text>
+  <text x="65" y="201" fill="#1e3a8a" font-size="10">• BUTTON1 short press: no-op</text>
+  <text x="65" y="217" fill="#1e3a8a" font-size="10">• BUTTON2 5 s: provisioning</text>
+  <text x="65" y="255" fill="#1e3a8a" font-size="10"/>
+
+  <!-- MANUAL MODE (right) -->
+  <rect x="335" y="100" width="195" height="165" rx="8" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+  <rect x="335" y="100" width="195" height="30" rx="8" fill="#15803d"/>
+  <rect x="335" y="122" width="195" height="8" fill="#15803d"/>
+  <text x="432" y="121" text-anchor="middle" fill="#fff" font-weight="bold" font-size="13">Manual Mode</text>
+  <text x="350" y="153" fill="#14532d" font-size="10">• LED2: off</text>
+  <text x="350" y="169" fill="#14532d" font-size="10">• IR sensor: ignored</text>
+  <text x="350" y="185" fill="#14532d" font-size="10">• BUTTON1 short: toggle RFID</text>
+  <text x="350" y="201" fill="#14532d" font-size="10">• BUTTON2 5 s: provisioning</text>
+  <text x="350" y="217" fill="#14532d" font-size="10">• Both 10 s: cache purge</text>
+
+  <!-- Transition: IR → Manual (top arc) -->
+  <path d="M 245 128 Q 290 68 335 128" fill="none" stroke="#374151" stroke-width="1.8" marker-end="url(#a)"/>
+  <text x="290" y="68" text-anchor="middle" font-size="11" fill="#374151" font-weight="bold">BUTTON1 held 3 s</text>
+  <text x="290" y="81" text-anchor="middle" font-size="9" fill="#64748b">stop RFID · disable IR · LED2 off</text>
+
+  <!-- Transition: Manual → IR (bottom arc) -->
+  <path d="M 335 238 Q 290 305 245 238" fill="none" stroke="#374151" stroke-width="1.8" marker-end="url(#a)"/>
+  <text x="290" y="318" text-anchor="middle" font-size="11" fill="#374151" font-weight="bold">BUTTON1 held 3 s</text>
+  <text x="290" y="331" text-anchor="middle" font-size="9" fill="#64748b">stop RFID · enable IR · LED2 on</text>
+
+  <!-- Boot entry arrow -->
+  <line x1="147" y1="52" x2="147" y2="100" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="147" y="48" text-anchor="middle" font-size="10" fill="#374151">boot</text>
+
+  <!-- Guard note at bottom -->
+  <rect x="100" y="352" width="380" height="24" rx="3" fill="#f1f5f9" stroke="#d1d5db" stroke-width="1"/>
+  <text x="290" y="368" text-anchor="middle" font-size="10" fill="#475569">RFID scanning is always stopped before any mode transition</text>
+
+</svg>

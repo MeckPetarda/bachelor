@@ -1,0 +1,98 @@
+<svg viewBox="0 0 500 760" xmlns="http://www.w3.org/2000/svg" font-family="Georgia, serif" font-size="12">
+  <rect width="500" height="760" fill="#fff"/>
+  <text x="250" y="26" text-anchor="middle" font-size="14" font-weight="bold" fill="#111">Firmware Boot Sequence</text>
+
+  <defs>
+    <marker id="a" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#374151"/></marker>
+    <marker id="ar" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#b91c1c"/></marker>
+    <marker id="ag" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#15803d"/></marker>
+  </defs>
+
+  <!-- Power on -->
+  <rect x="170" y="44" width="160" height="32" rx="16" fill="#1d4ed8" stroke="#1e3a8a" stroke-width="1.5"/>
+  <text x="250" y="64" text-anchor="middle" fill="#fff" font-weight="bold">Power On / Reset</text>
+  <line x1="250" y1="76" x2="250" y2="98" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- GPIO init -->
+  <rect x="170" y="98" width="160" height="32" rx="4" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.5"/>
+  <text x="250" y="118" text-anchor="middle" fill="#0c4a6e" font-weight="bold">GPIO Configuration</text>
+  <line x1="250" y1="130" x2="250" y2="152" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- Battery monitor -->
+  <rect x="170" y="152" width="160" height="32" rx="4" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.5"/>
+  <text x="250" y="172" text-anchor="middle" fill="#0c4a6e" font-weight="bold">Battery Monitor Init</text>
+  <line x1="250" y1="184" x2="250" y2="206" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- Provisioning flag? -->
+  <polygon points="250,206 325,234 250,262 175,234" fill="#fef9c3" stroke="#a16207" stroke-width="1.5"/>
+  <text x="250" y="228" text-anchor="middle" fill="#78350f" font-weight="bold" font-size="11">Provisioning</text>
+  <text x="250" y="244" text-anchor="middle" fill="#78350f" font-weight="bold" font-size="11">flag in RTC?</text>
+
+  <!-- YES → AP mode -->
+  <line x1="325" y1="234" x2="395" y2="234" stroke="#b91c1c" stroke-width="1.5" marker-end="url(#ar)"/>
+  <text x="358" y="226" text-anchor="middle" font-size="10" fill="#b91c1c">Yes</text>
+  <rect x="395" y="218" width="90" height="32" rx="4" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+  <text x="440" y="232" text-anchor="middle" fill="#7f1d1d" font-size="10" font-weight="bold">AP Mode +</text>
+  <text x="440" y="244" text-anchor="middle" fill="#7f1d1d" font-size="10">Captive Portal</text>
+
+  <!-- NO → WiFi STA -->
+  <line x1="250" y1="262" x2="250" y2="284" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="260" y="277" font-size="10" fill="#374151">No</text>
+
+  <!-- WiFi STA connect -->
+  <rect x="170" y="284" width="160" height="32" rx="4" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.5"/>
+  <text x="250" y="304" text-anchor="middle" fill="#0c4a6e" font-weight="bold">WiFi STA Connect</text>
+  <line x1="250" y1="316" x2="250" y2="338" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- WiFi ok? -->
+  <polygon points="250,338 325,362 250,386 175,362" fill="#fef9c3" stroke="#a16207" stroke-width="1.5"/>
+  <text x="250" y="356" text-anchor="middle" fill="#78350f" font-weight="bold" font-size="11">WiFi</text>
+  <text x="250" y="372" text-anchor="middle" fill="#78350f" font-weight="bold" font-size="11">connected?</text>
+
+  <!-- YES down -->
+  <line x1="250" y1="386" x2="250" y2="408" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="260" y="401" font-size="10" fill="#374151">Yes</text>
+
+  <!-- NO → offline mode -->
+  <line x1="175" y1="362" x2="105" y2="362" stroke="#b91c1c" stroke-width="1.5" marker-end="url(#ar)"/>
+  <text x="143" y="354" text-anchor="middle" font-size="10" fill="#b91c1c">No</text>
+  <rect x="20" y="346" width="85" height="32" rx="4" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+  <text x="62" y="360" text-anchor="middle" fill="#7f1d1d" font-size="10" font-weight="bold">Offline</text>
+  <text x="62" y="373" text-anchor="middle" fill="#7f1d1d" font-size="10">mode</text>
+  <!-- Rejoin below SNTP -->
+  <line x1="62" y1="378" x2="62" y2="478" stroke="#b91c1c" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <line x1="62" y1="478" x2="170" y2="478" stroke="#b91c1c" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+
+  <!-- SNTP -->
+  <rect x="170" y="408" width="160" height="38" rx="4" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.5"/>
+  <text x="250" y="426" text-anchor="middle" fill="#0c4a6e" font-weight="bold">SNTP Time Sync</text>
+  <text x="250" y="439" text-anchor="middle" fill="#0c4a6e" font-size="10">chrony NTP server on LAN</text>
+  <line x1="250" y1="446" x2="250" y2="468" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- MQTT client -->
+  <rect x="170" y="468" width="160" height="32" rx="4" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.5"/>
+  <text x="250" y="488" text-anchor="middle" fill="#0c4a6e" font-weight="bold">MQTT Client Init</text>
+  <line x1="250" y1="500" x2="250" y2="522" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- LittleFS -->
+  <rect x="170" y="522" width="160" height="38" rx="4" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.5"/>
+  <text x="250" y="540" text-anchor="middle" fill="#0c4a6e" font-weight="bold">Offline Logger Init</text>
+  <text x="250" y="553" text-anchor="middle" fill="#0c4a6e" font-size="10">LittleFS mount</text>
+  <line x1="250" y1="560" x2="250" y2="582" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- RFID reader -->
+  <rect x="170" y="582" width="160" height="38" rx="4" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.5"/>
+  <text x="250" y="600" text-anchor="middle" fill="#0c4a6e" font-weight="bold">RFID Reader Init</text>
+  <text x="250" y="613" text-anchor="middle" fill="#0c4a6e" font-size="10">UART · power · handshake</text>
+  <line x1="250" y1="620" x2="250" y2="642" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- Main task loop -->
+  <rect x="170" y="642" width="160" height="32" rx="16" fill="#15803d" stroke="#14532d" stroke-width="1.5"/>
+  <text x="250" y="658" text-anchor="middle" fill="#fff" font-weight="bold">Main Task Loop</text>
+  <!-- Loop arrow back up -->
+  <line x1="330" y1="658" x2="355" y2="658" stroke="#15803d" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <line x1="355" y1="658" x2="355" y2="700" stroke="#15803d" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <line x1="355" y1="700" x2="170" y2="700" stroke="#15803d" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="250" y="720" text-anchor="middle" font-size="9" fill="#15803d">IR trigger / button events restart cycle</text>
+
+</svg>
