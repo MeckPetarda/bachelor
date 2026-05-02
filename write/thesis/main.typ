@@ -600,7 +600,7 @@ discontinuity at the trace highlighted]
   caption: [Table 3.3.3-1 - Time quality tiers],
 )
 
-=== SNTP synchronisation
+==== SNTP synchronisation
 
 - The firmware uses the ESP-IDF SNTP client in polling mode against a chrony NTP server on the local network
 - On successful sync, a callback upgrades the time quality to `synced` and persists the current Unix timestamp alongside
@@ -608,7 +608,7 @@ discontinuity at the trace highlighted]
 - Timezone is set to CET/CEST (`TZ=CET-1CEST,M3.5.0,M10.5.0/3`) before SNTP initialisation so that `localtime()` returns
   correct local time immediately on sync
 
-=== Offline degradation
+==== Offline degradation
 
 - If SNTP sync does not complete (e.g. NTP server unreachable), the firmware continues operating with `estimated` or
   `relative` timestamps
@@ -790,7 +790,7 @@ discontinuity at the trace highlighted]
     table.header[Component][Technology][Role],
     [HTTP API],          [Hono],                     [REST endpoints, JWT auth],
     [MQTT Broker],       [Aedes],                    [Receives firmware scan/health messages],
-    [Database],          [PostgreSQL + Drizzle ORM], [Persistent event and user storage],
+    [Database],          [PSQL + Drizzle], [Persistent event and user storage],
     [WebSocket Gateway], [Bun WebSocket],             [Real-time push to dashboard clients],
     [Navigo3 Poller],    [Custom interval],           [Periodic retry of unsynced events],
     [Event Sweeper],     [Custom interval],           [Cluster detection and direction processing],
@@ -918,7 +918,7 @@ $ C_2 = "CSF"_w times "CSzF" times "BCF" times "RTCF" $
 
 ==== Retry sweep
 
-- Background poller runs every **60 s** (configurable via `NAVIGO3_RETRY_INTERVAL_MS`)
+- Background poller runs every *60 s* (configurable via `NAVIGO3_RETRY_INTERVAL_MS`)
 - Fetches up to 100 unsynced eligible events ordered by timestamp
 - Attempts paired upsert first; falls back to individual push if no counterpart found
 - Non-blocking: skips cycle if previous sweep still running
@@ -998,19 +998,19 @@ $ C_2 = "CSF"_w times "CSzF" times "BCF" times "RTCF" $
 - Filterable by algorithm, direction, user, group, and date range
 - Each row expands into a detail modal with three tabs:
 
-**Overview tab:**
+*Overview tab:*
 
 - Direction, confidence percentage, tag EPC, user, group, algorithm name, timestamp, and cluster time span
 - Confidence factor breakdown displayed as horizontal progress bars: centroid separation, cluster size, bilateral
   coverage, and (for Algorithm 2) RSSI trend consistency
 - Link to the companion event (same cluster, other algorithm) for side-by-side comparison
 
-**Raw Scans tab:**
+*Raw Scans tab:*
 
 - Lists all raw scans belonging to the cluster, grouped by lighthouse (inside vs. outside), showing EPC, RSSI,
   timestamp, and time basis
 
-**Timeline tab:**
+*Timeline tab:*
 
 - Scan timing histogram: horizontal time axis with bars representing scan detections per time bucket, colour-coded by
   lighthouse (blue = outside, orange = inside); centroid markers for the selected algorithm shown as dashed vertical
