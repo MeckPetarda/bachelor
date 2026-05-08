@@ -77,12 +77,14 @@
     numbering: "1"
   )
 
+  set par(justify: true)
+
   // ── Heading numbering ────────────────────────────────────────────────────
   // diplomka.sty \@seccntformat appends a period after every counter:
   //   chapter → "1."   section → "1.1."   subsection → "1.1.1."
   // Level 4 (subsubsection) is unnumbered and excluded from the TOC.
   set heading(numbering: "1.")
-  show heading.where(level: 4): set heading(numbering: "1.1.1-A", outlined: false)
+  show heading.where(level: 4): set heading(numbering: "1.1.1-A")
 
   // ── Chapter (level 1) ────────────────────────────────────────────────────
   // diplomka.sty: \huge\bfseries\textsc + \newpage, raggedright

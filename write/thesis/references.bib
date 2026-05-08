@@ -1,0 +1,152 @@
+% =============================================================================
+%  references.bib — Lighthouse Thesis Bibliography
+%  Jakub Hloušek, VUT FME, 2025/26
+% =============================================================================
+
+% ---------------------------------------------------------------------------
+% Standards and Regulations
+% ---------------------------------------------------------------------------
+
+@legislation{gdpr,
+  title        = {Regulation ({EU}) 2016/679 of the European Parliament and of the Council
+                  of 27 April 2016 on the protection of natural persons with regard to the
+                  processing of personal data and on the free movement of such data
+                  (General Data Protection Regulation)},
+  journal      = {Official Journal of the European Union},
+  volume       = {L 119},
+  pages        = {1--88},
+  date         = {2016-05-04},
+  url          = {https://eur-lex.europa.eu/eli/reg/2016/679/oj},
+}
+
+@standard{iso-14443,
+  title        = {{ISO/IEC} 14443: Cards and Security Devices for Personal Identification
+                  --- Contactless Proximity Objects},
+  organization = {International Organization for Standardization},
+  number       = {ISO/IEC 14443},
+}
+
+@standard{iso-15693,
+  title        = {{ISO/IEC} 15693: Cards and Security Devices for Personal Identification
+                  --- Contactless Vicinity Objects},
+  organization = {International Organization for Standardization},
+  number       = {ISO/IEC 15693},
+}
+
+@standard{iso-18000-63,
+  title        = {{ISO/IEC} 18000-63:2021: Information Technology --- Radio Frequency
+                  Identification for Item Management --- Part 63: Parameters for Air
+                  Interface Communications at 860~{MHz} to 960~{MHz} Type~C},
+  organization = {International Organization for Standardization},
+  number       = {ISO/IEC 18000-63:2021},
+  date         = {2021},
+  note         = {Technically equivalent to GS1 EPC Gen2 v2.0},
+}
+
+@techreport{rfc4330,
+  author       = {Mills, David L.},
+  title        = {Simple Network Time Protocol ({SNTP}) Version 4 for {IPv4}, {IPv6}
+                  and {OSI}},
+  institution  = {Internet Engineering Task Force},
+  number       = {RFC 4330},
+  date         = {2006-01},
+  url          = {https://www.rfc-editor.org/rfc/rfc4330},
+}
+
+@standard{mqtt,
+  title        = {{MQTT} Version 3.1.1},
+  organization = {OASIS},
+  number       = {OASIS Standard},
+  date         = {2014-10-29},
+  url          = {http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html},
+}
+
+% ---------------------------------------------------------------------------
+% Academic Papers
+% ---------------------------------------------------------------------------
+
+@inproceedings{oikawa-2009,
+  author       = {Oikawa, Y.},
+  title        = {Tag Movement Direction Estimation Methods in an {RFID} Gate System},
+  booktitle    = {Proceedings of the 6th International Symposium on Wireless Communication
+                  Systems ({ISWCS} 2009)},
+  publisher    = {IEEE},
+  date         = {2009},
+  pages        = {41--45},
+  doi          = {10.1109/ISWCS.2009.5285332},
+}
+
+@article{jie-2022-rf-access,
+  author       = {Jie, Z. and others},
+  title        = {{RF-Access}: Barrier-Free Access Control Systems with {UHF} {RFID}},
+  journal      = {Applied Sciences},
+  publisher    = {MDPI},
+  volume       = {12},
+  number       = {22},
+  pages        = {11592},
+  date         = {2022},
+  doi          = {10.3390/app122211592},
+  note         = {Direction detection via Friis-derived RSSI peak argument: §2.1, Eqs.~1--2},
+}
+
+% ---------------------------------------------------------------------------
+% Books
+% ---------------------------------------------------------------------------
+
+@book{maly-2024,
+  author       = {Malý, Martin},
+  title        = {{ESP32} prakticky: od základních obvodů k pokročilým aplikacím},
+  edition      = {1},
+  publisher    = {CZ.NIC, z.s.p.o.},
+  location     = {Praha},
+  date         = {2024},
+  pagetotal    = {525},
+  isbn         = {978-80-88168-79-9},
+}
+
+% ---------------------------------------------------------------------------
+% Manufacturer and Vendor Documentation
+% ---------------------------------------------------------------------------
+
+@manual{esp32-trm,
+  author       = {{Espressif Systems}},
+  title        = {{ESP32} Technical Reference Manual},
+  url          = {https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf},
+  note         = {Sections cited: §1.1 (system architecture), §9.3.6 (RTC reset behaviour),
+                  §14 (AES accelerator)},
+}
+
+@manual{esp-idf,
+  author       = {{Espressif Systems}},
+  title        = {{ESP-IDF} Programming Guide},
+  url          = {https://docs.espressif.com/projects/esp-idf/en/stable/esp32/},
+}
+
+% ---------------------------------------------------------------------------
+% Software and Online Resources
+% ---------------------------------------------------------------------------
+
+@software{freertos,
+  author       = {{Real Time Engineers Ltd.} and {Amazon Web Services}},
+  title        = {{FreeRTOS} Kernel},
+  url          = {https://www.freertos.org/Documentation/},
+}
+
+@software{littlefs,
+  author       = {Haster, Christopher},
+  title        = {littlefs --- A Little Fail-Safe Filesystem Designed for Microcontrollers},
+  url          = {https://github.com/littlefs-project/littlefs},
+  note         = {Design rationale in \texttt{DESIGN.md}},
+}
+
+@software{dry-api,
+  author       = {{Navigo Solutions s.r.o.}},
+  title        = {dry-api --- Typed {JSON}-over-{HTTP} {API} Framework},
+  url          = {https://github.com/NavigoSolutions/dry-api},
+}
+
+@online{navigo3-api,
+  author       = {{Navigo Solutions s.r.o.}},
+  title        = {{API} a předchystané integrace},
+  url          = {https://www.navigo3.com/cs/api-a-predchystane-integrace},
+}

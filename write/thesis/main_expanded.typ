@@ -66,24 +66,15 @@
 
 == Attendance System Technologies <attendance_system_tech>
 
-- Automated employee attendance tracking requires a reliable method of identifying a person at a physical boundary
-  (doorway, turnstile, office entrance) without manual interaction from staff or administrator
-- Three broad categories of identification technology are used in commercially available attendance systems:
-  knowledge-based (PIN code), biometric (fingerprint, facial recognition), and token-based (card/tag carried by the
-  employee)
-- PIN-based systems require the employee to actively stop and enter a code at a terminal; prone to buddy-punching (one
-  employee entering a code on behalf of another); fully unsuitable for passive, hands-free operation
-- Biometric systems (fingerprint readers, facial recognition cameras) can eliminate deliberate user action but involve
-  the collection and processing of sensitive personal data; classified as special category data under GDPR Article 9
-  (Regulation (EU) 2016/679); high unit cost; rejected on privacy and cost grounds `[REF: GDPR Article 9 - EUR-Lex]`
-- Token-based systems use a physical tag or card carried by the employee; identification is passive from the employee's
-  perspective; read range is the critical differentiating parameter between technologies:
-  - HF RFID (13.56 MHz, ISO 14443 / ISO 15693): 0-10 cm; requires deliberate card presentation at a reader - effectively
-    equivalent to PIN in user experience
-  - UHF RFID (860-960 MHz, EPC Gen2 / ISO 18000-63): 1-12 m; passive tag, no battery, no user action; tag can be
-    detected while carried in a bag or pocket at walking pace
-- *Conclusion:* UHF RFID is the only passive identification technology meeting the hands-free, 2-3 m range
-  requirement; selected as the identification method for this system
+Automated employee attendance tracking requires a reliable means of identifying a person at a physical boundary - a doorway, turnstile, or office entrance - without manual involvement from staff or administrators. Commercially available systems draw their identification mechanism from one of three categories: knowledge-based (PIN code), biometric (fingerprint, facial recognition), or token-based (a card or tag carried by the employee). The relevant question for this project is which of these can be made fully passive at a distance of two to three metres.
+
+Knowledge-based systems require the employee to stop at a terminal and enter a code. Beyond the queueing this introduces, they are highly susceptible to so-called buddy-punching, where one employee enters another's code on their behalf. Knowledge-based identification is therefore unsuitable for any application aiming at hands-free operation.
+
+Biometric systems can technically eliminate deliberate user action - a face is read while the employee walks past a camera - but introduce a considerably more serious obstacle. Biometric data processed for the purpose of uniquely identifying a person is classified as a special category of personal data under Article 9 of Regulation (EU) 2016/679 (GDPR), and its processing is by default prohibited absent one of the narrow legal bases enumerated in Article 9(2) @gdpr. Combined with a unit cost typically an order of magnitude above token-based readers, both factors disqualify biometrics for this project.
+
+Token-based identification removes any requirement for the employee to stop or act; the employee simply carries a tag. The differentiating parameter between technologies in this category is read range. High-frequency RFID at 13.56 MHz - the technology behind ISO/IEC 14443 @iso-14443 and ISO/IEC 15693 @iso-15693 - operates in the near field and is restricted to roughly 0–10 cm, which forces the user to deliberately present the card; the experience is effectively equivalent to PIN entry. Ultra-high-frequency RFID at 860–960 MHz, governed by EPC Gen2 / ISO/IEC 18000-63 @iso-18000-63, operates in the far field and reaches 1–12 m with passive (battery-less) tags. A tag carried in a bag or pocket is detected at walking pace without any deliberate action by its carrier.
+
+UHF RFID is therefore the only mature passive identification technology meeting the hands-free, 2–3 m range requirement, and is selected as the basis for this system.
 
 #figure(
   table(
@@ -99,56 +90,35 @@
 
 == Direction Detection Methods <direction_detection_methods>
 
-- A single reader confirms a tag was present at a location but cannot determine direction of
-  traversal; for an attendance system, arrival vs. departure must be distinguished
-- Fundamental principle: two spatially separated readers on opposite sides of a doorway encode
-  direction in the temporal sequence of their detections - outside-first implies entry,
-  inside-first implies exit
-- Naive first-read comparison is unreliable: passive UHF tags respond probabilistically;
-  occasional reads at RF null points or from reflected waves can invert the apparent detection
-  order - Oikawa (2009) demonstrates this failure mode experimentally and proposes comparing
-  the read-count-weighted temporal centroid of each antenna's full detection group instead
-  `[REF: Oikawa, Y. - Tag movement direction estimation methods in an RFID gate system.
-  IEEE ISWCS 2009, pp. 41-45]`
-- A complementary signal is available in RSSI: as a tag moves through a portal, RSSI at each
-  reader rises, peaks at closest approach, then falls; the reader whose RSSI peaks first is the
-  one the tag passed first - follows directly from the Friis transmission equation
-  `[REF: Jie et al. - RF-Access: Barrier-Free Access Control Systems with UHF RFID.
-  Applied Sciences 12(22), MDPI 2022 - Section 2.1, Eqs. 1-2]`
-- *Two algorithmic families* emerge from this literature: temporal centroid and RSSI-weighted
-  centroid; both require the full set of raw timestamped RSSI readings from both readers -
-  per-device deduplication would destroy the signal; detailed formulations in #ref(<direction_detection_and_event_processing>)
+Distinguishing arrival from departure is a hard requirement for any attendance system; merely confirming that a tag was present at a location is not sufficient. A single reader provides only a presence event and cannot resolve direction, so direction information must be recovered from a second observable.
+
+The standard approach is to mount two readers on opposite sides of the doorway and treat the pair as a portal. The temporal sequence of detections from the two readers carries the direction: detections that begin at the outside reader before the inside reader imply entry, and the reverse implies exit.
+
+The simplest implementation is comparing the timestamps of the very first detection from each reader but is somewhat unreliable in practice. Passive UHF tags respond probabilistically and the radiation field in a real doorway is irregular due to multipath reflections; an early read from an RF null or a reflected wave can invert the apparent detection order. Oikawa demonstrates this failure mode experimentally on an RFID gate and proposes comparing the read-count-weighted temporal centroid of each reader's full detection group instead, which is far more robust to individual outlier reads @oikawa-2009.
+
+A complementary signal is available in the received signal strength indicator (RSSI). As a tag traverses the portal, its RSSI at each reader rises while the tag approaches, peaks at the moment of closest approach, and falls as the tag moves away - a direct consequence of the inverse-square dependence of received power on distance described by the Friis transmission equation. The reader whose RSSI peaks first is therefore the reader the tag passed first; in the portal geometry this carries the same direction information as the temporal centroid by an entirely different physical mechanism. This principle is used as the primary direction cue in the RF-Access barrier-free access control system of Jie et al. @jie-2022-rf-access.
+
+Two algorithmic families therefore emerge from this literature: a temporal centroid algorithm following Oikawa's approach, and an RSSI-weighted centroid algorithm based on the Friis-derived peak-time argument. Both require the full set of raw timestamped RSSI readings from both readers - any per-device deduplication or summarisation discards the very signal the algorithms operate on. Detailed mathematical formulations of both families are given in #ref(<direction_detection_and_event_processing>).
 
 #fig-placeholder[Figure 2.2-1: Dual RSSI curves over time for a single traversal; temporal centroids C_out and C_in marked; RSSI peaks labelled; direction arrow outside to inside]
 
 == Hardware Platforms and Embedded Architectures <hardware_platforms_and_embedded_architectures>
 
+The Lighthouse unit's hardware platform must support the full set of identification, network, and local-storage tasks within a single self-contained embedded device. The two principal sub-decisions are the choice of microcontroller and the choice of UHF RFID reader module.
+
 === Microcontroller Selection <microcontroller_selection>
 
-- The Lighthouse unit must perform several concurrent tasks: UART communication with the RFID reader module, WiFi
-  connectivity and MQTT messaging, local event storage, and GPIO management (IR sensor, LEDs, buttons); the platform
-  must support all of these within a single self-contained embedded unit
-- Requirements: integrated WiFi (no external module), at least one hardware UART, sufficient RAM to run a network stack
-  concurrently with application logic, adequate flash for firmware and a local event cache filesystem, low enough power
-  draw for battery-backed operation, mature development ecosystem, and low unit cost
-- Single-board computers (e.g. Raspberry Pi) satisfy the connectivity and processing requirements but run a full Linux
-  OS, draw substantially more power, depend on an SD card for storage (a known reliability concern in embedded
-  deployments), and are oversized for a single-peripheral embedded task; rejected
-- Microcontrollers with integrated WiFi and a mature SDK narrow the field considerably; the ESP32 (Espressif Systems)
-  stands out: dual-core Xtensa LX6 at up to 240 MHz, 520 KB SRAM, 4 MB flash (module), integrated WiFi and Bluetooth,
-  rich peripheral set including multiple UARTs, I²C, SPI, ADC, and hardware cryptographic accelerators; dual-core
-  architecture allows the WiFi/network stack to be isolated on Core 0 while application logic runs uninterrupted on Core
-  1 `[REF: ESP32 TRM Section 1.1; Malý [3]]`
-- The ESP-IDF framework provides a complete, production-grade SDK: FreeRTOS kernel, WiFi stack, MQTT client, NVS,
-  LittleFS, SNTP, mbedTLS - all maintained by the silicon vendor; large community, extensive documentation, and low
-  module cost (~\$3-5) make it the clear choice
-- *Selected:* ESP32-WROOM-32 module
+The Lighthouse runs several concurrent tasks: UART communication with the RFID reader, WiFi connectivity and MQTT publishing, persistent local event storage, and management of GPIO peripherals. The microcontroller therefore needs integrated WiFi, at least one hardware UART, sufficient RAM to run a network stack alongside application logic, enough flash for firmware and an event-cache filesystem, a power profile compatible with battery-backed operation, a mature SDK and toolchain, and a low unit cost.
+
+Single-board computers such as the Raspberry Pi satisfy the connectivity and processing requirements but are unsuitable on several other axes. They run a full Linux distribution with all of its boot, update, and management overhead; their power draw is substantially higher than a microcontroller's; and they typically depend on an SD card for persistent storage, with well-documented reliability problems in continuous embedded deployments. They are also significantly oversized for a single-peripheral embedded task. SBCs are therefore rejected.
+
+Among microcontrollers with integrated WiFi, the ESP32 from Espressif Systems is the strongest match. It pairs a dual-core Xtensa LX6 CPU at up to 240 MHz with 520 KB of internal SRAM, integrated 2.4 GHz WiFi (802.11 b/g/n) and Bluetooth, and a rich peripheral set including multiple UARTs, I²C, SPI, ADC, and hardware AES/SHA cryptographic accelerators @esp32-trm. The dual-core architecture is particularly relevant for this application: the WiFi/network stack can be pinned to Core 0 while the application logic runs on Core 1, eliminating cross-task interference between time-critical RFID handling and the inherently non-deterministic behaviour of a wireless network stack @maly-2024.
+
+The ESP-IDF framework, Espressif's official SDK, integrates every component this project requires - a FreeRTOS kernel, the WiFi stack, an MQTT client, NVS, LittleFS, SNTP, and mbedTLS - all maintained by the silicon vendor @esp-idf. Combined with extensive documentation, an active community, and a module unit cost of approximately 3–5 USD, the ESP32-WROOM-32 module is selected as the platform for the Lighthouse unit.
 
 === UHF RFID Reader Modules <uhf_rfid_reader_modules>
 
-- The embedded-integration tier - compact modules with a UART interface, controlled directly
-  by a microcontroller - was surveyed; key selection criteria: documented UART command
-  protocol, 5 V supply compatibility, and unit cost suitable for small scope prototyping
+UHF RFID readers are available across a wide cost and integration spectrum, from rack-mountable enterprise readers (Impinj R420 and similar) at hundreds of dollars to bare R-series chips intended for OEM integration. The relevant tier for this project is the embedded-integration tier: compact carrier modules that expose a UART command interface and can be controlled directly by a microcontroller. Within this tier, the selection criteria were a documented UART command protocol, 5 V supply compatibility (matching the board's primary rail), and a unit cost suitable for small-scope prototyping.
 
 #figure(
   table(
@@ -162,49 +132,31 @@
   caption: [Table 2.3.2-1 - UHF RFID reader module candidates],
 )
 
-- R300 selected over R200 for higher RF output (supporting the 2-3 m range requirement) and
-  native 5 V supply matching the board power rail; over the integrated-antenna variant for
-  external SMA connector enabling antenna substitution during range testing; over the bare chip
-  for its complete carrier board and documented command protocol requiring no custom RF design
-- *Vendor specification caveat:* the datasheet-stated 33 dBm ceiling is incorrect; hardware
-  cap is 25 dBm - `set_power(33)` returns error `0x48`; initially missed due to absent response
-  validation; a general caution on cost-tier module datasheets; full details in #ref(<uhf_rfid_scan_control>)
+The YPD-R300 was selected. Its higher RF output rating relative to the R200 line supports the 2–3 m range requirement; its 5 V supply matches the board's main power rail directly; and its external SMA connector permits the antenna to be substituted during range testing, which is not possible with the integrated-antenna variant. The bare R-series chip option was rejected as it would require a custom RF front-end design, an unjustifiable scope expansion at the prototype stage. The Impinj R420 and the ThingMagic and SparkFun modules, while well-supported, were excluded on cost grounds; their per-unit price would consume a disproportionate share of the prototype budget for three units.
+
+The 25 dBm RF output value cited in Table 2.3.2-1 reflects the module's actual hardware ceiling rather than the higher 33 dBm nominal value given on the manufacturer's datasheet; the relevant firmware-side handling of this discrepancy is discussed in #ref(<uhf_rfid_scan_control>).
 
 === Power Supply and Battery Considerations <power_supply_and_battery_considerations>
 
-- The Lighthouse unit must operate from USB-C mains power with a lithium battery providing backup autonomy; both sources
-  must be able to power the device simultaneously with automatic, safe arbitration between them
-- A single lithium cell (3.7 V nominal) cannot directly supply the ESP32 (requires 3.3 V regulated) or the RFID reader
-  module (requires 5 V); a boost converter is required to raise the battery output to 5 V, from which a 3.3 V LDO can be
-  derived
-- Battery charging, protection (overcurrent, overvoltage, undervoltage), and source arbitration (USB vs. boost output
-  via Schottky diode OR configuration) are well-defined sub-problems with established reference circuits; standard ICs
-  exist for each function and were selected during hardware design (covered on #ref(<power_delivery_architecture>, form: "page"))
-- Critical consideration: the UHF RFID reader draws significant peak current during active scan windows; the power
-  supply design must sustain transient loads without causing voltage rail collapse - a failure mode that manifests as
-  device reset and was encountered during Board v2 bring-up
+The Lighthouse must operate from USB-C mains power while a lithium-ion cell provides backup autonomy. Both sources must be capable of powering the device simultaneously, with automatic and electrically safe arbitration between them so that connecting or disconnecting either source does not interrupt operation.
+
+A single lithium-ion cell at 3.7 V nominal cannot directly supply either of the two regulated rails the device requires: the ESP32 needs a 3.3 V regulated supply, and the YPD-R300 RFID reader requires 5 V. A boost converter is therefore required to step the cell voltage up to 5 V, from which a low-dropout regulator derives the 3.3 V rail.
+
+The constituent sub-problems - battery charging, cell protection (against overcurrent, overvoltage, and undervoltage), and arbitration between the USB and battery-derived 5 V rails via a Schottky-diode OR are well-established in embedded design practice, and dedicated single-function ICs exist for each role. The specific selections and the assembled topology are described on #ref(<power_delivery_architecture>, form: "page").
+
+One characteristic of this particular load deserves mention here, as it constrains the entire power chain: the UHF reader draws significant peak current during active scan windows. The supply must sustain these transients without rail collapse - an undersized converter or insufficient bulk decoupling will cause the ESP32 to brown out and reset. Sizing of converters, bulk capacitance, and the connections between them must therefore be dimensioned for peak rather than average current.
 
 === Timekeeping Without a Hardware RTC <timekeeping_without_a_hardware_rtc>
 
-- The ESP32-WROOM-32 module does not include a battery-backed hardware RTC; the internal RTC counter runs only while the
-  device is powered and loses its value on cold boot `[REF: ESP32 TRM Section 9.3.6]`
-- For an attendance system, all events must carry timestamps traceable to real calendar time; a boot-relative counter is
-  insufficient
-- SNTP (Simple Network Time Protocol) synchronisation over WiFi is the standard approach for ESP32 timekeeping; ESP-IDF
-  provides a built-in SNTP component; accuracy is adequate for attendance timestamping (sub-second error after sync)
-  `[REF: IETF RFC 4330 - SNTPv4]`
-- The limitation of SNTP-only timekeeping is that time is lost when the device is powered off or loses network access; a
-  `timeBasis` field (`synced` / `estimated` / `relative`) is declared on every event payload to communicate timestamp
-  quality to the server, which can then apply appropriate handling
-- A hardware RTC IC with coin cell backup would eliminate this limitation and is identified as the primary hardware
-  improvement for a future board revision
+The ESP32-WROOM-32 module does not include a battery-backed real-time clock. The internal RTC counter on the SoC continues to run during deep sleep but loses its value on a cold boot @esp32-trm[§9.3.6]. For an attendance system, every event must carry a timestamp traceable to real calendar time, so a boot-relative counter is not by itself sufficient.
+
+The standard approach for ESP32 timekeeping is synchronisation over the network using the Simple Network Time Protocol (SNTPv4) @rfc4330. ESP-IDF includes a built-in SNTP client that synchronises the SoC's RTC counter against one or more configured time servers; the residual error after synchronisation is well below one second, which is more than adequate for attendance event timestamping.
+
+The limitation of an SNTP-only design is that calendar time is lost whenever the device powers off or loses network access. The mitigation applied at the data-model level is a `timeBasis` field carried on every event payload, with three values - `synced`, `estimated`, or `relative` - communicating the provenance of the timestamp to the server, which then applies appropriate handling. A hardware RTC IC with coin-cell backup would eliminate the underlying limitation entirely and is identified as the primary hardware improvement for a future board revision.
 
 == Communication Protocols and Enterprise Integration <communication_protocols_and_enterprise_integration>
 
-- Two distinct communication paths exist in this system with different requirements: the
-  firmware-to-server path (frequent small messages from a constrained embedded device on an
-  unreliable network) and the server-to-enterprise path (low-frequency, high-importance
-  attendance records pushed to an HR system)
+Two distinct communication paths exist in this system, with different requirements. The firmware-to-server path carries frequent small messages from a constrained embedded device over an unreliable wireless network. The server-to-enterprise path carries low-frequency, high-importance attendance records pushed from the server to an external HR system. The two paths are evaluated separately.
 
 #figure(
   table(
@@ -218,40 +170,25 @@
   caption: [Table 2.4-1 - Communication protocol comparison for firmware transport],
 )
 
-- MQTT features directly applied: QoS 1 for live scan publishes (at-least-once, tolerable
-  during high-frequency scan windows); QoS 2 for offline replay (exactly-once, prevents
-  duplicate attendance records); LWT for automatic device-offline detection without polling
-- *Offline-first:* events written to LittleFS before any transmission attempt; replayed on
-  reconnection - no event discarded due to transient network unavailability
-- *Server-to-enterprise path - REST:* attendance records created once per traversal event;
-  stateless REST appropriate - low frequency, widely supported by enterprise software,
-  idempotent by design
-- *Navigo3:* integration target; Czech HR and project management platform by Navigo Solutions s.r.o.; REST API built
-  on the open-source `dry-api` framework (typed JSON-over-HTTP)
-  `[REF: NavigoSolutions/dry-api - github.com/NavigoSolutions/dry-api]`
-  `[REF: navigo3.com/cs/api-a-predchystane-integrace]`; attendance recording endpoints extended with parametrised
-  `start`/`stop` overloads in release 2026.03, co-developed with this thesis; implementation detail in section 3.4.5
+For the firmware-to-server path, MQTT is selected. It was designed specifically for constrained devices communicating over unreliable networks and provides the three features this project relies on directly: tunable Quality-of-Service levels, automatic reconnection in the client library, and a Last Will and Testament (LWT) message published by the broker when a client disconnects unexpectedly @mqtt. QoS 1 (at-least-once) is used for live scan publishes during high-frequency scan windows, where occasional duplicate delivery is tolerable and the lower handshake overhead is essential. QoS 2 (exactly-once) is used for offline replay of cached events, where duplicate attendance records would be incorrect and the lower throughput is irrelevant. The LWT mechanism gives the server immediate notification of an unexpected device disconnection without polling.
+
+The transport is offline-first: every event is written to a LittleFS-backed cache before any attempt to transmit it, and is replayed on reconnection. No event is discarded as a result of transient network unavailability.
+
+For the server-to-enterprise path, REST over HTTP is appropriate. Attendance records are created once per traversal event - a low-frequency, high-importance flow that is well served by stateless idempotent HTTP endpoints, which are also universally supported by enterprise software. The integration target is Navigo3, the HR and project-management platform developed by Navigo Solutions s.r.o.; its REST API is built on the open-source `dry-api` framework, a typed JSON-over-HTTP transport @dry-api @navigo3-api. The platform's attendance-recording endpoints were extended in release 2026.03 with parametrised `start`/`stop` overloads, developed in conjunction with this thesis; the connector implementation is described in #ref(<navigo3_integration>).
 
 == Embedded Software Frameworks <embedded_software_frameworks>
 
-- The ESP32 platform is supported by ESP-IDF (Espressif IoT Development Framework), the official vendor SDK; it
-  integrates all components needed for this project and avoids the fragmentation of assembling a firmware stack from
-  independent libraries `[REF: Espressif ESP-IDF Programming Guide; Malý [3]]`
-- *FreeRTOS* (integrated into ESP-IDF): preemptive real-time kernel; provides tasks, queues, semaphores, and event
-  groups; the dual-core architecture allows the WiFi stack (managed by ESP-IDF) to run on Core 0 while application tasks
-  (RFID control, MQTT, offline cache, LED state machine) run on Core 1 without interference; the standard choice for
-  ESP32 application firmware `[REF: FreeRTOS documentation]`
-- *NVS (Non-Volatile Storage):* key-value store over internal flash with transparent wear-levelling; used for WiFi
-  credentials, MQTT broker address, device identity, last known good timestamp, and offline buffer pointers; simpler and
-  more robust than a raw flash partition for configuration data
-- *LittleFS:* wear-levelling filesystem for NOR flash, included as an ESP-IDF component; chosen over SPIFFS (the older
-  alternative) for its better crash resilience and support for directories; used for the offline event cache
-- *mbedTLS (AES):* TLS and cryptographic library integrated into ESP-IDF; AES-128-ECB used for encrypting WiFi
-  credentials stored in NVS; the ESP32 hardware AES accelerator is used transparently via the mbedTLS API, keeping
-  encryption overhead negligible `[REF: ESP32 TRM Section 14 - AES Accelerator]`
-- *WiFi provisioning approach:* the ESP-IDF `wifi_provisioning` component (BLE-based) was evaluated but rejected - it
-  requires a companion mobile application; a custom captive portal (SoftAP + DNS hijack + HTTP form served from SPIFFS)
-  was implemented instead, working with any device browser regardless of OS
+The ESP32 platform is supported by ESP-IDF (Espressif IoT Development Framework), the official vendor SDK. It bundles all of the components this project requires and avoids the fragmentation of assembling a firmware stack from independent libraries @esp-idf @maly-2024.
+
+FreeRTOS, integrated into ESP-IDF, is a preemptive real-time kernel that provides tasks, queues, semaphores, and event groups @freertos. It pairs with the dual-core architecture naturally: the WiFi stack runs on Core 0 (managed by ESP-IDF) while application tasks - RFID control, MQTT publishing, the offline event cache, and the LED state machine - run on Core 1 without contending for the network stack's CPU time. This is the standard arrangement for ESP32 application firmware.
+
+NVS (Non-Volatile Storage), an ESP-IDF component, exposes a key-value store backed by an internal flash partition with transparent wear-levelling. It is used for WiFi credentials, MQTT broker configuration, device identity, the last-known-good timestamp, and offline buffer pointers; for configuration data of this kind it is simpler and more robust than maintaining a hand-rolled flash partition.
+
+LittleFS, a wear-levelling filesystem designed for NOR flash, is used for the offline event cache. It is included as an ESP-IDF component and was chosen over SPIFFS - the older alternative bundled with earlier ESP-IDF versions - for its crash resilience and its support for directories @littlefs.
+
+mbedTLS, also part of ESP-IDF, provides the cryptographic primitives needed to encrypt WiFi credentials stored in NVS using AES-128-ECB. The ESP32 includes a hardware AES accelerator, which mbedTLS uses transparently when configured for the platform @esp32-trm[§14], keeping the encryption overhead negligible.
+
+For initial WiFi credential entry, the ESP-IDF `wifi_provisioning` component (BLE-based) was evaluated and rejected because it requires a companion mobile application, undermining the goal of a self-contained device with no auxiliary tooling on the employee or installer side. A custom captive-portal solution was implemented instead - SoftAP mode combined with DNS hijacking and an HTTP credential form served from SPIFFS - so that any device with a browser can provision the unit regardless of operating system.
 
 #figure(
   table(
@@ -865,18 +802,24 @@ Errors encountered during retry are logged with the event ID and exception detai
 
 == Dashboard <dashboard>
 
-=== Architecture and Stack
+=== Architecture and Stack <dashboard-arch>
 
-- The dashboard is a single-page application built with SolidJS, chosen for its small bundle size and fine-grained
-  reactivity model (no virtual DOM diffing)
-- Routing uses `@solidjs/router` with five client-side routes; the SPA is served as a static build from the same BunJS
-  process that hosts the API and MQTT broker
-- Styling uses CSS modules scoped per component
-- Real-time updates are delivered via a WebSocket connection established on application mount (`App.tsx`); the WebSocket
-  store dispatches incoming messages to page-specific reactive stores, so each page updates independently without
-  polling
-- Authentication is out of scope for this prototype; the REST API and dashboard are accessible without credentials on
-  the local network; session management and role-based access are identified as future work
+The dashboard is a single-page application built with SolidJS, chosen for its
+fine-grained reactivity model: component state updates propagate directly to the DOM
+without a virtual-DOM diffing pass, keeping the runtime footprint small. Client-side
+routing is handled by `@solidjs/router` with five declared routes; the compiled static
+build is served directly from the BunJS process that hosts the REST API and MQTT broker,
+eliminating the need for a separate static file server. Per-component CSS modules provide
+style encapsulation.
+
+Real-time updates are delivered over a single WebSocket connection opened on application
+mount in `App.tsx`. A central WebSocket store receives incoming messages and dispatches
+them to page-specific reactive stores, so only the relevant page re-renders on each
+incoming event; no polling is required. Table~@tbl-ws-messages lists the seven message
+types produced by the server and their consumer pages. Authentication is outside the scope
+of this prototype; the dashboard and REST API are accessible without credentials on the
+local network, with session management and role-based access control identified as future
+work.
 
 #figure(
   table(
@@ -890,76 +833,83 @@ Errors encountered during retry are logged with the event ID and exception detai
 [ `event:new`      ],[ Processed event created          ],[ Processed Events ],
 [ `event:orphaned` ],[ Scans orphaned by sweeper        ],[ Processed Events ],
   ),
-  caption: [Table 3.5.1-1 - WebSocket message types],
-)
+  caption: [WebSocket message types and their consumer pages],
+) <tbl-ws-messages>
 
-=== Pages
+=== Pages <dashboard-pages>
 
-==== Lighthouses (`/`)
+==== Lighthouses (`/`) <page-lighthouses>
 
-- Lists all registered Lighthouse devices with live status: online/offline indicator, last health telemetry (uptime,
-  WiFi RSSI, RFID reader state)
-- Health data updates in real time via `device:health` WebSocket messages without page refresh
-- Pending (unregistered) devices that connect to the MQTT broker appear in a separate section; the operator can claim a
-  pending device by assigning it a name and placement (inside/outside)
-- Device registration uses the ESP32's eFuse MAC address as the stable device identifier
+The root page lists all registered Lighthouse devices with their current status:
+online/offline indicator and the most recent health telemetry payload - uptime, WiFi RSSI,
+and RFID reader state. Health data arrives via `device:health` WebSocket messages and
+updates the display without a page refresh. Devices that connect to the MQTT broker but
+are not yet registered appear in a separate _pending_ section; the operator assigns a name
+and a placement (inside/outside) to claim the device. The ESP32 eFuse MAC address serves
+as the stable device identifier throughout registration.
 
-==== Groups (`/groups`)
+==== Groups (`/groups`) <page-groups>
 
-- Groups pair two Lighthouses (one outside, one inside) into a detection portal
-- `activityTimeoutMs` (default 4 000 ms) and `orphanTimeoutMs` (default 8 000 ms) are stored per-group in the database
-  and configurable via the API; the dashboard Groups page manages group label and description only - UI controls for
-  timeout values are out of scope for this prototype
-- A lighthouse can belong to at most one group; ungrouped lighthouses have their scans orphaned by the event sweeper
+A group pairs two Lighthouses - one designated outside, one inside - into a detection
+portal. The page manages the group label and description; the two per-group timing
+parameters (`activityTimeoutMs`, default 4 000 ms; `orphanTimeoutMs`, default 8 000 ms)
+are stored in the database and configurable via the REST API, but UI controls for these
+values are out of scope for this prototype. A Lighthouse may belong to at most one group;
+scans from ungrouped units are orphaned by the event sweeper and never produce processed
+events.
 
-==== Events (`/events`)
+==== Events (`/events`) <page-events>
 
-- Real-time feed of raw scan events as they arrive from Lighthouse units; new scans are prepended to the table via the
-  `scan` WebSocket message
-- Filterable by lighthouse, EPC (partial match), scan source (`realtime` / `offline_sync`), and date range
-- Serves as a debugging and monitoring tool - the operator can verify that tags are being detected and that both units
-  in a portal are reporting scans
+The Events page is a live feed of raw scan records as they arrive from Lighthouse units.
+New scans are prepended to the table via the `scan` WebSocket message. The table is
+filterable by Lighthouse, EPC (partial match), scan source (`realtime` / `offline_sync`),
+and date range. The page serves as a diagnostic tool, allowing the operator to confirm
+that both units in a portal are detecting tags before trusting the direction detection
+output.
 
-==== Processed events (`/processed`)
+==== Processed Events (`/processed`) <page-processed>
 
-- Displays the output of the direction detection pipeline: one row per processed event, showing direction
-  (in/out/unknown), confidence, algorithm, tag EPC, user (if assigned), group, and timestamp
-- Filterable by algorithm, direction, user, group, and date range
-- Each row expands into a detail modal with three tabs:
+This page displays the output of the direction detection pipeline. Each row represents one
+processed event and shows direction, confidence, algorithm, tag EPC, assigned user, group,
+and timestamp. Rows are filterable by algorithm, direction, user, group, and date range;
+both algorithms can be viewed simultaneously in a merged, time-sorted view. A notification
+banner appears when new `event:new` WebSocket messages arrive while the page is open,
+allowing the operator to refresh without leaving the page.
 
-*Overview tab:*
+Each row opens a detail modal with three tabs:
 
-- Direction, confidence percentage, tag EPC, user, group, algorithm name, timestamp, and cluster time span
-- Confidence factor breakdown displayed as horizontal progress bars: centroid separation, cluster size, bilateral
-  coverage, and (for Algorithm 2) RSSI trend consistency
-- Link to the companion event (same cluster, other algorithm) for side-by-side comparison
+- *Overview* - direction, confidence percentage, tag EPC, user, group, algorithm,
+  timestamp, and cluster time span; confidence factor breakdown rendered as horizontal
+  progress bars (centroid separation, cluster size, bilateral coverage, and - for
+  Algorithm~2 - RSSI trend consistency); a link to the companion event produced by the
+  other algorithm for direct comparison.
+- *Raw Scans* - all raw scans belonging to the cluster, grouped by Lighthouse
+  (inside vs. outside), with EPC, RSSI, timestamp, and time basis.
+- *Timeline* - a scan-timing histogram with a horizontal time axis, bars coloured by
+  Lighthouse (blue = outside, orange = inside), and dashed centroid markers. For
+  Algorithm~2, an RSSI-over-time scatter plot with per-Lighthouse linear regression lines
+  is rendered below the histogram, illustrating the signal trend used in the RSSI Trend
+  Consistency Factor calculation.
 
-*Raw Scans tab:*
+#figure(
+  image("images/3.5.2-1_modal.png", width: 100%),
+  caption: [Processed event detail modal - Overview tab showing direction, confidence,
+            confidence factor bars, and companion algorithm link.],
+) <fig-modal-overview>
 
-- Lists all raw scans belonging to the cluster, grouped by lighthouse (inside vs. outside), showing EPC, RSSI,
-  timestamp, and time basis
+#figure(
+  image("images/3.5.2-2_modal.png", width: 100%),
+  caption: [Processed event detail modal - Timeline tab showing scan timing histogram
+            with centroid markers and RSSI scatter plot with regression lines.],
+) <fig-modal-timeline>
 
-*Timeline tab:*
+==== Users (`/users`) <page-users>
 
-- Scan timing histogram: horizontal time axis with bars representing scan detections per time bucket, colour-coded by
-  lighthouse (blue = outside, orange = inside); centroid markers for the selected algorithm shown as dashed vertical
-  lines
-- For Algorithm 2: RSSI-over-time scatter plot below the histogram, with per-lighthouse regression lines illustrating
-  the RSSI trend used in RTCF calculation
+The Users page manages user records comprising a display name, email address, and a
+Navigo3 sync ID used by the integration layer. Each user may have multiple EPC tag
+assignments active simultaneously; deactivated assignments are retained with a
+`deactivatedAt` timestamp for audit purposes rather than being deleted.
 
-![Figure 3.5.2-1: Processed event detail modal - Overview tab showing direction, confidence, confidence factor bars,
-and companion algorithm link.](./images/3.5.2-1_modal.png)
-
-![Figure 3.5.2-2: Processed event detail modal - Timeline tab showing scan timing histogram with centroid markers and
-RSSI-over-time scatter plot with regression lines.](./images/3.5.2-2_modal.png)
-
-==== Users (`/users`)
-
-- Manages user records: name, email, and Navigo3 sync ID for integration
-- Each user can have multiple EPC tags assigned at a time; any orphaned tag assignments are preserved with a
-  `revokedAt` timestamp for audit
-
-== System Verification
 
 === Lab Validation
 
@@ -1115,3 +1065,5 @@ RSSI-over-time scatter plot with regression lines.](./images/3.5.2-2_modal.png)
   - Further software and firmware improvements identified during development
   - Improved API and web interface with proper authentication and session management
 
+
+#bibliography("references.bib", style: "ieee")
