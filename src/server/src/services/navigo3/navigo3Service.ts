@@ -32,14 +32,20 @@ export async function initNavigo3Service(): Promise<void> {
 
   connector = new Navigo3Connector(baseUrl, username, password);
 
-  const types = (await connector.execute(
-    "attendance/embedded/types",
-    {},
-  )) as Array<{
-    id: number;
-    name: string;
-    systemName?: string | null;
-  }>;
+  let types: Array<{ id: number; name: string; systemName?: string | null }>;
+  try {
+    types = (await connector.execute(
+      "attendance/embedded/types",
+      {},
+    )) as typeof types;
+  } catch (err) {
+    logger.warn(
+      "Navigo3: could not connect to Navigo3 instance — integration disabled",
+      { err },
+    );
+    connector = null;
+    return;
+  }
 
   const atWorkType = types.find((t) => t.systemName === "atWork");
   if (!atWorkType) {
