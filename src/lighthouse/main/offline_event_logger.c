@@ -53,8 +53,8 @@ RTC_DATA_ATTR static uint32_t rtc_seq_counter  = 0;
 
 // Pre-registered replay callback — set by offline_logger_schedule_replay() so that
 // offline_logger_init() can auto-start replay when it runs after MQTT connects.
-static offline_replay_callback_t s_pending_replay_cb         = NULL;
-static uint32_t                  s_pending_replay_grace       = 0;
+static offline_batch_replay_callback_t s_pending_replay_cb   = NULL;
+static uint32_t                        s_pending_replay_grace = 0;
 
 // Snapshot of rtc_write_index taken when replay starts. Used to detect when all
 // pre-replay events are ACKed, even if new live events have since been stored.
@@ -78,9 +78,9 @@ static struct
     SemaphoreHandle_t storage_mutex; // Protects file operations
 
     // Replay state
-    TaskHandle_t              replay_task; // Background replay task
-    offline_replay_callback_t replay_callback;
-    bool                      replay_active;
+    TaskHandle_t                    replay_task; // Background replay task
+    offline_batch_replay_callback_t replay_callback;
+    bool                            replay_active;
 
     // Statistics
     offline_logger_stats_t stats;
@@ -482,6 +482,12 @@ static void replay_task(void *arg)
         s_sync_start_cb(entries_to_replay);
     }
 
+    // Batch accumulator: events are grouped into OFFLINE_REPLAY_BATCH_SIZE chunks
+    // and published as a single MQTT array message. This reduces the number of
+    // NVS saves triggered by incoming ACKs (the dominant replay latency factor).
+    offline_replay_entry_t batch[OFFLINE_REPLAY_BATCH_SIZE];
+    uint32_t               batch_count = 0;
+
     for (uint32_t i = 0; i < entries_to_replay && logger_state.replay_active; i++)
     {
         // Acquire storage mutex
@@ -520,40 +526,39 @@ static void replay_task(void *arg)
         rfid_tag_event_t rfid_event;
         offline_event_to_rfid_event(&offline_event, &rfid_event);
 
-        // Release mutex before network I/O
+        batch[batch_count].event                = rfid_event;
+        batch[batch_count].offline_timestamp_ms = offline_event.timestamp_ms;
+        batch[batch_count].rtc_timestamp_s      = offline_event.rtc_timestamp_s;
+        batch[batch_count].time_quality =
+            (offline_event.rtc_timestamp_s > 0) ? TIME_QUALITY_SYNCED : TIME_QUALITY_NONE;
+        batch[batch_count].seq_no = offline_event.seq_no;
+        batch_count++;
+
         xSemaphoreGive(logger_state.storage_mutex);
 
-        if (logger_state.replay_callback)
-        {
-            uint64_t       replay_time    = esp_timer_get_time() / 1000;
-            time_quality_t stored_quality =
-                (offline_event.rtc_timestamp_s > 0) ? TIME_QUALITY_SYNCED : TIME_QUALITY_NONE;
+        local_cursor = (local_cursor + 1) % OFFLINE_MAX_EVENTS;
 
-            // Publish; pointer advancement is driven by server ACK, not return value.
-            // Callback returns ESP_FAIL if MQTT is disconnected — stop replay so the
-            // next MQTT_EVENT_CONNECTED can start a fresh replay from rtc_read_index.
-            esp_err_t cb_ret = logger_state.replay_callback(&rfid_event, offline_event.timestamp_ms, replay_time,
-                                                             offline_event.rtc_timestamp_s, stored_quality,
-                                                             offline_event.seq_no);
+        bool flush = (batch_count == OFFLINE_REPLAY_BATCH_SIZE) || (i == entries_to_replay - 1);
+        if (flush && logger_state.replay_callback)
+        {
+            uint64_t  replay_time = esp_timer_get_time() / 1000;
+            esp_err_t cb_ret      = logger_state.replay_callback(batch, batch_count, replay_time);
             if (cb_ret != ESP_OK)
             {
-                ESP_LOGW(TAG, "Replay publish failed (MQTT disconnected?) — stopping replay");
+                ESP_LOGW(TAG, "Batch replay publish failed (MQTT disconnected?) — stopping replay");
                 logger_state.replay_active = false;
                 break;
             }
 
-            events_replayed++;
-            logger_state.stats.events_replayed++;
-            ESP_LOGI(TAG, "Replayed event seqNo=%lu (%lu/%lu)", offline_event.seq_no, events_replayed,
-                     entries_to_replay);
+            events_replayed += batch_count;
+            logger_state.stats.events_replayed += batch_count;
+            ESP_LOGI(TAG, "Replayed batch of %lu events (%lu/%lu total)", (unsigned long)batch_count,
+                     (unsigned long)events_replayed, (unsigned long)entries_to_replay);
+            batch_count = 0;
+
+            // Yield once per batch so higher-priority tasks (logging, MQTT handler) can run.
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
-
-        local_cursor = (local_cursor + 1) % OFFLINE_MAX_EVENTS;
-
-        // Minimal yield so higher-priority tasks (logging, MQTT event handler) can run.
-        // The ACK round-trip (~80ms) is the natural rate-limiter; a hard 100ms delay
-        // per event was the main reason replay of 19 events took >90 seconds.
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
 
     logger_state.replay_active = false;
@@ -588,7 +593,7 @@ void offline_logger_set_sync_start_callback(offline_sync_start_callback_t callba
     s_sync_start_cb = callback;
 }
 
-void offline_logger_schedule_replay(offline_replay_callback_t callback, uint32_t grace_period_s)
+void offline_logger_schedule_replay(offline_batch_replay_callback_t callback, uint32_t grace_period_s)
 {
     s_pending_replay_cb    = callback;
     s_pending_replay_grace = grace_period_s;
@@ -840,7 +845,7 @@ esp_err_t offline_logger_store_event(const rfid_tag_event_t *event)
     return ESP_OK;
 }
 
-esp_err_t offline_logger_start_replay(offline_replay_callback_t callback, uint32_t grace_period_s)
+esp_err_t offline_logger_start_replay(offline_batch_replay_callback_t callback, uint32_t grace_period_s)
 {
     if (!logger_state.initialized)
     {

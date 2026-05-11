@@ -191,79 +191,89 @@ static void on_sync_start(uint32_t count)
     ESP_LOGI(TAG, "Published sync/start: %lu events", (unsigned long)count);
 }
 
-static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t offline_timestamp,
-                                      uint64_t replay_timestamp, uint32_t rtc_timestamp_s, time_quality_t time_quality,
-                                      uint32_t seq_no)
+// JSON buffer large enough for OFFLINE_REPLAY_BATCH_SIZE entries (~350 bytes each).
+#define OFFLINE_REPLAY_JSON_BUF_SIZE (OFFLINE_REPLAY_BATCH_SIZE * 350 + 32)
+
+static esp_err_t replay_offline_event_batch(const offline_replay_entry_t *entries, uint32_t count,
+                                            uint64_t replay_timestamp_ms)
 {
-    ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms, rtc_s=%lu, quality=%d)", event->epc[0],
-             event->epc[1], offline_timestamp, rtc_timestamp_s, (int)time_quality);
-
     if (s_mqtt_client == NULL || !mqtt_client_is_connected())
-    {
         return ESP_FAIL;
-    }
 
-    char epc_hex[65];
-    epc_to_hex_string(event->epc, event->epc_len, epc_hex);
-    int rssi_dbm = rssi_to_dbm(event->rssi);
-
-    // Determine timeBasis and timestampMs from stored quality
-    const char *time_basis;
-    int64_t     timestamp_ms;
-
-    if (time_quality == TIME_QUALITY_SYNCED && rtc_timestamp_s > 0)
-    {
-        timestamp_ms = (int64_t)rtc_timestamp_s * 1000;
-        time_basis   = "synced";
-    }
-    else
-    {
-        // Use boot-relative ms (the original detection offset)
-        timestamp_ms = (int64_t)offline_timestamp;
-        time_basis   = (time_quality == TIME_QUALITY_ESTIMATED) ? "estimated" : "relative";
-    }
-
-    uint64_t replay_time_ms = (uint64_t)(esp_timer_get_time() / 1000);
-
-    char payload[512];
-    int  len = snprintf(payload, sizeof(payload),
-                        "[{"
-                         "\"epc\":\"%s\","
-                         "\"timestampMs\":%lld,"
-                         "\"rssiDbm\":%d,"
-                         "\"antennaId\":%u,"
-                         "\"frequency\":%u,"
-                         "\"deviceId\":\"%s\","
-                         "\"offline\":true,"
-                         "\"replayTime\":%llu,"
-                         "\"timeBasis\":\"%s\","
-                         "\"seqNo\":%lu"
-                         "}]",
-                        epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac,
-                        replay_time_ms, time_basis, (unsigned long)seq_no);
-
-    if (len >= (int)sizeof(payload))
-    {
-        ESP_LOGW(TAG, "Offline replay payload truncated");
-    }
-
-    // replay_offline_event runs from replay_task — use a local topic buffer to avoid
-    // racing with health timer and MQTT event handler on the shared s_topic_buffer.
+    // replay_offline_event_batch runs from replay_task — use a local topic buffer to
+    // avoid racing with health timer and MQTT event handler on s_topic_buffer.
     char scans_topic[128];
     snprintf(scans_topic, sizeof(scans_topic), "%s%s/scans", MQTT_TOPIC_BASE, s_device_mac);
-    // enqueue (non-blocking) avoids the 5000ms stall that esp_mqtt_client_publish
-    // (synchronous) causes: publish blocks replay_task until PUBACK, and the MQTT
-    // task only drains its outbox after network.timeout_ms (5000ms) poll expires.
-    int msg_id = esp_mqtt_client_enqueue(s_mqtt_client, scans_topic, payload, 0, MQTT_QOS_TAG_EVENTS_LIVE, 0, true);
+
+    static char json_buf[OFFLINE_REPLAY_JSON_BUF_SIZE];
+    int         pos = 0;
+
+    json_buf[pos++] = '[';
+
+    for (uint32_t i = 0; i < count; i++)
+    {
+        const offline_replay_entry_t *e = &entries[i];
+
+        char epc_hex[65];
+        epc_to_hex_string(e->event.epc, e->event.epc_len, epc_hex);
+        int rssi_dbm = rssi_to_dbm(e->event.rssi);
+
+        const char *time_basis;
+        int64_t     timestamp_ms;
+
+        if (e->time_quality == TIME_QUALITY_SYNCED && e->rtc_timestamp_s > 0)
+        {
+            timestamp_ms = (int64_t)e->rtc_timestamp_s * 1000;
+            time_basis   = "synced";
+        }
+        else
+        {
+            timestamp_ms = (int64_t)e->offline_timestamp_ms;
+            time_basis   = (e->time_quality == TIME_QUALITY_ESTIMATED) ? "estimated" : "relative";
+        }
+
+        int written = snprintf(json_buf + pos, sizeof(json_buf) - pos,
+                               "%s{"
+                               "\"epc\":\"%s\","
+                               "\"timestampMs\":%lld,"
+                               "\"rssiDbm\":%d,"
+                               "\"antennaId\":%u,"
+                               "\"frequency\":%u,"
+                               "\"deviceId\":\"%s\","
+                               "\"offline\":true,"
+                               "\"replayTime\":%llu,"
+                               "\"timeBasis\":\"%s\","
+                               "\"seqNo\":%lu"
+                               "}",
+                               i > 0 ? "," : "",
+                               epc_hex, timestamp_ms, rssi_dbm, e->event.antenna_id, e->event.frequency,
+                               s_device_mac, replay_timestamp_ms, time_basis, (unsigned long)e->seq_no);
+
+        if (written < 0 || pos + written >= (int)sizeof(json_buf) - 2)
+        {
+            ESP_LOGW(TAG, "Offline replay batch JSON buffer full at entry %lu — dropping batch", i);
+            s_stats.publish_errors++;
+            return ESP_FAIL;
+        }
+        pos += written;
+    }
+
+    json_buf[pos++] = ']';
+    json_buf[pos]   = '\0';
+
+    // enqueue (non-blocking): all batch entries go out in a single MQTT message,
+    // reducing NVS saves from N to ⌈N/BATCH_SIZE⌉ (NVS writes are the dominant
+    // replay latency on ESP32, typically 100–2000 ms each).
+    int msg_id = esp_mqtt_client_enqueue(s_mqtt_client, scans_topic, json_buf, pos,
+                                         MQTT_QOS_TAG_EVENTS_LIVE, 0, true);
     if (msg_id < 0)
     {
-        ESP_LOGE(TAG, "Failed to enqueue offline replay event (outbox full or not connected)");
+        ESP_LOGE(TAG, "Failed to enqueue offline replay batch (outbox full or disconnected)");
         s_stats.publish_errors++;
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "Replayed offline event: %s timeBasis=%s ts=%lld (msg_id=%d)", epc_hex, time_basis, timestamp_ms,
-             msg_id);
+    ESP_LOGI(TAG, "Enqueued offline replay batch: %lu events, msg_id=%d", (unsigned long)count, msg_id);
     return ESP_OK;
 }
 
@@ -457,7 +467,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         // Register sync-start and replay callbacks (safe to call repeatedly — idempotent)
         offline_logger_set_sync_start_callback(on_sync_start);
-        offline_logger_schedule_replay(replay_offline_event, OFFLINE_REPLAY_GRACE_PERIOD);
+        offline_logger_schedule_replay(replay_offline_event_batch, OFFLINE_REPLAY_GRACE_PERIOD);
 
         // Also try to start immediately for the normal reconnect case where the
         // logger is already initialized with pending events.
@@ -469,7 +479,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "  Found %lu offline events to replay", pending_events);
             ESP_LOGI(TAG, "════════════════════════════════════");
 
-            esp_err_t replay_ret = offline_logger_start_replay(replay_offline_event, OFFLINE_REPLAY_GRACE_PERIOD);
+            esp_err_t replay_ret = offline_logger_start_replay(replay_offline_event_batch, OFFLINE_REPLAY_GRACE_PERIOD);
 
             if (replay_ret == ESP_OK)
             {

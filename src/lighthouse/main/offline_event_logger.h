@@ -114,21 +114,39 @@ typedef struct
 } offline_logger_stats_t;
 
 /**
- * Event Replay Callback
- *
- * Called for each event during replay with offline flag set to true.
- * This allows the MQTT client to publish with appropriate metadata.
- *
- * @param event            Original RFID tag event (EPC, RSSI, etc.)
- * @param offline_timestamp Boot-relative ms when event was originally detected
- * @param replay_timestamp  Current time in boot-relative ms (when being replayed)
- * @param rtc_timestamp_s   Unix seconds at detection time (0 if unknown)
- * @param time_quality      Time quality inferred from rtc_timestamp_s (> 0 → SYNCED)
- * @return ESP_OK if event published successfully
+ * Number of offline events bundled into one MQTT message during replay.
+ * Batching cuts per-event NVS saves and MQTT round-trips, which are the
+ * dominant latency during offline replay (~100-2000 ms per NVS write).
  */
-typedef esp_err_t (*offline_replay_callback_t)(const rfid_tag_event_t *event, uint64_t offline_timestamp,
-                                               uint64_t replay_timestamp, uint32_t rtc_timestamp_s,
-                                               time_quality_t time_quality, uint32_t seq_no);
+#define OFFLINE_REPLAY_BATCH_SIZE 8
+
+/**
+ * Single entry within a batch replay callback.
+ */
+typedef struct
+{
+    rfid_tag_event_t event;
+    uint64_t         offline_timestamp_ms;
+    uint32_t         rtc_timestamp_s;
+    time_quality_t   time_quality;
+    uint32_t         seq_no;
+} offline_replay_entry_t;
+
+/**
+ * Batch Event Replay Callback
+ *
+ * Called once per batch of up to OFFLINE_REPLAY_BATCH_SIZE events during
+ * replay. Publishing as a single MQTT array message reduces MQTT round-trips
+ * and, crucially, the number of NVS saves triggered by incoming ACKs.
+ *
+ * @param entries             Array of up to OFFLINE_REPLAY_BATCH_SIZE entries
+ * @param count               Actual number of entries in this batch
+ * @param replay_timestamp_ms Current boot-relative time in ms
+ * @return ESP_OK if batch published successfully; ESP_FAIL stops replay
+ */
+typedef esp_err_t (*offline_batch_replay_callback_t)(const offline_replay_entry_t *entries,
+                                                     uint32_t                      count,
+                                                     uint64_t                      replay_timestamp_ms);
 
 // ============================================================================
 // PUBLIC API
@@ -213,7 +231,7 @@ esp_err_t offline_logger_store_event(const rfid_tag_event_t *event);
  * 3. Marks events with offline flag
  * 4. Continues until all events replayed
  *
- * @param callback Function to call for each event (MQTT publish)
+ * @param callback Function to call for each batch of events (MQTT publish)
  * @param grace_period_s Delay before starting replay (0 = immediate)
  * @return ESP_OK if replay started successfully
  *         ESP_ERR_INVALID_STATE if already replaying
@@ -222,11 +240,11 @@ esp_err_t offline_logger_store_event(const rfid_tag_event_t *event);
  * Example:
  * ```c
  * void on_mqtt_connected(void) {
- *     offline_logger_start_replay(publish_offline_event, 30);
+ *     offline_logger_start_replay(publish_offline_batch, 30);
  * }
  * ```
  */
-esp_err_t offline_logger_start_replay(offline_replay_callback_t callback, uint32_t grace_period_s);
+esp_err_t offline_logger_start_replay(offline_batch_replay_callback_t callback, uint32_t grace_period_s);
 
 /**
  * Stop event replay process
@@ -305,10 +323,10 @@ void offline_logger_set_sync_start_callback(offline_sync_start_callback_t callba
  *
  * Safe to call before offline_logger_init().
  *
- * @param callback     Function to call for each event during replay
+ * @param callback     Function to call for each batch of events during replay
  * @param grace_period_s Delay before starting replay (0 = immediate)
  */
-void offline_logger_schedule_replay(offline_replay_callback_t callback, uint32_t grace_period_s);
+void offline_logger_schedule_replay(offline_batch_replay_callback_t callback, uint32_t grace_period_s);
 
 /**
  * Acknowledge receipt of replayed events up to acked_seq_no

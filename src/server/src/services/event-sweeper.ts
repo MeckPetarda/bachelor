@@ -4,6 +4,7 @@ import { createLogger } from "../utils/logger";
 import { processCluster } from "./event-processor";
 import type { ScanData } from "./algorithms/types";
 import { broadcastOrphanedScan } from "../api/websocket";
+import { hasActiveSyncInGroup } from "./sync-state";
 
 const logger = createLogger("EventSweeper");
 
@@ -159,6 +160,18 @@ async function sweep(): Promise<void> {
           orphaned += nonSynced.length;
         }
       } else if (result.reason === "insufficient_data") {
+        // Hold off if any lighthouse in this group is currently replaying offline
+        // events — sibling scans haven't been released from offlineSyncPending yet,
+        // so the cluster looks incomplete even though data is on its way.
+        const groupLhIds = await db
+          .select({ id: schema.lighthouses.id })
+          .from(schema.lighthouses)
+          .where(eq(schema.lighthouses.groupId, groupId));
+        if (hasActiveSyncInGroup(groupLhIds.map((l) => l.id))) {
+          skipped++;
+          continue;
+        }
+
         // Orphan only if the cluster has also exceeded the orphan timeout.
         const latestScan =
           clusterMeta.latestScan instanceof Date
