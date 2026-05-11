@@ -79,11 +79,11 @@
  * - reader_id: Which reader detected (1=A, 2=B, etc.)
  * - rssi: Signal strength (raw value)
  * - crc32: CRC32 checksum for integrity verification
- * - reserved[0]: time_quality_t at recording time (0=NONE, 1=ESTIMATED, 2=SYNCED)
- * - reserved[1..3]: unused padding
- *
- * Backward compatibility: existing events have reserved[0]=0, which maps to
- * TIME_QUALITY_NONE — the safe default (boot-relative timestamp, use received_at).
+ * - seq_no: monotonically increasing sequence number per device (assigned at write
+ *   time, excluded from CRC). Legacy entries written before this field was added
+ *   have seq_no == 0; the server acknowledges them with ackedSeqNo == 0.
+ *   Time quality at recording time is inferred from rtc_timestamp_s: > 0 means
+ *   TIME_QUALITY_SYNCED, == 0 means TIME_QUALITY_NONE.
  */
 typedef struct __attribute__((packed))
 {
@@ -93,9 +93,11 @@ typedef struct __attribute__((packed))
     uint8_t  epc_length;      // 1 byte - actual EPC length
     uint8_t  reader_id;       // 1 byte - reader ID (1=A, 2=B)
     uint16_t rssi;            // 2 bytes - signal strength
-    uint32_t crc32;           // 4 bytes - CRC32 checksum
-    uint8_t  reserved[4];     // 4 bytes - reserved[0]=time_quality_t, [1..3] unused
+    uint32_t crc32;           // 4 bytes - CRC32 checksum (does not cover seq_no)
+    uint32_t seq_no;          // 4 bytes - monotonic sequence number (not CRC'd)
 } offline_event_t;
+
+_Static_assert(sizeof(offline_event_t) == 48, "offline_event_t must be exactly 48 bytes");
 
 /**
  * Offline Logger Statistics
@@ -121,12 +123,12 @@ typedef struct
  * @param offline_timestamp Boot-relative ms when event was originally detected
  * @param replay_timestamp  Current time in boot-relative ms (when being replayed)
  * @param rtc_timestamp_s   Unix seconds at detection time (0 if unknown)
- * @param time_quality      Time quality at recording time (from reserved[0])
+ * @param time_quality      Time quality inferred from rtc_timestamp_s (> 0 → SYNCED)
  * @return ESP_OK if event published successfully
  */
 typedef esp_err_t (*offline_replay_callback_t)(const rfid_tag_event_t *event, uint64_t offline_timestamp,
                                                uint64_t replay_timestamp, uint32_t rtc_timestamp_s,
-                                               time_quality_t time_quality);
+                                               time_quality_t time_quality, uint32_t seq_no);
 
 // ============================================================================
 // PUBLIC API
@@ -276,5 +278,63 @@ esp_err_t offline_logger_clear_all(void);
  * @return ESP_OK on success
  */
 esp_err_t offline_logger_format_partition(void);
+
+/**
+ * Sync-start notification callback
+ *
+ * Called from the replay task immediately before the first event is published
+ * (after the grace period). Use it to publish sync/start to the server.
+ *
+ * @param count Number of events about to be replayed
+ */
+typedef void (*offline_sync_start_callback_t)(uint32_t count);
+
+/**
+ * Register a callback fired at the start of each replay pass.
+ * Safe to call before offline_logger_init().
+ */
+void offline_logger_set_sync_start_callback(offline_sync_start_callback_t callback);
+
+/**
+ * Pre-register replay callback for deferred start
+ *
+ * Call this when MQTT connects so that offline_logger_init(), if it runs later,
+ * can automatically start replay without needing an additional trigger.
+ * If the logger is already initialized and has pending events, the registered
+ * callback is picked up by the next offline_logger_start_replay() call.
+ *
+ * Safe to call before offline_logger_init().
+ *
+ * @param callback     Function to call for each event during replay
+ * @param grace_period_s Delay before starting replay (0 = immediate)
+ */
+void offline_logger_schedule_replay(offline_replay_callback_t callback, uint32_t grace_period_s);
+
+/**
+ * Acknowledge receipt of replayed events up to acked_seq_no
+ *
+ * Called from the MQTT event handler when the server publishes an ACK on
+ * attendance/lighthouse/{MAC}/ack. Advances rtc_read_index past all entries
+ * whose seq_no <= acked_seq_no and persists the new position to NVS.
+ *
+ * For legacy entries (seq_no == 0): advanced when acked_seq_no == 0.
+ * Safe to call from any task context.
+ *
+ * @param acked_seq_no Highest sequence number committed by the server
+ */
+void offline_logger_ack_received(uint32_t acked_seq_no);
+
+/**
+ * Check whether all events that existed at the START of the current replay
+ * pass have been acknowledged.
+ *
+ * Returns true when rtc_read_index has caught up to the write-index snapshot
+ * taken when offline_logger_start_replay() was called. New live events written
+ * to flash after replay started are NOT counted — this lets sync/complete fire
+ * even when the ring buffer continues to receive live scans.
+ *
+ * Returns false if no replay has ever been started.
+ */
+bool offline_logger_replay_batch_complete(void);
 
 #endif // OFFLINE_EVENT_LOGGER_H

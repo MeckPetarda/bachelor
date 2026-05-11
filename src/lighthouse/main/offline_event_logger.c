@@ -39,15 +39,30 @@ static const char *TAG = "OFFLINE_LOGGER";
 #define NVS_NAMESPACE_OFFLINE "offline_log"
 #define NVS_KEY_WRITE_INDEX   "write_idx"
 #define NVS_KEY_READ_INDEX    "read_idx"
+#define NVS_KEY_SEQ_COUNTER   "seq_ctr"
 
 // ============================================================================
 // GLOBAL STATE
 // ============================================================================
 
 // RTC memory for persistent write/read pointers (survives deep sleep)
-RTC_DATA_ATTR static uint32_t rtc_write_index = 0;
-RTC_DATA_ATTR static uint32_t rtc_read_index  = 0;
-RTC_DATA_ATTR static bool     rtc_initialized = false;
+RTC_DATA_ATTR static uint32_t rtc_write_index  = 0;
+RTC_DATA_ATTR static uint32_t rtc_read_index   = 0;
+RTC_DATA_ATTR static bool     rtc_initialized  = false;
+RTC_DATA_ATTR static uint32_t rtc_seq_counter  = 0;
+
+// Pre-registered replay callback — set by offline_logger_schedule_replay() so that
+// offline_logger_init() can auto-start replay when it runs after MQTT connects.
+static offline_replay_callback_t s_pending_replay_cb         = NULL;
+static uint32_t                  s_pending_replay_grace       = 0;
+
+// Snapshot of rtc_write_index taken when replay starts. Used to detect when all
+// pre-replay events are ACKed, even if new live events have since been stored.
+// UINT32_MAX = no replay has started yet.
+static uint32_t s_replay_end_index = UINT32_MAX;
+
+// Sync-start notification callback — fired right before the first replay publish.
+static offline_sync_start_callback_t s_sync_start_cb = NULL;
 
 // Runtime state
 static struct
@@ -58,6 +73,7 @@ static struct
 
     // Write queue and synchronization
     QueueHandle_t     event_queue;   // Queue for async writes
+    QueueHandle_t     ack_queue;     // Queue for ACK seq numbers (from MQTT handler → logging_task)
     TaskHandle_t      logging_task;  // Background logging task
     SemaphoreHandle_t storage_mutex; // Protects file operations
 
@@ -79,8 +95,8 @@ static struct
  */
 static uint32_t calculate_event_crc(const offline_event_t *event)
 {
-    // CRC everything except the crc32 field itself
-    size_t data_size = sizeof(offline_event_t) - sizeof(uint32_t) - sizeof(event->reserved);
+    // CRC everything except crc32 and seq_no (both excluded, seq_no is assigned after CRC)
+    size_t data_size = sizeof(offline_event_t) - sizeof(event->crc32) - sizeof(event->seq_no);
     return esp_crc32_le(0, (uint8_t *)event, data_size);
 }
 
@@ -107,9 +123,6 @@ static void rfid_event_to_offline_event(const rfid_tag_event_t *rfid_event, offl
         // No authoritative time — leave rtc_timestamp_s as 0
         offline_event->rtc_timestamp_s = 0;
     }
-
-    // Store time quality in reserved[0] for replay-time timeBasis selection
-    offline_event->reserved[0] = (uint8_t)quality;
 
     // EPC data
     offline_event->epc_length = rfid_event->epc_len;
@@ -175,9 +188,8 @@ static esp_err_t write_event_at_index(uint32_t index, const offline_event_t *eve
         return ESP_FAIL;
     }
 
-    // Flush to ensure data is written
-    fsync(logger_state.fd);
-
+    // fsync is intentionally NOT called here — the caller must do it after
+    // releasing the storage_mutex so the mutex is not held during slow flash I/O.
     return ESP_OK;
 }
 
@@ -263,6 +275,7 @@ static void nvs_save_pointers(void)
         return;
     nvs_set_u32(s_nvs_handle, NVS_KEY_WRITE_INDEX, rtc_write_index);
     nvs_set_u32(s_nvs_handle, NVS_KEY_READ_INDEX, rtc_read_index);
+    nvs_set_u32(s_nvs_handle, NVS_KEY_SEQ_COUNTER, rtc_seq_counter);
     nvs_commit(s_nvs_handle);
 }
 
@@ -280,10 +293,70 @@ static bool nvs_load_pointers(uint32_t *write_idx, uint32_t *read_idx)
 // ============================================================================
 
 /**
+ * Process a single ACK: advance rtc_read_index past all entries with seq_no <= acked_seq_no.
+ * Must only be called from logging_task (holds storage_mutex, does flash reads).
+ */
+static void process_ack(uint32_t acked_seq_no)
+{
+    if (!xSemaphoreTake(logger_state.storage_mutex, pdMS_TO_TICKS(2000)))
+    {
+        ESP_LOGW(TAG, "process_ack: failed to acquire mutex");
+        return;
+    }
+
+    uint32_t advanced = 0;
+
+    while (get_pending_count_internal() > 0)
+    {
+        offline_event_t entry;
+        if (read_event_at_index(rtc_read_index, &entry) != ESP_OK)
+            break;
+
+        if (entry.seq_no == 0)
+        {
+            if (acked_seq_no == 0)
+            {
+                rtc_read_index = (rtc_read_index + 1) % OFFLINE_MAX_EVENTS;
+                advanced++;
+            }
+            else
+            {
+                break;
+            }
+        }
+        else if (entry.seq_no <= acked_seq_no)
+        {
+            rtc_read_index = (rtc_read_index + 1) % OFFLINE_MAX_EVENTS;
+            advanced++;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    xSemaphoreGive(logger_state.storage_mutex);
+
+    if (advanced > 0)
+        nvs_save_pointers();
+
+    ESP_LOGI(TAG, "ACK seqNo=%lu: advanced %lu entries, %lu remaining", acked_seq_no, advanced,
+             get_pending_count_internal());
+
+    // Trigger sync/complete here — this is the only place rtc_read_index is updated,
+    // so replay_batch_complete() reflects the true post-ACK state. The MQTT_EVENT_DATA
+    // check fires before logging_task processes the ACK, so it always sees stale state.
+    if (advanced > 0 && offline_logger_replay_batch_complete() && s_sync_start_cb != NULL)
+    {
+        s_sync_start_cb(0);
+    }
+}
+
+/**
  * Event logging task
  *
- * Runs continuously, dequeuing events and writing them to storage.
- * This ensures RFID detection is never blocked by storage operations.
+ * Runs continuously, dequeuing events and writing them to storage,
+ * and draining the ACK queue so ack processing never blocks the MQTT handler.
  */
 static void logging_task(void *arg)
 {
@@ -293,16 +366,21 @@ static void logging_task(void *arg)
 
     while (1)
     {
-        // Wait for event from queue (blocks until available)
-        if (xQueueReceive(logger_state.event_queue, &rfid_event, portMAX_DELAY))
+        // Wait up to 50 ms for a write event; then drain ACK queue regardless.
+        if (xQueueReceive(logger_state.event_queue, &rfid_event, pdMS_TO_TICKS(50)))
         {
             // Convert to offline format
             offline_event_t offline_event;
             rfid_event_to_offline_event(&rfid_event, &offline_event);
 
-            // Acquire storage mutex
+            // Acquire storage mutex (only for flash I/O and pointer update)
+            bool wrote_ok = false;
             if (xSemaphoreTake(logger_state.storage_mutex, pdMS_TO_TICKS(1000)))
             {
+                // Assign seq_no after CRC (seq_no is excluded from CRC calculation)
+                offline_event.seq_no = rtc_seq_counter;
+                rtc_seq_counter++;
+
                 // Write event at current write index
                 esp_err_t ret = write_event_at_index(rtc_write_index, &offline_event);
 
@@ -321,10 +399,8 @@ static void logging_task(void *arg)
                         ESP_LOGW(TAG, "Buffer overflow! Oldest event overwritten");
                     }
 
-                    // Persist updated pointers to NVS so they survive a power outage
-                    nvs_save_pointers();
-
                     logger_state.stats.events_written++;
+                    wrote_ok = true;
                     ESP_LOGD(TAG, "Event stored at index %lu (pending: %lu)", old_write_index,
                              get_pending_count_internal());
                 }
@@ -341,6 +417,22 @@ static void logging_task(void *arg)
                 ESP_LOGE(TAG, "Failed to acquire storage mutex");
                 logger_state.stats.write_errors++;
             }
+
+            // fsync and NVS commit are slow — do both outside the mutex so
+            // replay/ack tasks are not starved by flash I/O.
+            if (wrote_ok)
+            {
+                fsync(logger_state.fd);
+                nvs_save_pointers();
+            }
+        }
+
+        // Drain pending ACKs posted by the MQTT event handler.
+        // Processed here (logging_task context) so the MQTT handler never blocks on mutex.
+        uint32_t acked_seq_no;
+        while (xQueueReceive(logger_state.ack_queue, &acked_seq_no, 0) == pdTRUE)
+        {
+            process_ack(acked_seq_no);
         }
     }
 }
@@ -355,6 +447,7 @@ static void replay_task(void *arg)
     uint32_t grace_period_s = (uint32_t)(uintptr_t)arg;
 
     ESP_LOGI(TAG, "Replay task started (grace period: %lu seconds)", grace_period_s);
+    logger_state.replay_active = true; // set early so stop_replay() works during grace period
 
     // Wait for grace period
     if (grace_period_s > 0)
@@ -363,91 +456,104 @@ static void replay_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(grace_period_s * 1000));
     }
 
+    if (!logger_state.replay_active)
+    {
+        // Stopped during grace period (e.g. MQTT disconnect)
+        logger_state.replay_task = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+
     ESP_LOGI(TAG, "Starting event replay...");
-    logger_state.replay_active = true;
 
     uint32_t events_replayed   = 0;
     uint64_t replay_start_time = esp_timer_get_time() / 1000;
 
-    while (logger_state.replay_active && get_pending_count_internal() > 0)
+    // Snapshot pending count and starting position. We publish exactly this many
+    // entries once, then exit. Pointer advancement happens asynchronously via
+    // offline_logger_ack_received(); a local cursor lets us iterate without
+    // modifying rtc_read_index (except to skip CRC-corrupt entries permanently).
+    uint32_t entries_to_replay = get_pending_count_internal();
+    uint32_t local_cursor      = rtc_read_index;
+
+    // Notify the MQTT client so it can publish sync/start before any events arrive
+    if (s_sync_start_cb != NULL)
+    {
+        s_sync_start_cb(entries_to_replay);
+    }
+
+    for (uint32_t i = 0; i < entries_to_replay && logger_state.replay_active; i++)
     {
         // Acquire storage mutex
-        if (xSemaphoreTake(logger_state.storage_mutex, pdMS_TO_TICKS(1000)))
-        {
-            // Read event at current read index
-            offline_event_t offline_event;
-            esp_err_t       ret = read_event_at_index(rtc_read_index, &offline_event);
-
-            if (ret == ESP_OK)
-            {
-                // Validate CRC
-                if (validate_event_crc(&offline_event))
-                {
-                    // Convert to RFID format
-                    rfid_tag_event_t rfid_event;
-                    offline_event_to_rfid_event(&offline_event, &rfid_event);
-
-                    // Release mutex before callback (avoid holding during network I/O)
-                    xSemaphoreGive(logger_state.storage_mutex);
-
-                    // Call replay callback with stored time metadata
-                    if (logger_state.replay_callback)
-                    {
-                        uint64_t       replay_time    = esp_timer_get_time() / 1000;
-                        time_quality_t stored_quality = (time_quality_t)offline_event.reserved[0];
-                        ret = logger_state.replay_callback(&rfid_event, offline_event.timestamp_ms, replay_time,
-                                                           offline_event.rtc_timestamp_s, stored_quality);
-
-                        if (ret == ESP_OK)
-                        {
-                            events_replayed++;
-                            logger_state.stats.events_replayed++;
-
-                            // Advance read pointer (acquire mutex again)
-                            if (xSemaphoreTake(logger_state.storage_mutex, pdMS_TO_TICKS(1000)))
-                            {
-                                rtc_read_index = (rtc_read_index + 1) % OFFLINE_MAX_EVENTS;
-                                // Persist updated read pointer so replay progress survives power loss
-                                nvs_save_pointers();
-                                xSemaphoreGive(logger_state.storage_mutex);
-                            }
-
-                            ESP_LOGI(TAG, "Replayed event %lu/%lu", events_replayed,
-                                     events_replayed + get_pending_count_internal());
-                        }
-                        else
-                        {
-                            ESP_LOGW(TAG, "Failed to replay event, will retry");
-                            vTaskDelay(pdMS_TO_TICKS(1000)); // Wait before retry
-                        }
-                    }
-
-                    // Throttle replay rate (max 10 events/second)
-                    vTaskDelay(pdMS_TO_TICKS(100));
-                }
-                else
-                {
-                    // CRC validation failed
-                    logger_state.stats.crc_errors++;
-                    ESP_LOGE(TAG, "CRC validation failed for event at index %lu", rtc_read_index);
-
-                    // Skip corrupted event
-                    rtc_read_index = (rtc_read_index + 1) % OFFLINE_MAX_EVENTS;
-                    xSemaphoreGive(logger_state.storage_mutex);
-                }
-            }
-            else
-            {
-                xSemaphoreGive(logger_state.storage_mutex);
-                ESP_LOGE(TAG, "Failed to read event");
-                vTaskDelay(pdMS_TO_TICKS(1000));
-            }
-        }
-        else
+        if (!xSemaphoreTake(logger_state.storage_mutex, pdMS_TO_TICKS(1000)))
         {
             ESP_LOGE(TAG, "Failed to acquire storage mutex during replay");
             vTaskDelay(pdMS_TO_TICKS(1000));
+            i--; // retry this entry
+            continue;
         }
+
+        offline_event_t offline_event;
+        esp_err_t       ret = read_event_at_index(local_cursor, &offline_event);
+
+        if (ret != ESP_OK)
+        {
+            xSemaphoreGive(logger_state.storage_mutex);
+            ESP_LOGE(TAG, "Failed to read event at index %lu", local_cursor);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            i--; // retry
+            continue;
+        }
+
+        if (!validate_event_crc(&offline_event))
+        {
+            // CRC failure: permanently skip this entry (advance both cursors)
+            logger_state.stats.crc_errors++;
+            ESP_LOGE(TAG, "CRC failure at index %lu — skipping", local_cursor);
+            local_cursor   = (local_cursor + 1) % OFFLINE_MAX_EVENTS;
+            rtc_read_index = (rtc_read_index + 1) % OFFLINE_MAX_EVENTS;
+            xSemaphoreGive(logger_state.storage_mutex);
+            nvs_save_pointers(); // outside mutex — NVS commit is slow
+            continue;
+        }
+
+        rfid_tag_event_t rfid_event;
+        offline_event_to_rfid_event(&offline_event, &rfid_event);
+
+        // Release mutex before network I/O
+        xSemaphoreGive(logger_state.storage_mutex);
+
+        if (logger_state.replay_callback)
+        {
+            uint64_t       replay_time    = esp_timer_get_time() / 1000;
+            time_quality_t stored_quality =
+                (offline_event.rtc_timestamp_s > 0) ? TIME_QUALITY_SYNCED : TIME_QUALITY_NONE;
+
+            // Publish; pointer advancement is driven by server ACK, not return value.
+            // Callback returns ESP_FAIL if MQTT is disconnected — stop replay so the
+            // next MQTT_EVENT_CONNECTED can start a fresh replay from rtc_read_index.
+            esp_err_t cb_ret = logger_state.replay_callback(&rfid_event, offline_event.timestamp_ms, replay_time,
+                                                             offline_event.rtc_timestamp_s, stored_quality,
+                                                             offline_event.seq_no);
+            if (cb_ret != ESP_OK)
+            {
+                ESP_LOGW(TAG, "Replay publish failed (MQTT disconnected?) — stopping replay");
+                logger_state.replay_active = false;
+                break;
+            }
+
+            events_replayed++;
+            logger_state.stats.events_replayed++;
+            ESP_LOGI(TAG, "Replayed event seqNo=%lu (%lu/%lu)", offline_event.seq_no, events_replayed,
+                     entries_to_replay);
+        }
+
+        local_cursor = (local_cursor + 1) % OFFLINE_MAX_EVENTS;
+
+        // Minimal yield so higher-priority tasks (logging, MQTT event handler) can run.
+        // The ACK round-trip (~80ms) is the natural rate-limiter; a hard 100ms delay
+        // per event was the main reason replay of 19 events took >90 seconds.
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 
     logger_state.replay_active = false;
@@ -456,12 +562,37 @@ static void replay_task(void *arg)
     uint64_t replay_duration = (esp_timer_get_time() / 1000) - replay_start_time;
     ESP_LOGI(TAG, "Replay complete! Replayed %lu events in %llu ms", events_replayed, replay_duration);
 
+    // Wait briefly for the final in-flight ACK(s) to arrive and advance the pointer.
+    // Stop early once all pre-replay events are ACKed (read index caught up to the
+    // write-index snapshot). New live events added after replay started are excluded.
+    for (int i = 0; i < 20 && !offline_logger_replay_batch_complete(); i++)
+    {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    // Safety path: if process_ack hasn't already fired sync/complete, do it here.
+    if (offline_logger_replay_batch_complete() && s_sync_start_cb != NULL)
+    {
+        s_sync_start_cb(0); // count=0 signals "all done"
+    }
+
     vTaskDelete(NULL);
 }
 
 // ============================================================================
 // PUBLIC API IMPLEMENTATION
 // ============================================================================
+
+void offline_logger_set_sync_start_callback(offline_sync_start_callback_t callback)
+{
+    s_sync_start_cb = callback;
+}
+
+void offline_logger_schedule_replay(offline_replay_callback_t callback, uint32_t grace_period_s)
+{
+    s_pending_replay_cb    = callback;
+    s_pending_replay_grace = grace_period_s;
+}
 
 esp_err_t offline_logger_init(void)
 {
@@ -535,6 +666,22 @@ esp_err_t offline_logger_init(void)
             rtc_read_index  = 0;
             ESP_LOGI(TAG, "RTC pointers initialized (first boot)");
         }
+
+        // Restore or initialise the sequence counter
+        uint32_t nvs_seq = 0;
+        esp_err_t seq_ret = s_nvs_open ? nvs_get_u32(s_nvs_handle, NVS_KEY_SEQ_COUNTER, &nvs_seq) : ESP_FAIL;
+        if (seq_ret == ESP_OK)
+        {
+            rtc_seq_counter = nvs_seq;
+            ESP_LOGI(TAG, "Seq counter restored from NVS: %lu", rtc_seq_counter);
+        }
+        else
+        {
+            // First boot after firmware update — start at 1 (0 reserved for legacy entries)
+            rtc_seq_counter = 1;
+            ESP_LOGI(TAG, "Seq counter initialized to 1 (first boot)");
+        }
+
         rtc_initialized = true;
     }
     else
@@ -557,6 +704,18 @@ esp_err_t offline_logger_init(void)
     if (!logger_state.event_queue)
     {
         ESP_LOGE(TAG, "Failed to create event queue");
+        vSemaphoreDelete(logger_state.storage_mutex);
+        close(logger_state.fd);
+        esp_vfs_littlefs_unregister(OFFLINE_EVENTS_PARTITION_LABEL);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Create ACK queue — consumed by logging_task so the MQTT event handler never blocks
+    logger_state.ack_queue = xQueueCreate(16, sizeof(uint32_t));
+    if (!logger_state.ack_queue)
+    {
+        ESP_LOGE(TAG, "Failed to create ACK queue");
+        vQueueDelete(logger_state.event_queue);
         vSemaphoreDelete(logger_state.storage_mutex);
         close(logger_state.fd);
         esp_vfs_littlefs_unregister(OFFLINE_EVENTS_PARTITION_LABEL);
@@ -589,6 +748,16 @@ esp_err_t offline_logger_init(void)
     ESP_LOGI(TAG, "  Pending events: %lu", logger_state.stats.pending_events);
     ESP_LOGI(TAG, "════════════════════════════════════\n");
 
+    // If MQTT connected before this init ran, a replay callback was pre-registered.
+    // Start replay now so events are not silently dropped.
+    if (s_pending_replay_cb != NULL && get_pending_count_internal() > 0)
+    {
+        ESP_LOGI(TAG, "Auto-starting replay (%lu events) using pre-registered callback",
+                 get_pending_count_internal());
+        offline_logger_start_replay(s_pending_replay_cb, s_pending_replay_grace);
+        s_pending_replay_cb = NULL;
+    }
+
     return ESP_OK;
 }
 
@@ -614,11 +783,17 @@ esp_err_t offline_logger_deinit(void)
         logger_state.logging_task = NULL;
     }
 
-    // Delete queue
+    // Delete queues
     if (logger_state.event_queue)
     {
         vQueueDelete(logger_state.event_queue);
         logger_state.event_queue = NULL;
+    }
+
+    if (logger_state.ack_queue)
+    {
+        vQueueDelete(logger_state.ack_queue);
+        logger_state.ack_queue = NULL;
     }
 
     // Delete mutex
@@ -692,6 +867,11 @@ esp_err_t offline_logger_start_replay(offline_replay_callback_t callback, uint32
     }
 
     ESP_LOGI(TAG, "Starting replay of %lu events...", pending);
+
+    // Snapshot write pointer: events at indices [rtc_read_index, rtc_write_index) are
+    // the "replay batch". sync/complete fires when rtc_read_index reaches this value.
+    s_replay_end_index = rtc_write_index;
+
 
     logger_state.replay_callback = callback;
 
@@ -784,6 +964,29 @@ esp_err_t offline_logger_clear_all(void)
     }
 
     return ESP_FAIL;
+}
+
+void offline_logger_ack_received(uint32_t acked_seq_no)
+{
+    if (!logger_state.initialized)
+        return;
+
+    // Non-blocking: post to queue consumed by logging_task.
+    // Safe to call from MQTT event handler (no mutex, no flash I/O).
+    if (xQueueSend(logger_state.ack_queue, &acked_seq_no, 0) != pdTRUE)
+        ESP_LOGW(TAG, "ack_received: ACK queue full, dropping seqNo=%lu", (unsigned long)acked_seq_no);
+}
+
+bool offline_logger_replay_batch_complete(void)
+{
+    if (s_replay_end_index == UINT32_MAX)
+        return false;
+    // Use ring-buffer modular distance. If rtc_read_index has reached or passed
+    // s_replay_end_index the forward distance is 0 or small (< MAX/2).
+    // process_ack can advance rtc_read_index past s_replay_end_index in one step
+    // when an ACK covers events that straddle the boundary, so == would miss it.
+    uint32_t dist = (rtc_read_index - s_replay_end_index + OFFLINE_MAX_EVENTS) % OFFLINE_MAX_EVENTS;
+    return dist < OFFLINE_MAX_EVENTS / 2;
 }
 
 esp_err_t offline_logger_format_partition(void)

@@ -114,6 +114,7 @@ export const rawScans = pgTable(
     orphanReason: orphanReasonType(),
     source: scanSource().notNull().default("realtime"),
     timeBasis: timeBasis().notNull().default("synced"),
+    offlineSyncPending: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -128,6 +129,9 @@ export const rawScans = pgTable(
     index("idx_raw_scans_orphaned")
       .on(table.orphanedAt)
       .where(sql`orphaned_at IS NOT NULL`),
+    uniqueIndex("raw_scans_offline_dedup")
+      .on(table.lighthouseId, table.epc, table.timestampMs)
+      .where(sql`source = 'offline_sync'`),
   ],
 );
 

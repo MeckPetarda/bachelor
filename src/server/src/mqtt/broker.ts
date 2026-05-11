@@ -6,10 +6,13 @@ import {
   SCAN_TOPIC_PATTERN,
   STATUS_TOPIC_PATTERN,
   HEALTH_TOPIC_PATTERN,
+  SYNC_START_TOPIC_PATTERN,
+  SYNC_COMPLETE_TOPIC_PATTERN,
 } from "./topics";
 import { handleStatusMessage } from "./handlers/status";
 import { handleHealthMessage } from "./handlers/health";
 import { handleScanMessage } from "./handlers/scan";
+import { handleSyncStart, handleSyncComplete } from "./handlers/sync";
 
 const logger = createLogger("MQTT Broker");
 
@@ -107,6 +110,18 @@ export function startMqttBroker(): Aedes {
       } catch (error) {
         logger.error(`Failed to handle health message:`, error);
       }
+    } else if (SYNC_START_TOPIC_PATTERN.test(packet.topic)) {
+      try {
+        await handleSyncStart(packet.topic, packet.payload);
+      } catch (error) {
+        logger.error(`Failed to handle sync/start message:`, error);
+      }
+    } else if (SYNC_COMPLETE_TOPIC_PATTERN.test(packet.topic)) {
+      try {
+        await handleSyncComplete(packet.topic, packet.payload);
+      } catch (error) {
+        logger.error(`Failed to handle sync/complete message:`, error);
+      }
     }
   });
 
@@ -150,8 +165,13 @@ export function getMqttBrokerStats(): MqttBrokerStats {
  * Publish a message to a topic
  * @param topic - The topic to publish to
  * @param payload - The message payload
+ * @param qos - QoS level (0, 1, or 2; default 0)
  */
-export function publishMessage(topic: string, payload: string | Buffer): void {
+export function publishMessage(
+  topic: string,
+  payload: string | Buffer,
+  qos: 0 | 1 | 2 = 0,
+): void {
   if (!aedes) {
     logger.warn("Cannot publish: MQTT broker not running");
     return;
@@ -161,7 +181,7 @@ export function publishMessage(topic: string, payload: string | Buffer): void {
     {
       topic,
       payload: typeof payload === "string" ? Buffer.from(payload) : payload,
-      qos: 0,
+      qos,
       retain: false,
       cmd: "publish",
       dup: false,

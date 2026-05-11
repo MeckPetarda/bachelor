@@ -43,6 +43,20 @@ export const CONFIG_TOPIC_PATTERN = new RegExp(
 );
 
 /**
+ * Pattern for offline sync start: attendance/lighthouse/{MAC}/sync/start
+ */
+export const SYNC_START_TOPIC_PATTERN = new RegExp(
+  `^${TOPIC_BASE}(${MAC_PATTERN})/sync/start$`,
+);
+
+/**
+ * Pattern for offline sync complete: attendance/lighthouse/{MAC}/sync/complete
+ */
+export const SYNC_COMPLETE_TOPIC_PATTERN = new RegExp(
+  `^${TOPIC_BASE}(${MAC_PATTERN})/sync/complete$`,
+);
+
+/**
  * Extract MAC address from any lighthouse topic
  * @param topic - The MQTT topic string
  * @returns The MAC address or null if not found
@@ -54,6 +68,8 @@ export function extractMacAddress(topic: string): string | null {
     STATUS_TOPIC_PATTERN,
     HEALTH_TOPIC_PATTERN,
     CONFIG_TOPIC_PATTERN,
+    SYNC_START_TOPIC_PATTERN,
+    SYNC_COMPLETE_TOPIC_PATTERN,
   ];
 
   for (const pattern of patterns) {

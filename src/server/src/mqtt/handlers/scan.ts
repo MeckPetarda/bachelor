@@ -3,6 +3,7 @@ import { createLogger, LogLevel } from "../../utils/logger";
 import { eq } from "drizzle-orm";
 import { extractMacAddress } from "../topics";
 import { broadcastScan } from "../../api/websocket";
+import { publishMessage } from "../broker";
 
 const logger = createLogger("Scan Handler");
 
@@ -22,6 +23,7 @@ export interface ScanEntry {
   offline?: boolean; // Indicates if this scan was synced from offline storage
   replayTime?: number; // Unix ms when the offline event was replayed
   timeBasis?: "synced" | "estimated" | "relative"; // Time quality from firmware
+  seqNo?: number; // Ring-buffer sequence number (firmware-assigned, for ACK)
 }
 
 /**
@@ -151,6 +153,8 @@ export async function handleScanMessage(
     const lighthouseId = lighthouses[0].id;
     const lighthouseName = lighthouses[0].name;
 
+    let maxOfflineSeqNo: number | null = null;
+
     for (let i = 0; i < scanArray.length; i++) {
       const scanData = scanArray[i];
 
@@ -200,16 +204,34 @@ export async function handleScanMessage(
           timestamp: scanTimestamp,
           source,
           timeBasis: basis,
+          offlineSyncPending: source === "offline_sync",
         })
+        .onConflictDoNothing()
         .returning({ id: schema.rawScans.id });
 
       const insertedScan = insertResult[0];
       if (!insertedScan) {
-        logger.error(`Failed to insert scan entry ${i} from ${macAddress}`);
+        // Either a genuine insert failure or a duplicate (dedup index hit) — skip
+        logger.debug(
+          `Scan entry ${i} from ${macAddress} skipped (duplicate or error)`,
+        );
+        // Still track seqNo for ACK so firmware advances past duplicates
+        if (source === "offline_sync" && typeof scanData.seqNo === "number") {
+          if (maxOfflineSeqNo === null || scanData.seqNo > maxOfflineSeqNo) {
+            maxOfflineSeqNo = scanData.seqNo;
+          }
+        }
         continue;
       }
       const scanId = insertedScan.id;
       logger.debug(`Stored scan ${scanId} from lighthouse ${lighthouseId}`);
+
+      // Track highest seqNo for offline ACK
+      if (source === "offline_sync" && typeof scanData.seqNo === "number") {
+        if (maxOfflineSeqNo === null || scanData.seqNo > maxOfflineSeqNo) {
+          maxOfflineSeqNo = scanData.seqNo;
+        }
+      }
 
       // Broadcast WebSocket event for dashboard (non-blocking)
       const eventData: ScanEventData = {
@@ -230,6 +252,19 @@ export async function handleScanMessage(
           eventEmitter!.emit("newScan", eventData);
         });
       }
+    }
+
+    // Publish ACK to firmware after processing all offline entries
+    if (maxOfflineSeqNo !== null) {
+      const ackTopic = `attendance/lighthouse/${macAddress}/ack`;
+      const ackPayload = JSON.stringify({
+        ackedSeqNo: maxOfflineSeqNo,
+        ts: new Date().toISOString(),
+      });
+      publishMessage(ackTopic, ackPayload, 1);
+      logger.debug(
+        `Published ACK to ${ackTopic} ackedSeqNo=${maxOfflineSeqNo}`,
+      );
     }
   } catch (error) {
     logger.error(`Failed to store scan from ${macAddress}:`, error);

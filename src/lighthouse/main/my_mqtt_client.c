@@ -78,6 +78,12 @@ static char s_device_mac[MQTT_MAC_STR_LEN] = {0};
 static char s_topic_buffer[128] = {0};
 
 /**
+ * Offline sync session tracking — set when a replay pass starts, cleared when
+ * the server has been notified of completion (sync/complete sent).
+ */
+static bool s_sync_in_progress = false;
+
+/**
  * Scan batch accumulator state
  */
 static rfid_tag_event_t   s_batch_entries[MQTT_SCAN_BATCH_MAX_ENTRIES];
@@ -150,8 +156,44 @@ static void init_device_mac(void)
  * @param time_quality      Time quality at recording time
  * @return ESP_OK if published successfully
  */
+/**
+ * Called by replay_task right before the first event publish.
+ * Publishes sync/start so the server holds offline scans from the sweeper.
+ */
+static void on_sync_start(uint32_t count)
+{
+    if (s_mqtt_client == NULL || !mqtt_client_is_connected())
+        return;
+
+    // on_sync_start runs from replay_task — use local buffers, not s_topic_buffer,
+    // to avoid racing with health timer and MQTT event handler calls to mqtt_client_get_topic().
+    char topic_buf[128];
+
+    if (count == 0)
+    {
+        if (s_sync_in_progress)
+        {
+            s_sync_in_progress = false;
+            snprintf(topic_buf, sizeof(topic_buf), "%s%s/sync/complete", MQTT_TOPIC_BASE, s_device_mac);
+            esp_mqtt_client_publish(s_mqtt_client, topic_buf, "{}", 0, 1, 0);
+            ESP_LOGI(TAG, "Published sync/complete (replay-task safety path)");
+        }
+        return;
+    }
+
+    s_sync_in_progress = true;
+
+    char payload[64];
+    snprintf(payload, sizeof(payload), "{\"count\":%lu}", (unsigned long)count);
+
+    snprintf(topic_buf, sizeof(topic_buf), "%s%s/sync/start", MQTT_TOPIC_BASE, s_device_mac);
+    esp_mqtt_client_publish(s_mqtt_client, topic_buf, payload, 0, 1, 0);
+    ESP_LOGI(TAG, "Published sync/start: %lu events", (unsigned long)count);
+}
+
 static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t offline_timestamp,
-                                      uint64_t replay_timestamp, uint32_t rtc_timestamp_s, time_quality_t time_quality)
+                                      uint64_t replay_timestamp, uint32_t rtc_timestamp_s, time_quality_t time_quality,
+                                      uint32_t seq_no)
 {
     ESP_LOGI(TAG, "Replaying offline event: EPC=%.2X%.2X... (detected @ %llu ms, rtc_s=%lu, quality=%d)", event->epc[0],
              event->epc[1], offline_timestamp, rtc_timestamp_s, (int)time_quality);
@@ -194,21 +236,28 @@ static esp_err_t replay_offline_event(const rfid_tag_event_t *event, uint64_t of
                          "\"deviceId\":\"%s\","
                          "\"offline\":true,"
                          "\"replayTime\":%llu,"
-                         "\"timeBasis\":\"%s\""
+                         "\"timeBasis\":\"%s\","
+                         "\"seqNo\":%lu"
                          "}]",
                         epc_hex, timestamp_ms, rssi_dbm, event->antenna_id, event->frequency, s_device_mac,
-                        replay_time_ms, time_basis);
+                        replay_time_ms, time_basis, (unsigned long)seq_no);
 
     if (len >= (int)sizeof(payload))
     {
         ESP_LOGW(TAG, "Offline replay payload truncated");
     }
 
-    const char *scans_topic = mqtt_client_get_topic("scans");
-    int         msg_id      = esp_mqtt_client_publish(s_mqtt_client, scans_topic, payload, 0, MQTT_QOS_TAG_EVENTS, 0);
+    // replay_offline_event runs from replay_task — use a local topic buffer to avoid
+    // racing with health timer and MQTT event handler on the shared s_topic_buffer.
+    char scans_topic[128];
+    snprintf(scans_topic, sizeof(scans_topic), "%s%s/scans", MQTT_TOPIC_BASE, s_device_mac);
+    // enqueue (non-blocking) avoids the 5000ms stall that esp_mqtt_client_publish
+    // (synchronous) causes: publish blocks replay_task until PUBACK, and the MQTT
+    // task only drains its outbox after network.timeout_ms (5000ms) poll expires.
+    int msg_id = esp_mqtt_client_enqueue(s_mqtt_client, scans_topic, payload, 0, MQTT_QOS_TAG_EVENTS_LIVE, 0, true);
     if (msg_id < 0)
     {
-        ESP_LOGE(TAG, "Failed to publish offline replay event");
+        ESP_LOGE(TAG, "Failed to enqueue offline replay event (outbox full or not connected)");
         s_stats.publish_errors++;
         return ESP_FAIL;
     }
@@ -391,7 +440,27 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             }
         }
 
-        // Check for pending offline events and start replay
+        // Subscribe to server ACK topic for offline replay acknowledgement
+        {
+            char ack_topic[128];
+            snprintf(ack_topic, sizeof(ack_topic), "%s%s/ack", MQTT_TOPIC_BASE, s_device_mac);
+            int ack_msg_id = esp_mqtt_client_subscribe(event->client, ack_topic, 1);
+            if (ack_msg_id >= 0)
+            {
+                ESP_LOGI(TAG, "Subscribed to ACK topic: %s", ack_topic);
+            }
+            else
+            {
+                ESP_LOGW(TAG, "Failed to subscribe to ACK topic");
+            }
+        }
+
+        // Register sync-start and replay callbacks (safe to call repeatedly — idempotent)
+        offline_logger_set_sync_start_callback(on_sync_start);
+        offline_logger_schedule_replay(replay_offline_event, OFFLINE_REPLAY_GRACE_PERIOD);
+
+        // Also try to start immediately for the normal reconnect case where the
+        // logger is already initialized with pending events.
         uint32_t pending_events = offline_logger_get_pending_count();
         if (pending_events > 0)
         {
@@ -400,7 +469,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             ESP_LOGI(TAG, "  Found %lu offline events to replay", pending_events);
             ESP_LOGI(TAG, "════════════════════════════════════");
 
-            // Start replay with grace period (default: 30 seconds)
             esp_err_t replay_ret = offline_logger_start_replay(replay_offline_event, OFFLINE_REPLAY_GRACE_PERIOD);
 
             if (replay_ret == ESP_OK)
@@ -419,6 +487,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         s_connection_state = MQTT_STATE_DISCONNECTED;
         s_stats.disconnection_count++;
         xEventGroupClearBits(s_mqtt_event_group, MQTT_CONNECTED_BIT);
+        // Sync session aborted — will restart with sync/start on next reconnect
+        s_sync_in_progress = false;
+        // Stop any in-progress replay so that the next MQTT_EVENT_CONNECTED can start a fresh one
+        offline_logger_stop_replay();
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -441,24 +513,54 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         s_stats.messages_received++;
 
-        // Null-terminate topic and data for callback
-        if (s_config_callback != NULL)
         {
-            char topic[256];
-            char payload[512];
+            // Check if this is a server ACK for offline replay
+            char ack_topic[128];
+            snprintf(ack_topic, sizeof(ack_topic), "%s%s/ack", MQTT_TOPIC_BASE, s_device_mac);
+            bool is_ack = (event->topic_len == (int)strlen(ack_topic) &&
+                           strncmp(event->topic, ack_topic, event->topic_len) == 0);
 
-            // Copy and null-terminate
-            int topic_len = event->topic_len < 255 ? event->topic_len : 255;
-            int data_len  = event->data_len < 511 ? event->data_len : 511;
+            if (is_ack)
+            {
+                // Parse ackedSeqNo from JSON payload (minimal: find key and read value)
+                char data_buf[128];
+                int  data_len = event->data_len < (int)(sizeof(data_buf) - 1) ? event->data_len : (int)(sizeof(data_buf) - 1);
+                memcpy(data_buf, event->data, data_len);
+                data_buf[data_len] = '\0';
 
-            memcpy(topic, event->topic, topic_len);
-            topic[topic_len] = '\0';
+                uint32_t acked_seq_no = 0;
+                char    *ptr          = strstr(data_buf, "\"ackedSeqNo\":");
+                if (ptr)
+                {
+                    ptr += strlen("\"ackedSeqNo\":");
+                    sscanf(ptr, "%lu", (unsigned long *)&acked_seq_no);
+                }
 
-            memcpy(payload, event->data, data_len);
-            payload[data_len] = '\0';
+                ESP_LOGI(TAG, "Received ACK for seqNo %lu", (unsigned long)acked_seq_no);
+                offline_logger_ack_received(acked_seq_no);
 
-            // Invoke callback
-            s_config_callback(topic, payload);
+                // sync/complete is triggered from process_ack() in logging_task,
+                // which is the only place rtc_read_index is actually updated.
+                // Checking replay_batch_complete() here would always see stale state
+                // because ack_received() is non-blocking (posts to queue, no update yet).
+            }
+            else if (s_config_callback != NULL)
+            {
+                // Forward to config callback
+                char topic[256];
+                char payload[512];
+
+                int topic_len = event->topic_len < 255 ? event->topic_len : 255;
+                int data_len  = event->data_len < 511 ? event->data_len : 511;
+
+                memcpy(topic, event->topic, topic_len);
+                topic[topic_len] = '\0';
+
+                memcpy(payload, event->data, data_len);
+                payload[data_len] = '\0';
+
+                s_config_callback(topic, payload);
+            }
         }
         break;
 
@@ -571,7 +673,7 @@ esp_err_t mqtt_client_init(void)
         // Network configuration
         .network.reconnect_timeout_ms        = 4000, // Wait 4s before retry
         .network.refresh_connection_after_ms = 0,    // 0 = disabled
-        .network.timeout_ms                  = 5000
+        .network.timeout_ms                  = 500   // MQTT task poll timeout; lower = outbox drained faster
 
     };
 
@@ -958,8 +1060,11 @@ esp_err_t mqtt_client_publish_health_metrics(void)
     // Publish to Consolidated Health Topic
     // ========================================================================
 
-    const char *health_topic = mqtt_client_get_topic("health");
-    int         msg_id = esp_mqtt_client_publish(s_mqtt_client, health_topic, payload, 0, MQTT_QOS_HEALTH_METRICS, 0);
+    // Use a local buffer — mqtt_client_publish_health_metrics is called from a timer
+    // task; sharing s_topic_buffer with replay_task causes silent topic corruption.
+    char health_topic[128];
+    snprintf(health_topic, sizeof(health_topic), "%s%s/health", MQTT_TOPIC_BASE, s_device_mac);
+    int msg_id = esp_mqtt_client_publish(s_mqtt_client, health_topic, payload, 0, MQTT_QOS_HEALTH_METRICS, 0);
 
     if (msg_id < 0)
     {

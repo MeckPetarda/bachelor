@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, sql, ne } from "drizzle-orm";
 import { getDatabase, schema } from "../database/client";
 import { createLogger } from "../utils/logger";
 import { processCluster } from "./event-processor";
@@ -81,6 +81,7 @@ async function sweep(): Promise<void> {
         and(
           isNull(schema.rawScans.processedAt),
           isNull(schema.rawScans.orphanedAt),
+          ne(schema.rawScans.offlineSyncPending, true),
         ),
       )
       .groupBy(
@@ -123,6 +124,7 @@ async function sweep(): Promise<void> {
             ),
             isNull(schema.rawScans.processedAt),
             isNull(schema.rawScans.orphanedAt),
+            ne(schema.rawScans.offlineSyncPending, true),
           ),
         )
         .orderBy(asc(schema.rawScans.timestamp));
@@ -215,6 +217,7 @@ async function handleUngroupedScans(): Promise<void> {
         isNull(schema.lighthouses.groupId),
         isNull(schema.rawScans.processedAt),
         isNull(schema.rawScans.orphanedAt),
+        ne(schema.rawScans.offlineSyncPending, true),
         lt(schema.rawScans.timestamp, cutoff),
       ),
     );
