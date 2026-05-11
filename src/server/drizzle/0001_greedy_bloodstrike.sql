@@ -1,0 +1,1 @@
+ALTER TABLE "raw_scans" ADD COLUMN "offline_sync_pending" boolean DEFAULT false NOT NULL;
