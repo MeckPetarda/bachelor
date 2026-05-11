@@ -1,0 +1,1690 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict 4NVhHwdUpYR4DgHaRMnVYEklWIllWHWGg2H2FencwkIuY0fdo83Jfa6rQWWV31S
+
+-- Dumped from database version 15.17 (Ubuntu 15.17-1.pgdg24.04+1)
+-- Dumped by pg_dump version 15.17 (Ubuntu 15.17-1.pgdg24.04+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: algorithm_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.algorithm_type AS ENUM (
+    'temporal_centroid',
+    'rssi_weighted_centroid',
+    'manual'
+);
+
+
+ALTER TYPE public.algorithm_type OWNER TO postgres;
+
+--
+-- Name: direction_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.direction_type AS ENUM (
+    'in',
+    'out',
+    'unknown'
+);
+
+
+ALTER TYPE public.direction_type OWNER TO postgres;
+
+--
+-- Name: lighthouse_placement; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.lighthouse_placement AS ENUM (
+    'STANDALONE',
+    'INSIDE',
+    'OUTSIDE'
+);
+
+
+ALTER TYPE public.lighthouse_placement OWNER TO postgres;
+
+--
+-- Name: orphan_reason_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.orphan_reason_type AS ENUM (
+    'insufficient_data',
+    'misconfigured_group',
+    'unsyncable'
+);
+
+
+ALTER TYPE public.orphan_reason_type OWNER TO postgres;
+
+--
+-- Name: scan_source; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.scan_source AS ENUM (
+    'realtime',
+    'offline_sync'
+);
+
+
+ALTER TYPE public.scan_source OWNER TO postgres;
+
+--
+-- Name: time_basis; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.time_basis AS ENUM (
+    'synced',
+    'estimated',
+    'relative'
+);
+
+
+ALTER TYPE public.time_basis OWNER TO postgres;
+
+--
+-- Name: user_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.user_type AS ENUM (
+    'STANDALONE',
+    'INSIDE',
+    'OUTSIDE'
+);
+
+
+ALTER TYPE public.user_type OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: audit_logs; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.audit_logs (
+    id bigint NOT NULL,
+    user_id uuid,
+    action character varying(100) NOT NULL,
+    resource_type character varying(100),
+    resource_id uuid,
+    changes jsonb,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.audit_logs OWNER TO postgres;
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.audit_logs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.audit_logs_id_seq OWNER TO postgres;
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.audit_logs_id_seq OWNED BY public.audit_logs.id;
+
+
+--
+-- Name: dashboard_users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dashboard_users (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    username character varying(255) NOT NULL,
+    password_hash character varying(255) NOT NULL,
+    role public.user_type NOT NULL,
+    is_active boolean DEFAULT true,
+    last_login timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.dashboard_users OWNER TO postgres;
+
+--
+-- Name: lighthouse_connection_events; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lighthouse_connection_events (
+    id bigint NOT NULL,
+    lighthouse_id integer NOT NULL,
+    event_type character varying(20) NOT NULL,
+    is_graceful boolean,
+    recorded_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.lighthouse_connection_events OWNER TO postgres;
+
+--
+-- Name: lighthouse_connection_events_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.lighthouse_connection_events_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lighthouse_connection_events_id_seq OWNER TO postgres;
+
+--
+-- Name: lighthouse_connection_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.lighthouse_connection_events_id_seq OWNED BY public.lighthouse_connection_events.id;
+
+
+--
+-- Name: lighthouse_groups; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lighthouse_groups (
+    id integer NOT NULL,
+    label character varying(255) NOT NULL,
+    description character varying(500),
+    activity_timeout_ms integer DEFAULT 4000 NOT NULL,
+    orphan_timeout_ms integer DEFAULT 8000 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.lighthouse_groups OWNER TO postgres;
+
+--
+-- Name: lighthouse_groups_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.lighthouse_groups_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lighthouse_groups_id_seq OWNER TO postgres;
+
+--
+-- Name: lighthouse_groups_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.lighthouse_groups_id_seq OWNED BY public.lighthouse_groups.id;
+
+
+--
+-- Name: lighthouse_health_snapshots; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lighthouse_health_snapshots (
+    id bigint NOT NULL,
+    lighthouse_id integer NOT NULL,
+    uptime_sec integer,
+    free_heap_bytes integer,
+    min_free_heap_bytes integer,
+    wifi_rssi_dbm integer,
+    rfid_state character varying(50),
+    rfid_is_responsive boolean,
+    rfid_power_rail_present boolean,
+    rfid_fw_version character varying(20),
+    rfid_last_error integer,
+    recorded_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.lighthouse_health_snapshots OWNER TO postgres;
+
+--
+-- Name: lighthouse_health_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.lighthouse_health_snapshots_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lighthouse_health_snapshots_id_seq OWNER TO postgres;
+
+--
+-- Name: lighthouse_health_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.lighthouse_health_snapshots_id_seq OWNED BY public.lighthouse_health_snapshots.id;
+
+
+--
+-- Name: lighthouses; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lighthouses (
+    id integer NOT NULL,
+    name character varying(255) NOT NULL,
+    device_id character varying(255) NOT NULL,
+    placement public.lighthouse_placement DEFAULT 'STANDALONE'::public.lighthouse_placement NOT NULL,
+    comment character varying(256),
+    firmware_version character varying(50),
+    last_seen_at timestamp with time zone,
+    is_active boolean DEFAULT true,
+    config jsonb DEFAULT '{}'::jsonb,
+    group_id integer,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    canged_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.lighthouses OWNER TO postgres;
+
+--
+-- Name: lighthouses_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.lighthouses_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lighthouses_id_seq OWNER TO postgres;
+
+--
+-- Name: lighthouses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.lighthouses_id_seq OWNED BY public.lighthouses.id;
+
+
+--
+-- Name: mqtt_clients; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.mqtt_clients (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    lighthouse_id integer,
+    client_id character varying(255) NOT NULL,
+    connected_at timestamp with time zone,
+    last_activity timestamp with time zone,
+    is_connected boolean DEFAULT false,
+    ip_address character varying(45),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.mqtt_clients OWNER TO postgres;
+
+--
+-- Name: processed_event_scans; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.processed_event_scans (
+    processed_event_id uuid NOT NULL,
+    raw_scan_id bigint NOT NULL
+);
+
+
+ALTER TABLE public.processed_event_scans OWNER TO postgres;
+
+--
+-- Name: processed_event_scans_raw_scan_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.processed_event_scans_raw_scan_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.processed_event_scans_raw_scan_id_seq OWNER TO postgres;
+
+--
+-- Name: processed_event_scans_raw_scan_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.processed_event_scans_raw_scan_id_seq OWNED BY public.processed_event_scans.raw_scan_id;
+
+
+--
+-- Name: processed_events; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.processed_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    algorithm_id public.algorithm_type NOT NULL,
+    direction public.direction_type NOT NULL,
+    tag_epc character varying(96) NOT NULL,
+    user_id uuid,
+    group_id integer NOT NULL,
+    confidence real NOT NULL,
+    centroid_separation_factor real NOT NULL,
+    cluster_size_factor real NOT NULL,
+    bilateral_coverage_factor real NOT NULL,
+    rssi_trend_consistency_factor real,
+    "timestamp" timestamp with time zone NOT NULL,
+    cluster_started_at timestamp with time zone NOT NULL,
+    cluster_ended_at timestamp with time zone NOT NULL,
+    metadata jsonb,
+    synced_to_integration boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    navigo3_record_id integer
+);
+
+
+ALTER TABLE public.processed_events OWNER TO postgres;
+
+--
+-- Name: raw_scans; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.raw_scans (
+    id bigint NOT NULL,
+    lighthouse_id integer NOT NULL,
+    epc character varying(96) NOT NULL,
+    epc_length smallint,
+    rssi_dbm integer,
+    antenna_id smallint,
+    frequency integer,
+    sequence_number integer,
+    detection_confidence real,
+    timestamp_ms bigint NOT NULL,
+    "timestamp" timestamp with time zone NOT NULL,
+    received_at timestamp with time zone DEFAULT now(),
+    processed_at timestamp with time zone,
+    orphaned_at timestamp with time zone,
+    orphan_reason public.orphan_reason_type,
+    source public.scan_source DEFAULT 'realtime'::public.scan_source NOT NULL,
+    time_basis public.time_basis DEFAULT 'synced'::public.time_basis NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.raw_scans OWNER TO postgres;
+
+--
+-- Name: raw_scans_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.raw_scans_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.raw_scans_id_seq OWNER TO postgres;
+
+--
+-- Name: raw_scans_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.raw_scans_id_seq OWNED BY public.raw_scans.id;
+
+
+--
+-- Name: raw_scans_timestamp_ms_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.raw_scans_timestamp_ms_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.raw_scans_timestamp_ms_seq OWNER TO postgres;
+
+--
+-- Name: raw_scans_timestamp_ms_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.raw_scans_timestamp_ms_seq OWNED BY public.raw_scans.timestamp_ms;
+
+
+--
+-- Name: tag_assignments; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tag_assignments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid,
+    tag_epc character varying(96) NOT NULL,
+    assigned_at timestamp with time zone DEFAULT now() NOT NULL,
+    deactivated_at timestamp with time zone,
+    notes character varying(1000),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.tag_assignments OWNER TO postgres;
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.users (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    sync_id character varying(255),
+    name character varying(255),
+    email character varying(255),
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: audit_logs id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.audit_logs ALTER COLUMN id SET DEFAULT nextval('public.audit_logs_id_seq'::regclass);
+
+
+--
+-- Name: lighthouse_connection_events id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_connection_events ALTER COLUMN id SET DEFAULT nextval('public.lighthouse_connection_events_id_seq'::regclass);
+
+
+--
+-- Name: lighthouse_groups id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_groups ALTER COLUMN id SET DEFAULT nextval('public.lighthouse_groups_id_seq'::regclass);
+
+
+--
+-- Name: lighthouse_health_snapshots id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_health_snapshots ALTER COLUMN id SET DEFAULT nextval('public.lighthouse_health_snapshots_id_seq'::regclass);
+
+
+--
+-- Name: lighthouses id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses ALTER COLUMN id SET DEFAULT nextval('public.lighthouses_id_seq'::regclass);
+
+
+--
+-- Name: processed_event_scans raw_scan_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_event_scans ALTER COLUMN raw_scan_id SET DEFAULT nextval('public.processed_event_scans_raw_scan_id_seq'::regclass);
+
+
+--
+-- Name: raw_scans id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.raw_scans ALTER COLUMN id SET DEFAULT nextval('public.raw_scans_id_seq'::regclass);
+
+
+--
+-- Name: raw_scans timestamp_ms; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.raw_scans ALTER COLUMN timestamp_ms SET DEFAULT nextval('public.raw_scans_timestamp_ms_seq'::regclass);
+
+
+--
+-- Data for Name: audit_logs; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.audit_logs (id, user_id, action, resource_type, resource_id, changes, "timestamp") FROM stdin;
+\.
+
+
+--
+-- Data for Name: dashboard_users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.dashboard_users (id, username, password_hash, role, is_active, last_login, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: lighthouse_connection_events; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.lighthouse_connection_events (id, lighthouse_id, event_type, is_graceful, recorded_at) FROM stdin;
+342	10	connected	\N	2026-05-09 19:29:17.539716+02
+343	9	connected	\N	2026-05-09 19:29:18.041345+02
+344	10	disconnected	t	2026-05-09 19:29:54.610093+02
+345	10	connected	\N	2026-05-09 19:29:55.443119+02
+346	9	disconnected	t	2026-05-09 19:30:38.325875+02
+347	9	connected	\N	2026-05-09 19:30:43.322578+02
+348	9	disconnected	t	2026-05-09 19:31:10.95663+02
+349	9	connected	\N	2026-05-09 19:31:10.975275+02
+350	9	disconnected	t	2026-05-09 19:33:29.024061+02
+351	10	disconnected	t	2026-05-09 19:33:34.24946+02
+352	9	connected	\N	2026-05-09 19:34:03.627155+02
+353	10	connected	\N	2026-05-09 19:34:08.871029+02
+354	10	disconnected	t	2026-05-09 19:34:16.504713+02
+355	10	connected	\N	2026-05-09 19:34:20.679591+02
+356	9	disconnected	t	2026-05-09 19:40:03.39725+02
+357	9	connected	\N	2026-05-09 19:40:09.803941+02
+358	9	disconnected	t	2026-05-09 19:40:15.926811+02
+359	9	connected	\N	2026-05-09 19:40:20.254573+02
+360	10	disconnected	t	2026-05-09 19:45:01.423185+02
+361	10	connected	\N	2026-05-09 19:45:01.434921+02
+362	9	disconnected	t	2026-05-09 19:45:02.895895+02
+363	9	connected	\N	2026-05-09 19:45:44.951873+02
+364	9	disconnected	t	2026-05-09 19:46:54.204628+02
+365	10	disconnected	t	2026-05-09 19:46:54.61351+02
+366	10	connected	\N	2026-05-09 19:47:35.890143+02
+367	9	connected	\N	2026-05-09 19:47:35.948688+02
+368	10	disconnected	t	2026-05-09 19:48:09.069635+02
+369	10	connected	\N	2026-05-09 19:48:13.161065+02
+370	10	disconnected	t	2026-05-09 19:48:58.237665+02
+371	10	connected	\N	2026-05-09 19:49:02.554938+02
+372	9	disconnected	t	2026-05-09 19:49:16.975916+02
+373	9	connected	\N	2026-05-09 19:49:23.097947+02
+\.
+
+
+--
+-- Data for Name: lighthouse_groups; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.lighthouse_groups (id, label, description, activity_timeout_ms, orphan_timeout_ms, created_at, updated_at) FROM stdin;
+5	Test	\N	4000	8000	2026-05-08 22:50:40.19+02	2026-05-08 22:50:40.19+02
+\.
+
+
+--
+-- Data for Name: lighthouse_health_snapshots; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.lighthouse_health_snapshots (id, lighthouse_id, uptime_sec, free_heap_bytes, min_free_heap_bytes, wifi_rssi_dbm, rfid_state, rfid_is_responsive, rfid_power_rail_present, rfid_fw_version, rfid_last_error, recorded_at) FROM stdin;
+7734	9	90	165772	149684	-72	POWERED_OFF	t	t	129.3	0	2026-05-09 19:29:29.842314+02
+7735	10	90	165708	152636	-82	POWERED_OFF	t	t	129.3	0	2026-05-09 19:29:30.354335+02
+7736	10	96	165684	152636	-79	POWERED_OFF	t	t	129.3	0	2026-05-09 19:29:35.75997+02
+7737	9	114	165664	149684	-71	POWERED_OFF	t	t	129.3	0	2026-05-09 19:29:52.984354+02
+7738	10	6	189968	189836	-65	UNINITIALIZED	f	f	0.0	0	2026-05-09 19:29:55.6048+02
+7739	9	121	165688	149684	-86	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:00.152755+02
+7740	10	21	170640	166020	-73	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:11.416612+02
+7741	10	27	170396	166020	-75	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:16.413613+02
+7742	10	34	170396	166020	-79	UNKNOWN	t	t	129.3	0	2026-05-09 19:30:23.704592+02
+7743	10	39	170396	166020	-78	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:28.824527+02
+7744	10	44	170396	166020	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:33.842413+02
+7745	10	49	170396	166020	-64	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:38.859721+02
+7746	9	6	193320	191076	-72	UNINITIALIZED	f	f	0.0	0	2026-05-09 19:30:43.376867+02
+7747	10	54	170396	166020	-64	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:43.980099+02
+7748	10	59	170396	166020	-65	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:48.998557+02
+7749	10	64	170396	166020	-64	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:54.117989+02
+7750	10	69	170396	166020	-64	POWERED_OFF	t	t	129.3	0	2026-05-09 19:30:59.093571+02
+7751	10	74	170396	166020	-63	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:04.255475+02
+7752	10	79	170396	166020	-64	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:09.273087+02
+7753	9	6	193304	190908	-74	UNINITIALIZED	f	f	0.0	0	2026-05-09 19:31:11.024085+02
+7754	10	84	170396	166020	-63	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:14.274225+02
+7755	10	89	170396	166020	-64	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:19.33373+02
+7756	10	94	170396	166020	-63	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:24.428431+02
+7757	9	20	170636	165484	-74	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:25.05032+02
+7758	10	100	170396	166020	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:29.547898+02
+7759	9	25	170408	165484	-86	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:30.060062+02
+7760	10	105	170396	166020	-63	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:34.565779+02
+7761	9	30	170408	165484	-75	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:35.08018+02
+7762	10	110	170396	166020	-63	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:39.584327+02
+7763	9	35	170408	165484	-80	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:40.198329+02
+7764	10	115	170396	166020	-63	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:44.624527+02
+7766	10	120	170380	166020	-64	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:49.721696+02
+7768	10	125	170416	166020	-65	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:54.723919+02
+7770	10	130	170416	166020	-64	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:59.784637+02
+7771	10	135	170416	166020	-76	POWERED_OFF	t	t	129.3	0	2026-05-09 19:32:04.877061+02
+7773	10	140	170416	166020	-72	POWERED_OFF	t	t	129.3	0	2026-05-09 19:32:09.997006+02
+7776	9	74	170404	165484	-65	POWERED_OFF	f	t	129.3	263	2026-05-09 19:32:19.325626+02
+7778	9	83	170404	165484	-65	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:27.917405+02
+7780	9	90	170404	165484	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:34.880543+02
+7782	9	100	170396	165484	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:44.607784+02
+7787	9	120	170404	163344	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:33:05.093653+02
+7788	10	202	170276	163432	-43	RESPONSIVE	t	t	129.3	0	2026-05-09 19:33:11.744862+02
+7852	10	521	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:30.834985+02
+7861	10	556	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:05.836099+02
+7865	9	498	165368	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:22.770216+02
+7866	10	577	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:26.835396+02
+7867	9	507	165700	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:32.471692+02
+7870	9	517	165696	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:42.199618+02
+7872	9	527	165692	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:51.927465+02
+7878	10	626	170272	154060	-47	RESPONSIVE	t	t	129.3	0	2026-05-09 19:40:15.845994+02
+7887	10	651	170272	154060	-46	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:41.284987+02
+7889	10	656	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:46.302523+02
+7890	9	583	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:47.735518+02
+7892	9	588	168732	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:52.790616+02
+7913	10	717	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:47.026046+02
+7915	10	722	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:52.043461+02
+7916	9	648	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:53.433427+02
+7918	9	653	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:58.597045+02
+7926	9	674	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:18.769837+02
+7930	9	684	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:28.908062+02
+7945	10	798	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:07.923009+02
+7946	9	724	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:09.356488+02
+7948	9	729	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:14.381842+02
+7951	10	813	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:23.186005+02
+7953	10	818	168712	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:28.231872+02
+7954	9	745	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:29.6319+02
+7956	9	750	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:34.64996+02
+7971	10	864	170272	154060	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:13.663953+02
+7984	10	899	170272	154060	-46	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:49.099428+02
+7989	10	36	170380	166016	-40	POWERED_OFF	t	t	129.3	0	2026-05-09 19:45:30.874455+02
+8009	9	56	170416	166036	-66	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:31.701485+02
+8012	10	173	162476	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:47:47.579843+02
+8013	9	136	162492	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:47:51.778243+02
+8014	10	181	165816	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:47:55.16255+02
+8017	9	156	165836	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:11.697326+02
+8018	10	204	165680	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:18.504583+02
+8019	9	165	165836	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:21.576936+02
+8023	9	185	165836	155600	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:41.556807+02
+8032	10	270	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:24.901366+02
+8039	10	298	170248	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:52.919256+02
+8043	9	273	165684	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:09.404407+02
+8046	10	326	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:20.976955+02
+8050	9	303	165668	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:38.794231+02
+8054	10	361	170248	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:55.997277+02
+8055	9	322	165684	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:58.353167+02
+8063	10	396	170248	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:30.902019+02
+8068	9	373	170288	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:49.348754+02
+8074	9	394	170288	155600	-69	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:10.340998+02
+7765	9	40	170408	165484	-76	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:45.216092+02
+7767	9	45	170408	165484	-70	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:50.335554+02
+7769	9	54	170408	165484	-72	POWERED_OFF	t	t	129.3	0	2026-05-09 19:31:58.985884+02
+7772	9	61	170404	165484	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:32:06.011021+02
+7774	9	69	170404	165484	-67	POWERED_OFF	f	t	129.3	263	2026-05-09 19:32:14.297771+02
+7775	10	149	170416	166020	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:18.496363+02
+7777	10	156	170416	165220	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:25.459554+02
+7779	10	163	170416	165220	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:32.550649+02
+7781	10	171	168852	164608	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:40.819244+02
+7783	10	178	170416	164608	-43	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:48.397558+02
+7786	10	194	170276	163432	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:33:04.478022+02
+7853	9	449	165700	153276	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:34.204826+02
+7854	10	528	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:37.835246+02
+7855	9	459	165700	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:43.932639+02
+7856	10	535	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:44.855071+02
+7858	9	469	165700	153276	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:53.765833+02
+7859	10	549	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:58.883463+02
+7860	9	478	165700	153276	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:03.492243+02
+7862	10	563	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:12.91213+02
+7863	9	488	165700	153276	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:12.934273+02
+7864	10	570	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:19.87602+02
+7869	10	591	170272	154060	-43	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:40.86795+02
+7875	10	612	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:40:01.860789+02
+7876	10	619	170028	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:40:08.838638+02
+7877	9	550	158780	153276	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:40:15.6857+02
+7879	10	631	170272	154060	-46	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:20.947217+02
+7895	10	672	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:01.417626+02
+7896	9	598	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:02.995864+02
+7897	10	677	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:06.577932+02
+7898	9	603	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:08.012055+02
+7903	10	692	170272	154060	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:21.732997+02
+7904	9	618	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:23.17187+02
+7905	10	697	170272	154060	-46	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:26.750948+02
+7906	9	623	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:28.184614+02
+7921	10	737	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:07.253027+02
+7923	10	742	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:12.319387+02
+7924	9	669	170292	153276	-69	STARTUP_PENDING	t	t	129.3	0	2026-05-09 19:42:13.752463+02
+7933	10	768	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:37.612011+02
+7934	9	694	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:39.046055+02
+7935	10	773	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:42.629701+02
+7936	9	699	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:44.06371+02
+7959	10	833	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:43.460616+02
+7961	10	838	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:48.371944+02
+7962	9	765	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:49.805066+02
+7964	9	770	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:54.924954+02
+7969	10	859	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:08.646313+02
+7970	9	785	170284	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:10.022063+02
+7975	10	874	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:23.80185+02
+7976	9	800	170284	153276	-67	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:25.234989+02
+7977	10	879	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:28.922533+02
+7978	9	805	170284	153276	-67	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:30.355456+02
+7995	10	62	170380	165340	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:45:56.167807+02
+8003	9	40	170416	166036	-65	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:16.474529+02
+8010	10	165	162608	158192	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:47:39.999274+02
+8011	9	126	162640	157392	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:47:42.152532+02
+8020	10	212	165680	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:26.12304+02
+8030	10	256	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:10.901416+02
+8031	10	263	170248	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:17.900571+02
+8035	10	284	170248	155224	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:38.991952+02
+8036	9	244	165684	155600	-70	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:40.016817+02
+8040	9	264	165684	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:59.77966+02
+8047	10	333	170248	155224	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:27.939775+02
+8052	9	312	165684	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:48.73243+02
+8057	9	332	165684	155600	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:07.978164+02
+8058	10	375	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:09.924379+02
+8059	10	382	170248	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:16.987895+02
+8060	9	341	165684	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:17.603582+02
+8070	9	380	170288	155600	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:56.531046+02
+8071	10	424	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:58.974028+02
+8080	9	415	170288	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:31.332849+02
+7784	9	110	170404	163344	-65	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:54.643501+02
+7785	10	186	170276	163432	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:32:56.38472+02
+7857	10	542	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:51.920332+02
+7868	10	584	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:33.905041+02
+7871	10	598	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:47.934132+02
+7873	10	605	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:39:54.897027+02
+7874	9	536	161384	153276	-77	RESPONSIVE	t	t	129.3	0	2026-05-09 19:40:01.553478+02
+7880	9	557	159632	153276	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:40:22.443939+02
+7883	10	641	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:31.401232+02
+7885	10	646	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:36.164479+02
+7886	9	573	170292	153276	-70	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:37.598625+02
+7888	9	578	170292	153276	-70	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:42.717897+02
+7911	10	712	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:41.905878+02
+7912	9	638	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:43.339755+02
+7914	9	643	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:48.46+02
+7937	10	778	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:47.749998+02
+7938	9	704	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:49.190242+02
+7939	10	783	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:52.767698+02
+7940	9	709	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:54.201291+02
+7963	10	844	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:53.41907+02
+7965	10	849	170272	154060	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:58.509035+02
+7966	9	775	170292	153276	-67	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:59.942497+02
+7968	9	780	170284	153276	-67	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:05.062108+02
+7972	9	790	170284	153276	-67	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:15.104792+02
+7973	10	869	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:18.784343+02
+7974	9	795	170284	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:20.142887+02
+7980	9	810	170284	153276	-67	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:35.373156+02
+7988	10	31	170380	166016	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:45:25.754904+02
+7994	10	56	168812	166016	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:45:51.090661+02
+8000	10	77	170380	165340	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:11.323564+02
+8016	10	189	165684	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:03.15015+02
+8021	9	175	165836	155600	-69	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:31.510022+02
+8022	10	219	165680	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:34.070591+02
+8027	10	242	160284	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:57.008527+02
+8041	10	305	170248	155224	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:59.901807+02
+8048	9	293	165664	155600	-69	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:29.066485+02
+8053	10	354	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:48.901871+02
+8069	10	417	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:51.908135+02
+8078	9	408	168728	155600	-70	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:24.369763+02
+8079	10	452	170248	155224	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:27.036653+02
+7789	9	183	161060	154072	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:08.180667+02
+7790	10	262	162484	160684	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:11.854062+02
+7792	10	276	166940	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:25.883563+02
+7797	10	297	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:46.87509+02
+7798	9	223	160936	153276	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:48.00125+02
+7800	9	233	165700	153276	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:57.729892+02
+7801	10	311	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:00.835676+02
+7802	9	243	165700	153276	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:07.673682+02
+7803	10	318	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:07.833823+02
+7808	10	339	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:28.859542+02
+7813	10	360	170092	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:49.832521+02
+7819	9	312	165700	153276	-72	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:16.921213+02
+7820	10	388	170272	154060	-43	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:17.909084+02
+7822	9	322	165700	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:26.817645+02
+7823	10	402	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:31.93872+02
+7832	10	437	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:06.856628+02
+7846	9	420	165700	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:04.634649+02
+7849	10	507	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:16.835765+02
+7881	10	636	170272	154060	-46	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:26.02685+02
+7882	9	562	170292	153276	-66	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:27.460512+02
+7884	9	567	170292	153276	-70	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:32.580286+02
+7899	10	682	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:11.595876+02
+7900	9	608	170292	153276	-69	STARTUP_PENDING	t	t	129.3	0	2026-05-09 19:41:13.02893+02
+7907	10	702	170272	154060	-46	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:31.768508+02
+7908	9	628	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:33.201438+02
+7909	10	707	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:36.81834+02
+7910	9	633	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:38.322135+02
+7941	10	788	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:57.785065+02
+7942	9	714	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:59.218585+02
+7943	10	793	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:02.905422+02
+7944	9	719	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:04.338683+02
+7949	10	808	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:18.060907+02
+7950	9	734	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:19.494791+02
+7952	9	739	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:24.512023+02
+7967	10	854	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:03.629613+02
+7979	10	884	170272	154060	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:33.939369+02
+7981	10	889	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:38.957574+02
+7982	9	815	170284	153276	-66	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:40.391796+02
+7986	10	19	170616	166016	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:45:13.46693+02
+7987	10	26	170380	166016	-43	UNKNOWN	t	t	129.3	0	2026-05-09 19:45:20.634765+02
+7990	10	41	170380	166016	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:45:35.892419+02
+7996	9	23	170740	166036	-67	UNKNOWN	t	t	129.3	0	2026-05-09 19:45:59.141931+02
+7997	10	67	170380	165340	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:01.190648+02
+7998	9	28	170416	166036	-67	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:04.25749+02
+7999	10	72	170380	165340	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:06.20286+02
+8002	10	82	170380	165340	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:16.340636+02
+8005	9	45	170416	166036	-66	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:21.538619+02
+8075	10	438	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:13.002724+02
+8077	10	445	168680	155224	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:20.069029+02
+7791	9	193	160936	153276	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:18.407622+02
+7794	10	283	170296	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:32.921402+02
+7796	10	290	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:39.833839+02
+7805	9	252	165700	153276	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:17.493521+02
+7807	9	262	165700	153276	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:27.425584+02
+7810	9	272	165420	153276	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:37.358572+02
+7816	10	374	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:03.88077+02
+7821	10	395	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:24.833997+02
+7824	9	332	165700	153276	-69	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:36.649081+02
+7825	10	409	170272	154060	-42	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:38.83413+02
+7826	10	416	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:45.865339+02
+7827	9	341	165700	153276	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:46.479414+02
+7829	9	351	165700	153276	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:56.207606+02
+7830	10	430	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:59.894132+02
+7831	9	361	165700	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:06.242772+02
+7835	10	451	170272	154060	-42	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:20.833645+02
+7837	10	458	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:27.849347+02
+7840	10	472	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:41.878099+02
+7845	10	493	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:02.835077+02
+7848	9	430	165700	153276	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:14.646374+02
+7850	10	514	170272	154060	-42	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:23.86319+02
+7851	9	439	165700	153276	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:24.477302+02
+7891	10	661	170272	154060	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:51.320921+02
+7893	10	666	170272	154060	-46	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:56.439615+02
+7894	9	593	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:40:57.873545+02
+7901	10	687	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:16.613087+02
+7902	9	613	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:18.024022+02
+7917	10	727	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:41:57.168975+02
+7919	10	732	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:02.181645+02
+7920	9	659	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:03.614625+02
+7922	9	664	170292	153276	-69	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:08.684694+02
+7925	10	747	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:17.337125+02
+7927	10	752	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:22.35841+02
+7928	9	679	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:23.890911+02
+8007	9	50	170416	166036	-66	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:26.5851+02
+8015	9	146	162496	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:01.916698+02
+8026	9	195	165836	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:51.080924+02
+8028	9	205	165832	155600	-72	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:00.797381+02
+8033	9	234	165684	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:30.288204+02
+8034	10	277	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:31.926102+02
+8037	10	291	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:46.030432+02
+8038	9	254	165684	155600	-72	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:49.960471+02
+8044	10	319	170248	155224	-47	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:13.910935+02
+8045	9	283	165680	155600	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:19.440133+02
+8051	10	347	170248	155224	-47	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:41.969062+02
+8056	10	368	170248	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:02.960932+02
+8061	10	389	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:25.517781+02
+8062	9	351	165668	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:27.502874+02
+8065	10	403	170248	155224	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:37.982374+02
+8072	9	387	170288	155600	-69	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:03.377326+02
+8081	10	459	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:33.995753+02
+7793	9	203	160936	153276	-70	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:28.274548+02
+7795	9	213	160936	153276	-72	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:37.948055+02
+7799	10	304	170272	154060	-47	RESPONSIVE	t	t	129.3	0	2026-05-09 19:34:53.941309+02
+7804	10	325	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:14.833387+02
+7806	10	332	170272	154060	-43	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:21.896671+02
+7809	10	346	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:35.834011+02
+7811	10	353	170296	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:42.834204+02
+7812	9	282	165700	153276	-69	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:47.289731+02
+7814	10	367	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:56.917749+02
+7815	9	292	165700	153276	-68	RESPONSIVE	t	t	129.3	0	2026-05-09 19:35:57.429665+02
+7817	9	302	165700	153276	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:07.162165+02
+7818	10	381	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:10.834009+02
+7828	10	423	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:36:52.930943+02
+7833	10	444	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:13.922952+02
+7834	9	371	165700	153276	-71	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:16.092079+02
+7836	9	381	165700	153276	-70	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:25.69907+02
+7838	10	465	170272	154060	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:34.915053+02
+7839	9	390	165700	153276	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:35.427295+02
+7841	9	400	165700	153276	-69	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:45.241957+02
+7842	10	479	170272	154060	-46	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:49.155851+02
+7843	9	410	165700	153276	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:55.018733+02
+7844	10	486	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:37:55.833788+02
+7847	10	500	170272	154060	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:38:09.935706+02
+7929	10	758	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:27.474468+02
+7931	10	763	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:32.478712+02
+7932	9	689	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:42:33.925981+02
+7947	10	803	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:13.042287+02
+7955	10	823	170272	154060	-45	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:33.217608+02
+7957	10	828	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:38.335859+02
+7958	9	755	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:39.769681+02
+7960	9	760	170292	153276	-68	POWERED_OFF	t	t	129.3	0	2026-05-09 19:43:44.732679+02
+7983	10	894	170272	154060	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:44:44.077219+02
+7985	10	7	193312	190904	-43	UNINITIALIZED	f	f	0.0	0	2026-05-09 19:45:01.489608+02
+7991	10	46	170380	166016	-44	POWERED_OFF	t	t	129.3	0	2026-05-09 19:45:40.891734+02
+7992	9	9	191644	191392	-73	UNINITIALIZED	f	f	0.0	0	2026-05-09 19:45:44.998681+02
+7993	10	51	170380	166016	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:45:46.030091+02
+8001	9	35	170416	166036	-72	UNKNOWN	t	t	129.3	0	2026-05-09 19:46:11.374427+02
+8004	10	87	170380	165340	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:21.460919+02
+8006	10	92	170380	165340	-43	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:26.479062+02
+8008	10	97	170380	165340	-42	POWERED_OFF	t	t	129.3	0	2026-05-09 19:46:31.496316+02
+8024	10	227	165680	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:41.557615+02
+8025	10	235	165804	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:48:49.225304+02
+7731	10	79	165812	152636	-75	POWERED_OFF	t	t	129.3	0	2026-05-09 19:29:18.783123+02
+7732	9	83	165924	149684	-72	POWERED_OFF	t	t	129.3	0	2026-05-09 19:29:22.67471+02
+7733	10	85	165676	152636	-66	POWERED_OFF	t	t	129.3	0	2026-05-09 19:29:24.622432+02
+8029	9	215	165688	155600	-69	RESPONSIVE	t	t	129.3	0	2026-05-09 19:49:10.795956+02
+8042	10	312	170248	155224	-43	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:06.947987+02
+8049	10	340	170248	155224	-44	RESPONSIVE	t	t	129.3	0	2026-05-09 19:50:35.007056+02
+8064	9	359	165684	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:35.268007+02
+8066	9	366	170288	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:42.28263+02
+8067	10	410	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:51:44.945633+02
+8073	10	431	170248	155224	-45	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:05.937637+02
+8076	9	401	170288	155600	-67	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:17.30419+02
+8082	9	422	170288	155600	-66	RESPONSIVE	t	t	129.3	0	2026-05-09 19:52:38.295938+02
+\.
+
+
+--
+-- Data for Name: lighthouses; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.lighthouses (id, name, device_id, placement, comment, firmware_version, last_seen_at, is_active, config, group_id, created_at, canged_at) FROM stdin;
+10	Red	68:FE:71:0D:D0:74	OUTSIDE	\N	\N	2026-05-09 19:52:33.999+02	t	{}	5	2026-05-08 22:52:09.26+02	2026-05-08 22:52:09.261586+02
+9	Yellow	00:70:07:25:15:00	INSIDE	\N	\N	2026-05-09 19:52:38.297+02	t	{}	5	2026-05-08 22:51:30.087+02	2026-05-08 22:51:30.088128+02
+\.
+
+
+--
+-- Data for Name: mqtt_clients; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.mqtt_clients (id, lighthouse_id, client_id, connected_at, last_activity, is_connected, ip_address, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: processed_event_scans; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.processed_event_scans (processed_event_id, raw_scan_id) FROM stdin;
+0d43c0ff-64a6-45d4-8e4c-0251ec4dc7b7	21313
+dd301a68-52bd-4939-b025-868d0139519f	21313
+0d43c0ff-64a6-45d4-8e4c-0251ec4dc7b7	21314
+dd301a68-52bd-4939-b025-868d0139519f	21314
+70474112-60ee-4b84-9e19-d15159675dcf	21330
+44566f98-25c2-4b5a-8e53-986f340d4e63	21330
+70474112-60ee-4b84-9e19-d15159675dcf	21332
+44566f98-25c2-4b5a-8e53-986f340d4e63	21332
+70474112-60ee-4b84-9e19-d15159675dcf	21331
+44566f98-25c2-4b5a-8e53-986f340d4e63	21331
+70474112-60ee-4b84-9e19-d15159675dcf	21329
+44566f98-25c2-4b5a-8e53-986f340d4e63	21329
+e0327451-1ca0-442f-8196-f96875e56d09	21348
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21348
+e0327451-1ca0-442f-8196-f96875e56d09	21354
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21354
+e0327451-1ca0-442f-8196-f96875e56d09	21346
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21346
+e0327451-1ca0-442f-8196-f96875e56d09	21347
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21347
+e0327451-1ca0-442f-8196-f96875e56d09	21350
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21350
+e0327451-1ca0-442f-8196-f96875e56d09	21351
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21351
+e0327451-1ca0-442f-8196-f96875e56d09	21349
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21349
+e0327451-1ca0-442f-8196-f96875e56d09	21353
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21353
+e0327451-1ca0-442f-8196-f96875e56d09	21355
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21355
+e0327451-1ca0-442f-8196-f96875e56d09	21352
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21352
+e0327451-1ca0-442f-8196-f96875e56d09	21357
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21357
+e0327451-1ca0-442f-8196-f96875e56d09	21356
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21356
+e0327451-1ca0-442f-8196-f96875e56d09	21358
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	21358
+\.
+
+
+--
+-- Data for Name: processed_events; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.processed_events (id, algorithm_id, direction, tag_epc, user_id, group_id, confidence, centroid_separation_factor, cluster_size_factor, bilateral_coverage_factor, rssi_trend_consistency_factor, "timestamp", cluster_started_at, cluster_ended_at, metadata, synced_to_integration, created_at, navigo3_record_id) FROM stdin;
+dd301a68-52bd-4939-b025-868d0139519f	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.05	1	0.1	1	0.5	2026-05-09 19:47:14+02	2026-05-09 19:47:14+02	2026-05-09 19:47:16+02	{"rssiTrend": {"inside": {"r2": 0, "slope": 0}, "outside": {"r2": 0, "slope": 0}}, "rssiWeights": {"inside": [0.48], "outside": [0.5800000000000001]}, "centroidDeltaMs": 2000, "insideScanCount": 1, "insideCentroidMs": 1778348836000, "outsideScanCount": 1, "clusterDurationMs": 2000, "outsideCentroidMs": 1778348834000}	f	2026-05-09 19:47:57.235462+02	\N
+0d43c0ff-64a6-45d4-8e4c-0251ec4dc7b7	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.1	1	0.1	1	\N	2026-05-09 19:47:14+02	2026-05-09 19:47:14+02	2026-05-09 19:47:16+02	{"centroidDeltaMs": 2000, "insideScanCount": 1, "insideCentroidMs": 1778348836000, "outsideScanCount": 1, "clusterDurationMs": 2000, "outsideCentroidMs": 1778348834000}	t	2026-05-09 19:47:57.235462+02	\N
+44566f98-25c2-4b5a-8e53-986f340d4e63	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.007412608	0.1779026	0.25	0.33333334	0.5	2026-05-09 19:47:16+02	2026-05-09 19:47:14+02	2026-05-09 19:47:20+02	{"rssiTrend": {"inside": {"r2": 0, "slope": 0}, "outside": {"r2": 0.75, "slope": 0.0003333333333333333}}, "rssiWeights": {"inside": [0.48], "outside": [0.5800000000000001, 0.5800000000000001, 0.62]}, "centroidDeltaMs": 1067.41552734375, "insideScanCount": 1, "insideCentroidMs": 1778348836000, "outsideScanCount": 3, "clusterDurationMs": 6000, "outsideCentroidMs": 1778348837067.4155}	f	2026-05-09 19:48:57.294452+02	\N
+70474112-60ee-4b84-9e19-d15159675dcf	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.013888889	0.16666667	0.25	0.33333334	\N	2026-05-09 19:47:16+02	2026-05-09 19:47:14+02	2026-05-09 19:47:20+02	{"centroidDeltaMs": 1000, "insideScanCount": 1, "insideCentroidMs": 1778348836000, "outsideScanCount": 3, "clusterDurationMs": 6000, "outsideCentroidMs": 1778348837000}	t	2026-05-09 19:48:57.294452+02	\N
+67c8161c-d2eb-4c1f-b77b-728a0ffa8d41	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.03904389	0.78087777	1	0.1	0.5	2026-05-09 19:47:16+02	2026-05-09 19:47:16+02	2026-05-09 19:48:42+02	{"rssiTrend": {"inside": {"r2": 0, "slope": 0}, "outside": {"r2": 0.1101040933233568, "slope": -0.00009555094881199171}}, "rssiWeights": {"inside": [0.48], "outside": [0.52, 0.56, 0.62, 0.56, 0.6599999999999999, 0.5800000000000001, 0.6, 0.6599999999999999, 0.5, 0.5, 0.43999999999999995, 0.36]}, "centroidDeltaMs": 67155.48779296875, "insideScanCount": 1, "insideCentroidMs": 1778348836000, "outsideScanCount": 12, "clusterDurationMs": 86000, "outsideCentroidMs": 1778348903155.4878}	f	2026-05-09 19:49:05.305016+02	\N
+e0327451-1ca0-442f-8196-f96875e56d09	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.07897287	0.7897287	1	0.1	\N	2026-05-09 19:47:16+02	2026-05-09 19:47:16+02	2026-05-09 19:48:42+02	{"centroidDeltaMs": 67916.66674804688, "insideScanCount": 1, "insideCentroidMs": 1778348836000, "outsideScanCount": 12, "clusterDurationMs": 86000, "outsideCentroidMs": 1778348903916.6667}	t	2026-05-09 19:49:05.305016+02	\N
+\.
+
+
+--
+-- Data for Name: raw_scans; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.raw_scans (id, lighthouse_id, epc, epc_length, rssi_dbm, antenna_id, frequency, sequence_number, detection_confidence, timestamp_ms, "timestamp", received_at, processed_at, orphaned_at, orphan_reason, source, time_basis, created_at) FROM stdin;
+21310	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:47:45.38943+02	\N	2026-05-09 19:47:47.226+02	insufficient_data	offline_sync	synced	2026-05-09 19:47:45.38943+02
+21370	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:49:34.111618+02	\N	2026-05-09 19:49:35.336+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:34.111618+02
+21311	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:47:47.303537+02	\N	2026-05-09 19:47:49.23+02	insufficient_data	offline_sync	synced	2026-05-09 19:47:47.303537+02
+21312	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:47:50.783513+02	\N	2026-05-09 19:47:51.23+02	insufficient_data	offline_sync	synced	2026-05-09 19:47:50.783513+02
+21382	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:51:30.266709+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:30.266709+02
+21313	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:47:56.591176+02	2026-05-09 19:47:57.238+02	\N	\N	offline_sync	synced	2026-05-09 19:47:56.591176+02
+21314	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:47:56.630807+02	2026-05-09 19:47:57.238+02	\N	\N	offline_sync	synced	2026-05-09 19:47:56.630807+02
+21388	9	E28011704000021D53DAB0CB	\N	-64	1	0	\N	\N	1778348866000	2026-05-09 19:47:46+02	2026-05-09 19:51:31.287105+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.287105+02
+21315	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:01.721997+02	\N	2026-05-09 19:48:03.239+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:01.721997+02
+21316	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:48:06.36357+02	\N	2026-05-09 19:48:07.24+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:06.36357+02
+21317	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:09.053907+02	\N	2026-05-09 19:48:09.243+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:09.053907+02
+21318	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:48:16.167554+02	\N	2026-05-09 19:48:17.249+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:16.167554+02
+21393	9	E28011704000021D53DAB0CB	\N	-71	1	0	\N	\N	1778348890000	2026-05-09 19:48:10+02	2026-05-09 19:51:31.629729+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.629729+02
+21319	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:17.949749+02	\N	2026-05-09 19:48:19.25+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:17.949749+02
+21398	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778348915000	2026-05-09 19:48:35+02	2026-05-09 19:51:32.231943+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:32.231943+02
+21320	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:23.507678+02	\N	2026-05-09 19:48:25.255+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:23.507678+02
+21403	9	E28011704000021D53DAB0CB	\N	-64	1	0	\N	\N	1778348939000	2026-05-09 19:48:59+02	2026-05-09 19:51:33.026381+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.026381+02
+21321	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:48:26.031321+02	\N	2026-05-09 19:48:27.256+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:26.031321+02
+21322	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:28.859535+02	\N	2026-05-09 19:48:29.259+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:28.859535+02
+21323	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:34.318946+02	\N	2026-05-09 19:48:35.267+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:34.318946+02
+21324	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:48:35.65717+02	\N	2026-05-09 19:48:37.27+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:35.65717+02
+21325	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:39.767158+02	\N	2026-05-09 19:48:41.273+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:39.767158+02
+21326	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:45.007487+02	\N	2026-05-09 19:48:45.279+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:45.007487+02
+21327	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:48:45.744522+02	\N	2026-05-09 19:48:47.282+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:45.744522+02
+21328	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:50.863437+02	\N	2026-05-09 19:48:51.287+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:50.863437+02
+21329	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:48:55.573912+02	2026-05-09 19:48:57.297+02	\N	\N	offline_sync	synced	2026-05-09 19:48:55.573912+02
+21330	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348834000	2026-05-09 19:47:14+02	2026-05-09 19:48:56.700294+02	2026-05-09 19:48:57.297+02	\N	\N	offline_sync	synced	2026-05-09 19:48:56.700294+02
+21331	10	E28011704000021D53DAB0CB	\N	-59	1	0	\N	\N	1778348840000	2026-05-09 19:47:20+02	2026-05-09 19:48:57.007883+02	2026-05-09 19:48:57.297+02	\N	\N	offline_sync	synced	2026-05-09 19:48:57.007883+02
+21332	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348837000	2026-05-09 19:47:17+02	2026-05-09 19:48:57.008489+02	2026-05-09 19:48:57.297+02	\N	\N	offline_sync	synced	2026-05-09 19:48:57.008489+02
+21333	10	E28011704000021D53DAB0CB	\N	-65	1	0	\N	\N	1778348845000	2026-05-09 19:47:25+02	2026-05-09 19:48:57.318352+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:57.318352+02
+21334	10	E28011704000021D53DAB0CB	\N	-60	1	0	\N	\N	1778348843000	2026-05-09 19:47:23+02	2026-05-09 19:48:57.318403+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:57.318403+02
+21335	10	E28011704000021D53DAB0CB	\N	-62	1	0	\N	\N	1778348848000	2026-05-09 19:47:28+02	2026-05-09 19:48:57.318403+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:57.318403+02
+21337	10	E28011704000021D53DAB0CB	\N	-65	1	0	\N	\N	1778348851000	2026-05-09 19:47:31+02	2026-05-09 19:48:57.622705+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:57.622705+02
+21336	10	E28011704000021D53DAB0CB	\N	-64	1	0	\N	\N	1778348854000	2026-05-09 19:47:34+02	2026-05-09 19:48:57.622705+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:57.622705+02
+21338	10	E28011704000021D53DAB0CB	\N	-65	1	0	\N	\N	1778348862000	2026-05-09 19:47:42+02	2026-05-09 19:48:57.929929+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:57.929929+02
+21340	10	E28011704000021D53DAB0CB	\N	-65	1	0	\N	\N	1778348857000	2026-05-09 19:47:37+02	2026-05-09 19:48:57.92996+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:57.92996+02
+21339	10	E28011704000021D53DAB0CB	\N	-65	1	0	\N	\N	1778348859000	2026-05-09 19:47:39+02	2026-05-09 19:48:57.929959+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:57.929959+02
+21341	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348865000	2026-05-09 19:47:45+02	2026-05-09 19:48:58.237613+02	\N	2026-05-09 19:48:59.295+02	insufficient_data	offline_sync	synced	2026-05-09 19:48:58.237613+02
+21342	10	E28011704000021D53DAB0CB	\N	-56	1	0	\N	\N	1778348867000	2026-05-09 19:47:47+02	2026-05-09 19:49:02.640088+02	\N	2026-05-09 19:49:03.301+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:02.640088+02
+21343	10	E28011704000021D53DAB0CB	\N	-56	1	0	\N	\N	1778348878000	2026-05-09 19:47:58+02	2026-05-09 19:49:02.645698+02	\N	2026-05-09 19:49:03.301+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:02.645698+02
+21344	10	E28011704000021D53DAB0CB	\N	-54	1	0	\N	\N	1778348892000	2026-05-09 19:48:12+02	2026-05-09 19:49:02.930898+02	\N	2026-05-09 19:49:03.301+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:02.930898+02
+21345	10	E28011704000021D53DAB0CB	\N	-62	1	0	\N	\N	1778348895000	2026-05-09 19:48:15+02	2026-05-09 19:49:03.058121+02	\N	2026-05-09 19:49:03.301+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:03.058121+02
+21346	10	E28011704000021D53DAB0CB	\N	-59	1	0	\N	\N	1778348897000	2026-05-09 19:48:17+02	2026-05-09 19:49:03.767006+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:03.767006+02
+21348	10	E28011704000021D53DAB0CB	\N	-64	1	0	\N	\N	1778348870000	2026-05-09 19:47:50+02	2026-05-09 19:49:04.074289+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.074289+02
+21347	10	E28011704000021D53DAB0CB	\N	-62	1	0	\N	\N	1778348900000	2026-05-09 19:48:20+02	2026-05-09 19:49:04.074344+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.074344+02
+21360	10	E28011704000021D53DAB0CB	\N	-59	1	0	\N	\N	1778348873000	2026-05-09 19:47:53+02	2026-05-09 19:49:05.302299+02	\N	2026-05-09 19:49:07.304+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:05.302299+02
+21359	10	E28011704000021D53DAB0CB	\N	-73	1	0	\N	\N	1778348924000	2026-05-09 19:48:44+02	2026-05-09 19:49:05.302309+02	\N	2026-05-09 19:49:07.304+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:05.302309+02
+21361	10	E28011704000021D53DAB0CB	\N	-76	1	0	\N	\N	1778348930000	2026-05-09 19:48:50+02	2026-05-09 19:49:05.303017+02	\N	2026-05-09 19:49:07.304+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:05.303017+02
+21362	10	E28011704000021D53DAB0CB	\N	-76	1	0	\N	\N	1778348927000	2026-05-09 19:48:47+02	2026-05-09 19:49:05.303088+02	\N	2026-05-09 19:49:07.304+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:05.303088+02
+21367	10	E28011704000021D53DAB0CB	\N	-55	1	0	\N	\N	1778348889000	2026-05-09 19:48:09+02	2026-05-09 19:49:08.373949+02	\N	2026-05-09 19:49:09.308+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:08.373949+02
+21368	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:49:16.92246+02	\N	2026-05-09 19:49:17.316+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:16.92246+02
+21351	10	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348906000	2026-05-09 19:48:26+02	2026-05-09 19:49:04.381853+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.381853+02
+21350	10	E28011704000021D53DAB0CB	\N	-57	1	0	\N	\N	1778348903000	2026-05-09 19:48:23+02	2026-05-09 19:49:04.381866+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.381866+02
+21349	10	E28011704000021D53DAB0CB	\N	-60	1	0	\N	\N	1778348908000	2026-05-09 19:48:28+02	2026-05-09 19:49:04.38186+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.38186+02
+21353	10	E28011704000021D53DAB0CB	\N	-57	1	0	\N	\N	1778348911000	2026-05-09 19:48:31+02	2026-05-09 19:49:04.689019+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.689019+02
+21355	10	E28011704000021D53DAB0CB	\N	-65	1	0	\N	\N	1778348914000	2026-05-09 19:48:34+02	2026-05-09 19:49:04.689018+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.689018+02
+21352	10	E28011704000021D53DAB0CB	\N	-65	1	0	\N	\N	1778348916000	2026-05-09 19:48:36+02	2026-05-09 19:49:04.68903+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.68903+02
+21354	10	E28011704000021D53DAB0CB	\N	-62	1	0	\N	\N	1778348881000	2026-05-09 19:48:01+02	2026-05-09 19:49:04.68903+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.68903+02
+21356	10	E28011704000021D53DAB0CB	\N	-72	1	0	\N	\N	1778348922000	2026-05-09 19:48:42+02	2026-05-09 19:49:04.995284+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.995284+02
+21357	10	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778348919000	2026-05-09 19:48:39+02	2026-05-09 19:49:04.995293+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:04.995293+02
+21358	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:49:05.034612+02	2026-05-09 19:49:05.308+02	\N	\N	offline_sync	synced	2026-05-09 19:49:05.034612+02
+21366	10	E28011704000021D53DAB0CB	\N	-56	1	0	\N	\N	1778348887000	2026-05-09 19:48:07+02	2026-05-09 19:49:06.838922+02	\N	2026-05-09 19:49:07.304+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:06.838922+02
+21371	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:49:43.739345+02	\N	2026-05-09 19:49:45.35+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:43.739345+02
+21385	9	E28011704000021D53DAB0CB	\N	-67	1	0	\N	\N	1778348851000	2026-05-09 19:47:31+02	2026-05-09 19:51:30.621732+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:30.621732+02
+21386	9	E28011704000021D53DAB0CB	\N	-64	1	0	\N	\N	1778348856000	2026-05-09 19:47:36+02	2026-05-09 19:51:31.272892+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.272892+02
+21391	9	E28011704000021D53DAB0CB	\N	-70	1	0	\N	\N	1778348881000	2026-05-09 19:48:01+02	2026-05-09 19:51:31.409336+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.409336+02
+21396	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778348905000	2026-05-09 19:48:25+02	2026-05-09 19:51:32.025785+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:32.025785+02
+21401	9	E28011704000021D53DAB0CB	\N	-59	1	0	\N	\N	1778348930000	2026-05-09 19:48:50+02	2026-05-09 19:51:33.015562+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.015562+02
+21406	9	E28011704000021D53DAB0CB	\N	-64	1	0	\N	\N	1778348954000	2026-05-09 19:49:14+02	2026-05-09 19:51:33.189747+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.189747+02
+21408	9	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348963000	2026-05-09 19:49:23+02	2026-05-09 19:51:33.465563+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.465563+02
+21409	9	E28011704000021D53DAB0CB	\N	-64	1	0	\N	\N	1778348968000	2026-05-09 19:49:28+02	2026-05-09 19:51:33.566595+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.566595+02
+21413	9	E28011704000021D53DAB0CB	\N	-56	1	0	\N	\N	1778348988000	2026-05-09 19:49:48+02	2026-05-09 19:51:34.029561+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:34.029561+02
+21414	9	E28011704000021D53DAB0CB	\N	-55	1	0	\N	\N	1778348993000	2026-05-09 19:49:53+02	2026-05-09 19:51:34.184068+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:34.184068+02
+21418	9	E28011704000021D53DAB0CB	\N	-58	1	0	\N	\N	1778349012000	2026-05-09 19:50:12+02	2026-05-09 19:51:34.630814+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:34.630814+02
+21419	9	E28011704000021D53DAB0CB	\N	-56	1	0	\N	\N	1778349017000	2026-05-09 19:50:17+02	2026-05-09 19:51:34.750724+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:34.750724+02
+21423	9	E28011704000021D53DAB0CB	\N	-73	1	0	\N	\N	1778349036000	2026-05-09 19:50:36+02	2026-05-09 19:51:35.230476+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:35.230476+02
+21424	9	E28011704000021D53DAB0CB	\N	-70	1	0	\N	\N	1778349041000	2026-05-09 19:50:41+02	2026-05-09 19:51:35.352111+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:35.352111+02
+21425	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778349046000	2026-05-09 19:50:46+02	2026-05-09 19:51:35.768513+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:35.768513+02
+21429	9	E28011704000021D53DAB0CB	\N	-63	1	0	\N	\N	1778349065000	2026-05-09 19:51:05+02	2026-05-09 19:51:36.43363+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:36.43363+02
+21430	9	E28011704000021D53DAB0CB	\N	-64	1	0	\N	\N	1778349070000	2026-05-09 19:51:10+02	2026-05-09 19:51:36.753377+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:36.753377+02
+21431	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778349080000	2026-05-09 19:51:20+02	2026-05-09 19:51:37.060584+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:37.060584+02
+21363	10	E28011704000021D53DAB0CB	\N	-74	1	0	\N	\N	1778348933000	2026-05-09 19:48:53+02	2026-05-09 19:49:05.609032+02	\N	2026-05-09 19:49:07.304+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:05.609032+02
+21372	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:49:53.441664+02	\N	2026-05-09 19:49:55.362+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:53.441664+02
+21369	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:49:24.198667+02	\N	2026-05-09 19:49:25.323+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:24.198667+02
+21374	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:50:12.988932+02	\N	2026-05-09 19:50:13.38+02	insufficient_data	offline_sync	synced	2026-05-09 19:50:12.988932+02
+21375	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:50:22.44171+02	\N	2026-05-09 19:50:23.39+02	insufficient_data	offline_sync	synced	2026-05-09 19:50:22.44171+02
+21377	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:50:42.378532+02	\N	2026-05-09 19:50:43.414+02	insufficient_data	offline_sync	synced	2026-05-09 19:50:42.378532+02
+21379	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:51:01.36038+02	\N	2026-05-09 19:51:01.432+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:01.36038+02
+21387	9	E28011704000021D53DAB0CB	\N	-67	1	0	\N	\N	1778348861000	2026-05-09 19:47:41+02	2026-05-09 19:51:31.280483+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.280483+02
+21392	9	E28011704000021D53DAB0CB	\N	-71	1	0	\N	\N	1778348886000	2026-05-09 19:48:06+02	2026-05-09 19:51:31.514635+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.514635+02
+21397	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778348910000	2026-05-09 19:48:30+02	2026-05-09 19:51:32.134034+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:32.134034+02
+21402	9	E28011704000021D53DAB0CB	\N	-60	1	0	\N	\N	1778348934000	2026-05-09 19:48:54+02	2026-05-09 19:51:33.019182+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.019182+02
+21407	9	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348958000	2026-05-09 19:49:18+02	2026-05-09 19:51:33.312805+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.312805+02
+21412	9	E28011704000021D53DAB0CB	\N	-59	1	0	\N	\N	1778348983000	2026-05-09 19:49:43+02	2026-05-09 19:51:33.916469+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.916469+02
+21417	9	E28011704000021D53DAB0CB	\N	-58	1	0	\N	\N	1778349007000	2026-05-09 19:50:07+02	2026-05-09 19:51:34.511056+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:34.511056+02
+21422	9	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778349031000	2026-05-09 19:50:31+02	2026-05-09 19:51:35.118692+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:35.118692+02
+21428	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778349060000	2026-05-09 19:51:00+02	2026-05-09 19:51:35.828621+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:35.828621+02
+21364	10	E28011704000021D53DAB0CB	\N	-57	1	0	\N	\N	1778348884000	2026-05-09 19:48:04+02	2026-05-09 19:49:05.916854+02	\N	2026-05-09 19:49:07.304+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:05.916854+02
+21373	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:50:03.311836+02	\N	2026-05-09 19:50:03.372+02	insufficient_data	offline_sync	synced	2026-05-09 19:50:03.311836+02
+21380	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:51:11.131625+02	\N	2026-05-09 19:51:11.441+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:11.131625+02
+21383	9	E28011704000021D53DAB0CB	\N	-73	1	0	\N	\N	1778348841000	2026-05-09 19:47:21+02	2026-05-09 19:51:30.381291+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:30.381291+02
+21389	9	E28011704000021D53DAB0CB	\N	-67	1	0	\N	\N	1778348871000	2026-05-09 19:47:51+02	2026-05-09 19:51:31.297492+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.297492+02
+21394	9	E28011704000021D53DAB0CB	\N	-74	1	0	\N	\N	1778348895000	2026-05-09 19:48:15+02	2026-05-09 19:51:31.751808+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.751808+02
+21399	9	E28011704000021D53DAB0CB	\N	-62	1	0	\N	\N	1778348920000	2026-05-09 19:48:40+02	2026-05-09 19:51:32.351938+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:32.351938+02
+21404	9	E28011704000021D53DAB0CB	\N	-67	1	0	\N	\N	1778348944000	2026-05-09 19:49:04+02	2026-05-09 19:51:33.03444+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.03444+02
+21411	9	E28011704000021D53DAB0CB	\N	-56	1	0	\N	\N	1778348978000	2026-05-09 19:49:38+02	2026-05-09 19:51:33.790474+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.790474+02
+21416	9	E28011704000021D53DAB0CB	\N	-50	1	0	\N	\N	1778349002000	2026-05-09 19:50:02+02	2026-05-09 19:51:34.391804+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:34.391804+02
+21421	9	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778349026000	2026-05-09 19:50:26+02	2026-05-09 19:51:35.00678+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:35.00678+02
+21427	9	E28011704000021D53DAB0CB	\N	-70	1	0	\N	\N	1778349056000	2026-05-09 19:50:56+02	2026-05-09 19:51:35.784376+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:35.784376+02
+21432	9	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778349075000	2026-05-09 19:51:15+02	2026-05-09 19:51:37.060986+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:37.060986+02
+21365	10	E28011704000021D53DAB0CB	\N	-56	1	0	\N	\N	1778348876000	2026-05-09 19:47:56+02	2026-05-09 19:49:06.531752+02	\N	2026-05-09 19:49:07.304+02	insufficient_data	offline_sync	synced	2026-05-09 19:49:06.531752+02
+21376	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:50:32.179945+02	\N	2026-05-09 19:50:33.401+02	insufficient_data	offline_sync	synced	2026-05-09 19:50:32.179945+02
+21378	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:50:51.977272+02	\N	2026-05-09 19:50:53.424+02	insufficient_data	offline_sync	synced	2026-05-09 19:50:51.977272+02
+21381	9	E28011704000021D53DAB0CB	\N	-66	1	0	\N	\N	1778348836000	2026-05-09 19:47:16+02	2026-05-09 19:51:20.624602+02	\N	2026-05-09 19:51:21.452+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:20.624602+02
+21384	9	E28011704000021D53DAB0CB	\N	-67	1	0	\N	\N	1778348846000	2026-05-09 19:47:26+02	2026-05-09 19:51:30.586257+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:30.586257+02
+21390	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778348876000	2026-05-09 19:47:56+02	2026-05-09 19:51:31.302845+02	\N	2026-05-09 19:51:31.465+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.302845+02
+21395	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778348900000	2026-05-09 19:48:20+02	2026-05-09 19:51:31.878006+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:31.878006+02
+21400	9	E28011704000021D53DAB0CB	\N	-61	1	0	\N	\N	1778348925000	2026-05-09 19:48:45+02	2026-05-09 19:51:33.004606+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.004606+02
+21405	9	E28011704000021D53DAB0CB	\N	-65	1	0	\N	\N	1778348949000	2026-05-09 19:49:09+02	2026-05-09 19:51:33.072147+02	\N	2026-05-09 19:51:33.47+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.072147+02
+21410	9	E28011704000021D53DAB0CB	\N	-62	1	0	\N	\N	1778348973000	2026-05-09 19:49:33+02	2026-05-09 19:51:33.670622+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:33.670622+02
+21415	9	E28011704000021D53DAB0CB	\N	-58	1	0	\N	\N	1778348998000	2026-05-09 19:49:58+02	2026-05-09 19:51:34.286976+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:34.286976+02
+21420	9	E28011704000021D53DAB0CB	\N	-57	1	0	\N	\N	1778349022000	2026-05-09 19:50:22+02	2026-05-09 19:51:34.903718+02	\N	2026-05-09 19:51:35.468+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:34.903718+02
+21426	9	E28011704000021D53DAB0CB	\N	-74	1	0	\N	\N	1778349051000	2026-05-09 19:50:51+02	2026-05-09 19:51:35.776638+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:35.776638+02
+21433	9	E28011704000021D53DAB0CB	\N	-68	1	0	\N	\N	1778349085000	2026-05-09 19:51:25+02	2026-05-09 19:51:37.367787+02	\N	2026-05-09 19:51:37.471+02	insufficient_data	offline_sync	synced	2026-05-09 19:51:37.367787+02
+\.
+
+
+--
+-- Data for Name: tag_assignments; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.tag_assignments (id, user_id, tag_epc, assigned_at, deactivated_at, notes, created_at) FROM stdin;
+bcfc66c5-9c3a-4967-ab2f-97b6356d87c9	\N	E28011704000021D53DAB0CB	2026-05-08 22:41:26.244+02	2026-05-08 22:48:04.44+02	\N	2026-05-08 22:41:26.244+02
+35905927-6d51-4a83-b2fe-2df54d382e9f	f908224d-2e38-409a-bc7f-81902406f95b	E28011704000021D53DAB0CB	2026-05-08 22:50:24.28+02	\N	\N	2026-05-08 22:50:24.28+02
+\.
+
+
+--
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.users (id, sync_id, name, email, is_active, created_at, updated_at) FROM stdin;
+f908224d-2e38-409a-bc7f-81902406f95b	153	Richard Adamec	\N	t	2026-05-08 22:50:24.28+02	2026-05-08 22:50:24.28+02
+\.
+
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 1, false);
+
+
+--
+-- Name: lighthouse_connection_events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.lighthouse_connection_events_id_seq', 373, true);
+
+
+--
+-- Name: lighthouse_groups_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.lighthouse_groups_id_seq', 5, true);
+
+
+--
+-- Name: lighthouse_health_snapshots_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.lighthouse_health_snapshots_id_seq', 8082, true);
+
+
+--
+-- Name: lighthouses_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.lighthouses_id_seq', 10, true);
+
+
+--
+-- Name: processed_event_scans_raw_scan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.processed_event_scans_raw_scan_id_seq', 1, false);
+
+
+--
+-- Name: raw_scans_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.raw_scans_id_seq', 21433, true);
+
+
+--
+-- Name: raw_scans_timestamp_ms_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.raw_scans_timestamp_ms_seq', 1, false);
+
+
+--
+-- Name: audit_logs audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.audit_logs
+    ADD CONSTRAINT audit_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dashboard_users dashboard_users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dashboard_users
+    ADD CONSTRAINT dashboard_users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dashboard_users dashboard_users_username_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dashboard_users
+    ADD CONSTRAINT dashboard_users_username_unique UNIQUE (username);
+
+
+--
+-- Name: lighthouse_connection_events lighthouse_connection_events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_connection_events
+    ADD CONSTRAINT lighthouse_connection_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lighthouse_groups lighthouse_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_groups
+    ADD CONSTRAINT lighthouse_groups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lighthouse_health_snapshots lighthouse_health_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_health_snapshots
+    ADD CONSTRAINT lighthouse_health_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lighthouses lighthouses_deviceId_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses
+    ADD CONSTRAINT "lighthouses_deviceId_unique" UNIQUE (device_id);
+
+
+--
+-- Name: lighthouses lighthouses_name_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses
+    ADD CONSTRAINT lighthouses_name_unique UNIQUE (name);
+
+
+--
+-- Name: lighthouses lighthouses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses
+    ADD CONSTRAINT lighthouses_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mqtt_clients mqtt_clients_clientId_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mqtt_clients
+    ADD CONSTRAINT "mqtt_clients_clientId_unique" UNIQUE (client_id);
+
+
+--
+-- Name: mqtt_clients mqtt_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mqtt_clients
+    ADD CONSTRAINT mqtt_clients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: processed_event_scans processed_event_scans_processed_event_id_raw_scan_id_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_event_scans
+    ADD CONSTRAINT processed_event_scans_processed_event_id_raw_scan_id_pk PRIMARY KEY (processed_event_id, raw_scan_id);
+
+
+--
+-- Name: processed_events processed_events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_events
+    ADD CONSTRAINT processed_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: raw_scans raw_scans_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.raw_scans
+    ADD CONSTRAINT raw_scans_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tag_assignments tag_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tag_assignments
+    ADD CONSTRAINT tag_assignments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_audit_logs_resource_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_audit_logs_resource_type ON public.audit_logs USING btree (resource_type);
+
+
+--
+-- Name: idx_audit_logs_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_audit_logs_timestamp ON public.audit_logs USING btree ("timestamp");
+
+
+--
+-- Name: idx_audit_logsuser_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_audit_logsuser_id ON public.audit_logs USING btree (user_id);
+
+
+--
+-- Name: idx_connection_events_lighthouse_recorded; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_connection_events_lighthouse_recorded ON public.lighthouse_connection_events USING btree (lighthouse_id, recorded_at);
+
+
+--
+-- Name: idx_connection_events_recorded; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_connection_events_recorded ON public.lighthouse_connection_events USING btree (recorded_at);
+
+
+--
+-- Name: idx_dashboard_users_username; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dashboard_users_username ON public.dashboard_users USING btree (username);
+
+
+--
+-- Name: idx_health_snapshots_lighthouse_recorded; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_health_snapshots_lighthouse_recorded ON public.lighthouse_health_snapshots USING btree (lighthouse_id, recorded_at);
+
+
+--
+-- Name: idx_health_snapshots_recorded; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_health_snapshots_recorded ON public.lighthouse_health_snapshots USING btree (recorded_at);
+
+
+--
+-- Name: idx_lighthouse_groups_label; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lighthouse_groups_label ON public.lighthouse_groups USING btree (label);
+
+
+--
+-- Name: idx_lighthouses_device_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lighthouses_device_id ON public.lighthouses USING btree (device_id);
+
+
+--
+-- Name: idx_lighthouses_group_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lighthouses_group_id ON public.lighthouses USING btree (group_id);
+
+
+--
+-- Name: idx_lighthouses_name; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lighthouses_name ON public.lighthouses USING btree (name);
+
+
+--
+-- Name: idx_mqtt_clients_client_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_mqtt_clients_client_id ON public.mqtt_clients USING btree (client_id);
+
+
+--
+-- Name: idx_mqtt_clients_lighthouse_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_mqtt_clients_lighthouse_id ON public.mqtt_clients USING btree (lighthouse_id);
+
+
+--
+-- Name: idx_processed_event_scans_raw_scan; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_event_scans_raw_scan ON public.processed_event_scans USING btree (raw_scan_id);
+
+
+--
+-- Name: idx_processed_events_algorithm; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_algorithm ON public.processed_events USING btree (algorithm_id, "timestamp");
+
+
+--
+-- Name: idx_processed_events_group; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_group ON public.processed_events USING btree (group_id, "timestamp");
+
+
+--
+-- Name: idx_processed_events_synced; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_synced ON public.processed_events USING btree (synced_to_integration);
+
+
+--
+-- Name: idx_processed_events_tag_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_tag_timestamp ON public.processed_events USING btree (tag_epc, "timestamp");
+
+
+--
+-- Name: idx_processed_events_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_timestamp ON public.processed_events USING btree ("timestamp");
+
+
+--
+-- Name: idx_processed_events_user_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_user_timestamp ON public.processed_events USING btree (user_id, "timestamp");
+
+
+--
+-- Name: idx_raw_scans_epc_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_raw_scans_epc_timestamp ON public.raw_scans USING btree (epc, "timestamp");
+
+
+--
+-- Name: idx_raw_scans_lighthouse_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_raw_scans_lighthouse_timestamp ON public.raw_scans USING btree (lighthouse_id, "timestamp");
+
+
+--
+-- Name: idx_raw_scans_orphaned; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_raw_scans_orphaned ON public.raw_scans USING btree (orphaned_at) WHERE (orphaned_at IS NOT NULL);
+
+
+--
+-- Name: idx_raw_scans_unprocessed; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_raw_scans_unprocessed ON public.raw_scans USING btree (epc, "timestamp") WHERE ((processed_at IS NULL) AND (orphaned_at IS NULL));
+
+
+--
+-- Name: idx_tag_assignments_active; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_tag_assignments_active ON public.tag_assignments USING btree (tag_epc) WHERE (deactivated_at IS NULL);
+
+
+--
+-- Name: idx_tag_assignments_epc; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_tag_assignments_epc ON public.tag_assignments USING btree (tag_epc);
+
+
+--
+-- Name: idx_tag_assignments_user_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_tag_assignments_user_id ON public.tag_assignments USING btree (user_id);
+
+
+--
+-- Name: idx_users_sync_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_users_sync_id ON public.users USING btree (sync_id);
+
+
+--
+-- Name: lighthouse_connection_events lighthouse_connection_events_lighthouse_id_lighthouses_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_connection_events
+    ADD CONSTRAINT lighthouse_connection_events_lighthouse_id_lighthouses_id_fk FOREIGN KEY (lighthouse_id) REFERENCES public.lighthouses(id);
+
+
+--
+-- Name: lighthouse_health_snapshots lighthouse_health_snapshots_lighthouse_id_lighthouses_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_health_snapshots
+    ADD CONSTRAINT lighthouse_health_snapshots_lighthouse_id_lighthouses_id_fk FOREIGN KEY (lighthouse_id) REFERENCES public.lighthouses(id);
+
+
+--
+-- Name: lighthouses lighthouses_group_id_lighthouse_groups_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses
+    ADD CONSTRAINT lighthouses_group_id_lighthouse_groups_id_fk FOREIGN KEY (group_id) REFERENCES public.lighthouse_groups(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mqtt_clients mqtt_clients_lighthouse_id_lighthouses_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mqtt_clients
+    ADD CONSTRAINT mqtt_clients_lighthouse_id_lighthouses_id_fk FOREIGN KEY (lighthouse_id) REFERENCES public.lighthouses(id);
+
+
+--
+-- Name: processed_event_scans processed_event_scans_processed_event_id_processed_events_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_event_scans
+    ADD CONSTRAINT processed_event_scans_processed_event_id_processed_events_id_fk FOREIGN KEY (processed_event_id) REFERENCES public.processed_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: processed_event_scans processed_event_scans_raw_scan_id_raw_scans_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_event_scans
+    ADD CONSTRAINT processed_event_scans_raw_scan_id_raw_scans_id_fk FOREIGN KEY (raw_scan_id) REFERENCES public.raw_scans(id);
+
+
+--
+-- Name: processed_events processed_events_group_id_lighthouse_groups_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_events
+    ADD CONSTRAINT processed_events_group_id_lighthouse_groups_id_fk FOREIGN KEY (group_id) REFERENCES public.lighthouse_groups(id);
+
+
+--
+-- Name: raw_scans raw_scans_lighthouse_id_lighthouses_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.raw_scans
+    ADD CONSTRAINT raw_scans_lighthouse_id_lighthouses_id_fk FOREIGN KEY (lighthouse_id) REFERENCES public.lighthouses(id);
+
+
+--
+-- Name: tag_assignments tag_assignments_user_id_users_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tag_assignments
+    ADD CONSTRAINT tag_assignments_user_id_users_id_fk FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict 4NVhHwdUpYR4DgHaRMnVYEklWIllWHWGg2H2FencwkIuY0fdo83Jfa6rQWWV31S
+

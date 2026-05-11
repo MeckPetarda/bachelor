@@ -1,0 +1,6315 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict uW0vtMHa7LvcLCAe8QUbdXTGyMD8N1bY7F7A1p4GawuuwufdH8hQPgQvvz1ATQe
+
+-- Dumped from database version 15.17 (Ubuntu 15.17-1.pgdg24.04+1)
+-- Dumped by pg_dump version 15.17 (Ubuntu 15.17-1.pgdg24.04+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: algorithm_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.algorithm_type AS ENUM (
+    'temporal_centroid',
+    'rssi_weighted_centroid',
+    'manual'
+);
+
+
+ALTER TYPE public.algorithm_type OWNER TO postgres;
+
+--
+-- Name: direction_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.direction_type AS ENUM (
+    'in',
+    'out',
+    'unknown'
+);
+
+
+ALTER TYPE public.direction_type OWNER TO postgres;
+
+--
+-- Name: lighthouse_placement; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.lighthouse_placement AS ENUM (
+    'STANDALONE',
+    'INSIDE',
+    'OUTSIDE'
+);
+
+
+ALTER TYPE public.lighthouse_placement OWNER TO postgres;
+
+--
+-- Name: orphan_reason_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.orphan_reason_type AS ENUM (
+    'insufficient_data',
+    'misconfigured_group',
+    'unsyncable'
+);
+
+
+ALTER TYPE public.orphan_reason_type OWNER TO postgres;
+
+--
+-- Name: scan_source; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.scan_source AS ENUM (
+    'realtime',
+    'offline_sync'
+);
+
+
+ALTER TYPE public.scan_source OWNER TO postgres;
+
+--
+-- Name: time_basis; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.time_basis AS ENUM (
+    'synced',
+    'estimated',
+    'relative'
+);
+
+
+ALTER TYPE public.time_basis OWNER TO postgres;
+
+--
+-- Name: user_type; Type: TYPE; Schema: public; Owner: postgres
+--
+
+CREATE TYPE public.user_type AS ENUM (
+    'STANDALONE',
+    'INSIDE',
+    'OUTSIDE'
+);
+
+
+ALTER TYPE public.user_type OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: audit_logs; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.audit_logs (
+    id bigint NOT NULL,
+    user_id uuid,
+    action character varying(100) NOT NULL,
+    resource_type character varying(100),
+    resource_id uuid,
+    changes jsonb,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.audit_logs OWNER TO postgres;
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.audit_logs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.audit_logs_id_seq OWNER TO postgres;
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.audit_logs_id_seq OWNED BY public.audit_logs.id;
+
+
+--
+-- Name: dashboard_users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dashboard_users (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    username character varying(255) NOT NULL,
+    password_hash character varying(255) NOT NULL,
+    role public.user_type NOT NULL,
+    is_active boolean DEFAULT true,
+    last_login timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.dashboard_users OWNER TO postgres;
+
+--
+-- Name: lighthouse_connection_events; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lighthouse_connection_events (
+    id bigint NOT NULL,
+    lighthouse_id integer NOT NULL,
+    event_type character varying(20) NOT NULL,
+    is_graceful boolean,
+    recorded_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.lighthouse_connection_events OWNER TO postgres;
+
+--
+-- Name: lighthouse_connection_events_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.lighthouse_connection_events_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lighthouse_connection_events_id_seq OWNER TO postgres;
+
+--
+-- Name: lighthouse_connection_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.lighthouse_connection_events_id_seq OWNED BY public.lighthouse_connection_events.id;
+
+
+--
+-- Name: lighthouse_groups; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lighthouse_groups (
+    id integer NOT NULL,
+    label character varying(255) NOT NULL,
+    description character varying(500),
+    activity_timeout_ms integer DEFAULT 4000 NOT NULL,
+    orphan_timeout_ms integer DEFAULT 8000 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.lighthouse_groups OWNER TO postgres;
+
+--
+-- Name: lighthouse_groups_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.lighthouse_groups_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lighthouse_groups_id_seq OWNER TO postgres;
+
+--
+-- Name: lighthouse_groups_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.lighthouse_groups_id_seq OWNED BY public.lighthouse_groups.id;
+
+
+--
+-- Name: lighthouse_health_snapshots; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lighthouse_health_snapshots (
+    id bigint NOT NULL,
+    lighthouse_id integer NOT NULL,
+    uptime_sec integer,
+    free_heap_bytes integer,
+    min_free_heap_bytes integer,
+    wifi_rssi_dbm integer,
+    rfid_state character varying(50),
+    rfid_is_responsive boolean,
+    rfid_power_rail_present boolean,
+    rfid_fw_version character varying(20),
+    rfid_last_error integer,
+    recorded_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.lighthouse_health_snapshots OWNER TO postgres;
+
+--
+-- Name: lighthouse_health_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.lighthouse_health_snapshots_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lighthouse_health_snapshots_id_seq OWNER TO postgres;
+
+--
+-- Name: lighthouse_health_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.lighthouse_health_snapshots_id_seq OWNED BY public.lighthouse_health_snapshots.id;
+
+
+--
+-- Name: lighthouses; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.lighthouses (
+    id integer NOT NULL,
+    name character varying(255) NOT NULL,
+    device_id character varying(255) NOT NULL,
+    placement public.lighthouse_placement DEFAULT 'STANDALONE'::public.lighthouse_placement NOT NULL,
+    comment character varying(256),
+    firmware_version character varying(50),
+    last_seen_at timestamp with time zone,
+    is_active boolean DEFAULT true,
+    config jsonb DEFAULT '{}'::jsonb,
+    group_id integer,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    canged_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.lighthouses OWNER TO postgres;
+
+--
+-- Name: lighthouses_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.lighthouses_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.lighthouses_id_seq OWNER TO postgres;
+
+--
+-- Name: lighthouses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.lighthouses_id_seq OWNED BY public.lighthouses.id;
+
+
+--
+-- Name: mqtt_clients; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.mqtt_clients (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    lighthouse_id integer,
+    client_id character varying(255) NOT NULL,
+    connected_at timestamp with time zone,
+    last_activity timestamp with time zone,
+    is_connected boolean DEFAULT false,
+    ip_address character varying(45),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.mqtt_clients OWNER TO postgres;
+
+--
+-- Name: processed_event_scans; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.processed_event_scans (
+    processed_event_id uuid NOT NULL,
+    raw_scan_id bigint NOT NULL
+);
+
+
+ALTER TABLE public.processed_event_scans OWNER TO postgres;
+
+--
+-- Name: processed_event_scans_raw_scan_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.processed_event_scans_raw_scan_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.processed_event_scans_raw_scan_id_seq OWNER TO postgres;
+
+--
+-- Name: processed_event_scans_raw_scan_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.processed_event_scans_raw_scan_id_seq OWNED BY public.processed_event_scans.raw_scan_id;
+
+
+--
+-- Name: processed_events; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.processed_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    algorithm_id public.algorithm_type NOT NULL,
+    direction public.direction_type NOT NULL,
+    tag_epc character varying(96) NOT NULL,
+    user_id uuid,
+    group_id integer NOT NULL,
+    confidence real NOT NULL,
+    centroid_separation_factor real NOT NULL,
+    cluster_size_factor real NOT NULL,
+    bilateral_coverage_factor real NOT NULL,
+    rssi_trend_consistency_factor real,
+    "timestamp" timestamp with time zone NOT NULL,
+    cluster_started_at timestamp with time zone NOT NULL,
+    cluster_ended_at timestamp with time zone NOT NULL,
+    metadata jsonb,
+    synced_to_integration boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    navigo3_record_id integer
+);
+
+
+ALTER TABLE public.processed_events OWNER TO postgres;
+
+--
+-- Name: raw_scans; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.raw_scans (
+    id bigint NOT NULL,
+    lighthouse_id integer NOT NULL,
+    epc character varying(96) NOT NULL,
+    epc_length smallint,
+    rssi_dbm integer,
+    antenna_id smallint,
+    frequency integer,
+    sequence_number integer,
+    detection_confidence real,
+    timestamp_ms bigint NOT NULL,
+    "timestamp" timestamp with time zone NOT NULL,
+    received_at timestamp with time zone DEFAULT now(),
+    processed_at timestamp with time zone,
+    orphaned_at timestamp with time zone,
+    orphan_reason public.orphan_reason_type,
+    source public.scan_source DEFAULT 'realtime'::public.scan_source NOT NULL,
+    time_basis public.time_basis DEFAULT 'synced'::public.time_basis NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.raw_scans OWNER TO postgres;
+
+--
+-- Name: raw_scans_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.raw_scans_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.raw_scans_id_seq OWNER TO postgres;
+
+--
+-- Name: raw_scans_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.raw_scans_id_seq OWNED BY public.raw_scans.id;
+
+
+--
+-- Name: raw_scans_timestamp_ms_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.raw_scans_timestamp_ms_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.raw_scans_timestamp_ms_seq OWNER TO postgres;
+
+--
+-- Name: raw_scans_timestamp_ms_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.raw_scans_timestamp_ms_seq OWNED BY public.raw_scans.timestamp_ms;
+
+
+--
+-- Name: tag_assignments; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tag_assignments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid,
+    tag_epc character varying(96) NOT NULL,
+    assigned_at timestamp with time zone DEFAULT now() NOT NULL,
+    deactivated_at timestamp with time zone,
+    notes character varying(1000),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.tag_assignments OWNER TO postgres;
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.users (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    sync_id character varying(255),
+    name character varying(255),
+    email character varying(255),
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: audit_logs id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.audit_logs ALTER COLUMN id SET DEFAULT nextval('public.audit_logs_id_seq'::regclass);
+
+
+--
+-- Name: lighthouse_connection_events id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_connection_events ALTER COLUMN id SET DEFAULT nextval('public.lighthouse_connection_events_id_seq'::regclass);
+
+
+--
+-- Name: lighthouse_groups id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_groups ALTER COLUMN id SET DEFAULT nextval('public.lighthouse_groups_id_seq'::regclass);
+
+
+--
+-- Name: lighthouse_health_snapshots id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_health_snapshots ALTER COLUMN id SET DEFAULT nextval('public.lighthouse_health_snapshots_id_seq'::regclass);
+
+
+--
+-- Name: lighthouses id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses ALTER COLUMN id SET DEFAULT nextval('public.lighthouses_id_seq'::regclass);
+
+
+--
+-- Name: processed_event_scans raw_scan_id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_event_scans ALTER COLUMN raw_scan_id SET DEFAULT nextval('public.processed_event_scans_raw_scan_id_seq'::regclass);
+
+
+--
+-- Name: raw_scans id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.raw_scans ALTER COLUMN id SET DEFAULT nextval('public.raw_scans_id_seq'::regclass);
+
+
+--
+-- Name: raw_scans timestamp_ms; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.raw_scans ALTER COLUMN timestamp_ms SET DEFAULT nextval('public.raw_scans_timestamp_ms_seq'::regclass);
+
+
+--
+-- Data for Name: audit_logs; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.audit_logs (id, user_id, action, resource_type, resource_id, changes, "timestamp") FROM stdin;
+\.
+
+
+--
+-- Data for Name: dashboard_users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.dashboard_users (id, username, password_hash, role, is_active, last_login, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: lighthouse_connection_events; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.lighthouse_connection_events (id, lighthouse_id, event_type, is_graceful, recorded_at) FROM stdin;
+277	9	disconnected	t	2026-05-08 22:51:56.26797+02
+278	9	connected	\N	2026-05-08 22:52:28.446521+02
+279	9	disconnected	t	2026-05-08 23:34:11.507486+02
+280	10	disconnected	t	2026-05-08 23:34:11.559899+02
+\.
+
+
+--
+-- Data for Name: lighthouse_groups; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.lighthouse_groups (id, label, description, activity_timeout_ms, orphan_timeout_ms, created_at, updated_at) FROM stdin;
+5	Test	\N	4000	8000	2026-05-08 22:50:40.19+02	2026-05-08 22:50:40.19+02
+\.
+
+
+--
+-- Data for Name: lighthouse_health_snapshots; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.lighthouse_health_snapshots (id, lighthouse_id, uptime_sec, free_heap_bytes, min_free_heap_bytes, wifi_rssi_dbm, rfid_state, rfid_is_responsive, rfid_power_rail_present, rfid_fw_version, rfid_last_error, recorded_at) FROM stdin;
+5909	10	41	169684	161164	-65	UNKNOWN	t	t	129.3	0	2026-05-08 22:52:19.510437+02
+5910	10	47	170296	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:25.681824+02
+5911	9	10	189972	189972	-65	UNINITIALIZED	f	f	0.0	0	2026-05-08 22:52:28.754922+02
+5912	10	52	170296	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:30.801683+02
+5913	10	57	170296	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:35.819222+02
+5914	10	62	170296	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:40.815918+02
+5915	10	67	168612	161164	-71	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:45.877712+02
+5916	9	29	170628	163284	-76	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:47.288272+02
+5917	10	72	170296	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:50.93645+02
+5918	9	36	170372	163284	-76	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:54.968188+02
+5919	10	77	170296	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 22:52:55.997756+02
+5920	10	82	170296	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:01.11314+02
+5921	9	44	170372	163284	-70	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:02.593525+02
+5922	10	87	170296	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:06.133127+02
+5923	9	51	170372	163284	-70	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:09.611868+02
+5924	10	93	170296	161164	-65	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:11.166005+02
+5925	10	98	170296	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:16.269005+02
+5926	9	59	168808	163284	-72	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:17.631017+02
+5927	10	103	170296	161164	-65	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:21.389124+02
+5928	9	67	170372	163284	-72	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:24.971943+02
+5929	10	108	170296	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:26.405274+02
+5930	10	113	170296	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:31.422949+02
+5931	9	74	170372	163284	-71	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:32.550258+02
+5932	10	118	170296	161164	-66	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:36.543275+02
+5933	9	82	170372	163284	-81	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:40.229551+02
+5934	10	123	170324	161164	-56	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:41.56087+02
+5935	10	128	170324	161164	-44	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:46.682591+02
+5936	9	89	170372	163284	-54	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:47.295209+02
+5937	10	133	170324	161164	-47	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:51.700326+02
+5938	9	96	170372	163284	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:54.975194+02
+5939	10	138	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:53:56.716961+02
+5940	10	143	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:01.835996+02
+5941	9	104	170372	163284	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:02.450646+02
+5942	10	148	170324	161164	-37	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:06.854107+02
+5943	9	112	170240	163284	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:10.130865+02
+5944	10	153	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:11.979015+02
+5945	10	158	168764	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:17.114541+02
+5946	9	119	170240	163284	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:17.708474+02
+5947	10	163	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:22.014657+02
+5948	9	127	170268	161192	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:25.286114+02
+5949	10	168	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:27.129284+02
+5950	10	173	170324	161164	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:32.148368+02
+5951	9	134	170268	161192	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:32.881572+02
+5952	10	179	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:37.266608+02
+5953	9	142	170260	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:40.646763+02
+5954	10	184	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:42.284605+02
+5955	10	189	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:47.302354+02
+5956	9	150	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:48.326072+02
+5957	10	194	170324	161164	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:52.424718+02
+5958	9	157	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:55.391676+02
+5959	10	199	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:54:57.396607+02
+5960	10	204	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:02.560159+02
+5961	9	164	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:02.866894+02
+5962	10	209	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:07.577712+02
+5963	9	172	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:10.757363+02
+5964	10	214	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:12.577198+02
+5965	10	219	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:17.636998+02
+5966	9	180	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:18.094286+02
+5967	10	224	170324	161164	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:22.696901+02
+5968	9	187	170260	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:25.702213+02
+5969	10	229	170324	161164	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:27.852739+02
+5970	10	234	170324	161164	-37	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:32.87027+02
+5971	9	195	170260	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:33.177462+02
+5972	10	239	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:37.888118+02
+5973	9	202	170260	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:40.6528+02
+5974	10	244	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:43.010717+02
+5975	10	249	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:47.98679+02
+5976	9	210	168704	161192	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:52.695073+02
+5977	10	254	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:53.047129+02
+5979	10	259	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:58.16373+02
+5982	10	270	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:08.301237+02
+5984	10	275	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:13.318979+02
+5978	9	217	170264	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:55:55.833248+02
+5980	10	265	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:03.18311+02
+5981	9	225	170264	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:03.299199+02
+5983	9	232	170264	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:10.55419+02
+5985	10	280	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:18.488036+02
+5986	9	240	168700	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:18.874221+02
+5987	10	285	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:23.466086+02
+5988	9	247	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:25.915501+02
+5989	10	290	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:28.474235+02
+5990	9	255	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:33.491709+02
+5991	10	295	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:33.517158+02
+5992	10	300	168764	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:38.733225+02
+5993	9	262	170268	161192	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:40.865693+02
+5994	10	305	170324	161164	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:43.627086+02
+5995	9	270	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:48.648056+02
+5996	10	310	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:48.687168+02
+5997	10	315	170324	161164	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:53.746584+02
+5998	9	278	168704	161192	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:56.281983+02
+5999	10	320	170324	161164	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 22:56:58.796896+02
+6000	9	285	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:03.803715+02
+6001	10	325	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:03.864886+02
+6002	10	330	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:09.025303+02
+6003	9	293	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:11.483907+02
+6004	10	335	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:14.047785+02
+6005	9	300	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:18.54993+02
+6006	10	340	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:19.060361+02
+6007	10	345	170324	161164	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:24.295239+02
+6008	9	308	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:26.142675+02
+6009	10	351	170324	161164	-37	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:29.19861+02
+6010	9	313	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:31.042137+02
+6011	10	356	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:34.216212+02
+6012	9	318	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:36.161198+02
+6013	10	361	170324	161164	-37	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:39.335942+02
+6014	9	323	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:41.179232+02
+6015	10	366	170324	161164	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:44.353921+02
+6016	9	328	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:46.18053+02
+6017	10	371	170324	161164	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:49.473596+02
+6018	9	333	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:51.317006+02
+6019	10	376	170324	161164	-64	STARTUP_PENDING	t	t	129.3	0	2026-05-08 22:57:54.491024+02
+6020	9	338	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:56.543727+02
+6021	10	381	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 22:57:59.509116+02
+6022	9	343	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:01.454114+02
+6023	10	386	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:04.630629+02
+6024	9	348	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:06.472642+02
+6025	10	391	168764	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:10.060632+02
+6026	9	353	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:11.489159+02
+6027	10	396	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:14.766354+02
+6028	9	358	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:16.610576+02
+6029	10	401	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:19.784656+02
+6030	9	363	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:21.627444+02
+6031	10	406	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:24.801724+02
+6032	9	368	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:26.748373+02
+6033	10	411	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:29.92182+02
+6034	9	373	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:31.765937+02
+6035	10	416	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:34.939674+02
+6036	9	378	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:36.885009+02
+6037	10	421	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:39.956836+02
+6038	9	383	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:41.902672+02
+6039	10	426	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:45.077043+02
+6040	9	388	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:46.920352+02
+6041	10	431	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:50.099846+02
+6042	9	394	170268	161192	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:52.044957+02
+6043	10	437	170324	161164	-60	STARTUP_PENDING	t	t	129.3	0	2026-05-08 22:58:55.215045+02
+6044	9	399	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:58:57.057909+02
+6045	10	442	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:00.359474+02
+6046	9	404	168704	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:02.811763+02
+6047	10	447	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:05.247898+02
+6048	9	409	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:07.120182+02
+6049	10	452	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:10.307443+02
+6050	9	414	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:12.179436+02
+6051	10	457	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:15.387438+02
+6052	9	419	170268	161192	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:17.333702+02
+6053	10	462	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:20.507817+02
+6054	9	424	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:22.351203+02
+6055	10	467	170300	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:25.525696+02
+6056	9	429	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:27.368327+02
+6057	10	472	170300	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:30.645221+02
+6058	9	434	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:32.697192+02
+6059	10	477	170300	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:35.789673+02
+6060	9	439	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:37.5063+02
+6061	10	482	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:40.681487+02
+6062	9	444	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:42.626673+02
+6063	10	487	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:45.801056+02
+6064	9	449	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:47.643823+02
+6065	10	492	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:50.778536+02
+6066	9	454	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:52.649252+02
+6067	10	497	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:55.880671+02
+6068	9	459	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 22:59:57.782084+02
+6069	10	502	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:00.898063+02
+6070	9	464	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:02.799874+02
+6071	10	507	170324	161164	-68	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:05.973753+02
+6077	10	523	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:21.231309+02
+6079	10	528	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:26.249582+02
+6087	10	548	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:46.525003+02
+6089	10	553	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:51.541887+02
+6094	9	525	170268	161192	-56	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:03.523623+02
+6100	9	540	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:18.678303+02
+6102	9	545	168704	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:23.825049+02
+6108	9	560	170268	161192	-59	STARTUP_PENDING	t	t	129.3	0	2026-05-08 23:01:38.953855+02
+6110	9	566	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:43.97186+02
+6116	9	581	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:59.126681+02
+6117	10	624	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:02.300792+02
+6119	10	629	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:07.422915+02
+6072	9	469	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:07.989409+02
+6078	9	485	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:23.075196+02
+6080	9	490	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:28.097244+02
+6088	9	510	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:48.367953+02
+6090	9	515	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:53.384846+02
+6095	10	568	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:06.697505+02
+6097	10	573	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:11.715026+02
+6103	10	588	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:26.97316+02
+6105	10	593	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:31.990428+02
+6107	10	598	168764	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:37.417988+02
+6111	10	608	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:47.145675+02
+6113	10	614	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:52.164142+02
+6118	9	586	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:04.24701+02
+6073	10	512	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:11.093912+02
+6075	10	517	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:16.117823+02
+6081	10	533	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:31.266919+02
+6083	10	538	170324	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:36.387237+02
+6085	10	543	170324	161164	-73	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:41.403804+02
+6091	10	558	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:56.559856+02
+6096	9	530	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:08.643231+02
+6098	9	535	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:13.660542+02
+6104	9	550	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:28.816513+02
+6106	9	555	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:33.936535+02
+6112	9	571	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:48.9999+02
+6114	9	576	170268	161192	-56	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:54.047523+02
+6121	10	634	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:12.438526+02
+6074	9	474	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:12.938068+02
+6076	9	480	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:17.954473+02
+6082	9	495	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:33.212162+02
+6084	9	500	170268	161192	-58	RESPONSIVE	t	t	129.3	0	2026-05-08 23:00:38.438232+02
+6086	9	505	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:43.35014+02
+6092	9	520	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:00:58.505493+02
+6093	10	563	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:01.679956+02
+6099	10	578	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:16.835172+02
+6101	10	583	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:21.852439+02
+6109	10	603	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:42.336805+02
+6115	10	619	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:01:57.208498+02
+6120	9	591	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:09.264016+02
+6122	9	596	170268	161192	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:14.319254+02
+6123	10	639	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:17.45658+02
+6124	9	601	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:19.401595+02
+6125	10	644	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:22.479497+02
+6126	9	606	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:24.419777+02
+6127	10	649	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:27.593638+02
+6128	9	611	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:29.54035+02
+6129	10	654	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:32.611873+02
+6130	9	616	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:34.557681+02
+6131	10	659	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:37.731433+02
+6132	9	621	170268	161192	-56	STARTUP_PENDING	t	t	129.3	0	2026-05-08 23:02:39.677431+02
+6133	10	664	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:42.74957+02
+6134	9	626	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:44.695173+02
+6135	10	669	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:47.869031+02
+6136	9	631	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:49.712373+02
+6137	10	674	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:52.887578+02
+6138	9	636	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:54.832977+02
+6139	10	679	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:57.904721+02
+6140	9	641	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:02:59.850841+02
+6141	10	684	170324	161164	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:03.02499+02
+6142	9	646	170268	161192	-60	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:04.868189+02
+6143	10	689	170324	161164	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:08.047827+02
+6144	9	651	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:09.906673+02
+6145	10	694	170324	161164	-66	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:13.162097+02
+6146	9	657	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:15.005455+02
+6147	10	699	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:18.181144+02
+6148	9	662	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:20.126044+02
+6149	10	705	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:23.197596+02
+6150	9	667	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:25.087+02
+6151	10	710	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:28.318206+02
+6152	9	672	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:30.160842+02
+6153	10	715	168764	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:33.540161+02
+6154	9	677	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:35.281495+02
+6155	10	720	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:38.353255+02
+6156	9	682	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:40.298431+02
+6157	10	725	170324	161164	-65	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:43.47267+02
+6158	9	687	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:45.418923+02
+6159	10	730	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:48.49075+02
+6160	9	692	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:50.3762+02
+6161	10	735	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:53.610713+02
+6162	9	697	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:55.45449+02
+6163	10	740	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:03:58.56916+02
+6164	9	702	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:00.573892+02
+6165	10	745	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:03.645983+02
+6166	9	707	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:05.591803+02
+6167	10	750	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:08.766081+02
+6168	9	712	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:10.711491+02
+6169	10	755	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:13.784074+02
+6170	9	717	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:15.729431+02
+6171	10	760	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:18.904091+02
+6172	9	722	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:20.747594+02
+6173	10	765	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:23.922814+02
+6174	9	727	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:25.866873+02
+6175	10	770	170324	161164	-62	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:28.939099+02
+6176	9	732	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:30.88469+02
+6177	10	775	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:34.063801+02
+6178	9	737	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:36.004529+02
+6179	10	780	170324	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:39.076782+02
+6180	9	743	170268	161192	-57	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:41.022307+02
+6181	10	785	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:44.196474+02
+6182	9	748	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:46.045166+02
+6183	10	791	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:49.214778+02
+6184	9	753	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:51.160127+02
+6185	10	796	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:54.232839+02
+6186	9	758	170268	161192	-58	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:56.423312+02
+6187	10	801	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:04:59.354183+02
+6188	9	763	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:05:01.297757+02
+6189	10	806	170324	161164	-63	POWERED_OFF	t	t	129.3	0	2026-05-08 23:05:04.369711+02
+6190	9	768	170268	161192	-59	POWERED_OFF	t	t	129.3	0	2026-05-08 23:05:06.316048+02
+6191	10	811	170324	161164	-64	POWERED_OFF	t	t	129.3	0	2026-05-08 23:05:09.490439+02
+6192	10	816	170324	161164	-61	POWERED_OFF	t	t	129.3	0	2026-05-08 23:05:14.508075+02
+6193	9	776	170268	161192	-56	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:14.815385+02
+6194	9	783	170268	161192	-55	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:21.80314+02
+6195	10	824	168020	161164	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:23.139899+02
+6196	9	790	170268	161192	-55	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:28.843301+02
+6197	10	832	170324	161164	-61	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:30.379426+02
+6198	9	797	170268	161192	-62	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:35.803425+02
+6199	10	839	170320	161164	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:37.957522+02
+6203	10	853	170324	161164	-61	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:51.987728+02
+6205	10	860	170324	161164	-62	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:58.929436+02
+6200	9	804	170268	161192	-58	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:42.872131+02
+6201	10	846	170324	161164	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:44.921164+02
+6202	9	811	170268	161192	-56	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:49.835675+02
+6204	9	818	170268	161192	-56	RESPONSIVE	t	t	129.3	0	2026-05-08 23:05:56.901198+02
+6207	10	867	170324	161164	-61	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:05.913501+02
+6209	10	874	170324	161164	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:12.889083+02
+6206	9	825	170268	161192	-60	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:03.864688+02
+6208	9	832	170268	161192	-60	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:10.930278+02
+6210	9	839	170268	161192	-58	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:17.83276+02
+6211	10	881	170324	161164	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:20.049167+02
+6212	9	846	170268	161192	-59	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:24.857279+02
+6213	10	889	170324	161164	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:27.314771+02
+6214	9	853	170268	161192	-59	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:31.922517+02
+6215	10	896	170324	161164	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:34.277473+02
+6216	9	860	170268	161192	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:38.88653+02
+6217	10	903	170324	161164	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:41.343297+02
+6218	9	867	170268	161192	-57	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:45.84916+02
+6219	10	910	170324	161164	-62	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:48.306639+02
+6220	9	874	170268	161192	-62	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:52.915336+02
+6221	10	917	170324	161164	-61	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:55.270616+02
+6222	9	881	170268	161192	-57	RESPONSIVE	t	t	129.3	0	2026-05-08 23:06:59.877864+02
+6223	10	924	167848	161164	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:03.157088+02
+6224	9	888	170268	161192	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:06.857743+02
+6225	10	932	170324	158728	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:10.834883+02
+6226	10	939	170324	158728	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:17.797946+02
+6227	9	901	167648	161192	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:19.57285+02
+6228	10	946	168756	158728	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:25.170638+02
+6229	9	912	170252	161192	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:30.393153+02
+6230	10	953	170324	158728	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:31.826658+02
+6231	10	960	170324	158728	-62	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:38.893132+02
+6232	9	922	170252	161192	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:40.837941+02
+6233	10	967	170324	158728	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:45.860062+02
+6234	9	933	170252	161192	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:51.590286+02
+6235	10	974	170324	158728	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:52.820748+02
+6236	10	981	170324	158728	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:07:59.884963+02
+6237	9	944	170252	161192	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:02.239922+02
+6238	10	988	170324	158728	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:06.788717+02
+6239	9	953	168688	161192	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:11.96774+02
+6240	10	995	170324	158728	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:13.8112+02
+6241	10	1002	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:20.877029+02
+6242	9	963	170392	161192	-82	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:21.901335+02
+6243	10	1009	170324	158728	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:27.839954+02
+6244	9	974	168660	161192	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:32.141105+02
+6245	10	1016	170324	158728	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:34.804054+02
+6246	10	1023	170324	158728	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:41.868614+02
+6247	9	984	170392	161192	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:42.278349+02
+6248	10	1030	170324	158728	-62	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:48.832081+02
+6249	9	994	170392	161192	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:52.826062+02
+6250	10	1037	170324	158728	-63	RESPONSIVE	t	t	129.3	0	2026-05-08 23:08:55.897959+02
+6251	10	1044	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:02.861151+02
+6252	9	1005	170392	161192	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:03.270962+02
+6253	10	1051	170324	158728	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:09.826244+02
+6254	9	1015	170392	161192	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:15.828479+02
+6255	10	1058	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:16.799534+02
+6256	9	1024	170392	161192	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:22.872964+02
+6257	10	1065	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:23.798912+02
+6258	10	1073	168196	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:31.328512+02
+6259	9	1035	170392	161192	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:33.478856+02
+6260	10	1080	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:38.292301+02
+6261	9	1045	170392	161192	-73	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:43.621635+02
+6262	10	1087	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:45.360164+02
+6263	10	1094	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:52.320641+02
+6264	9	1055	170392	161192	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:53.856982+02
+6265	10	1101	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:09:59.284511+02
+6266	9	1066	170260	161192	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:04.403904+02
+6267	10	1108	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:06.35049+02
+6268	10	1115	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:13.249819+02
+6269	9	1076	170260	161192	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:14.542088+02
+6270	10	1122	167380	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:20.583623+02
+6271	9	1086	170260	161192	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:24.577441+02
+6272	10	1129	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:27.44437+02
+6273	9	1096	168708	161192	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:34.407501+02
+6274	10	1136	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:34.421766+02
+6275	10	1143	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:41.47352+02
+6276	9	1106	170260	161192	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:44.545036+02
+6277	10	1150	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:48.464458+02
+6278	9	1116	170260	161192	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:54.560038+02
+6279	10	1157	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:10:55.501762+02
+6280	10	1164	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:02.466007+02
+6281	9	1126	170260	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:04.71902+02
+6282	10	1171	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:09.531149+02
+6283	9	1137	170260	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:15.162761+02
+6284	10	1178	170456	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:17.006119+02
+6285	10	1185	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:24.008608+02
+6286	9	1147	170260	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:25.710627+02
+6287	10	1192	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:31.03769+02
+6288	9	1158	170260	159636	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:36.360065+02
+6289	10	1200	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:38.817572+02
+6290	10	1207	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:45.883805+02
+6291	9	1168	170260	159636	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:45.984579+02
+6292	10	1214	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:53.165222+02
+6293	9	1178	170260	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:56.328208+02
+6294	10	1221	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:11:59.810507+02
+6295	9	1188	170260	159636	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:06.567875+02
+6296	10	1228	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:06.875483+02
+6297	10	1235	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:13.83882+02
+6298	9	1198	170264	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:16.911419+02
+6299	10	1242	170324	158728	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:20.802438+02
+6300	9	1209	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:27.355635+02
+6301	10	1249	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:27.867359+02
+6302	10	1256	170324	158728	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:34.830654+02
+6303	9	1219	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:37.698556+02
+6304	10	1264	170316	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:42.539708+02
+6305	9	1230	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:48.245225+02
+6306	10	1271	170316	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:49.576801+02
+6307	10	1278	170316	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:56.760088+02
+6308	9	1240	170268	159636	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:12:58.48618+02
+6309	10	1285	170316	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:03.605584+02
+6310	9	1251	166552	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:09.340398+02
+6311	10	1292	165888	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:11.08178+02
+6312	10	1300	170444	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:18.352421+02
+6313	9	1261	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:19.171248+02
+6314	10	1307	170444	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:25.3151+02
+6315	9	1271	170260	159636	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:29.47254+02
+6316	10	1314	170444	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:32.268768+02
+6317	10	1321	168008	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:39.753759+02
+6318	9	1281	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:39.754187+02
+6319	10	1328	170312	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:46.921086+02
+6320	9	1293	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:51.017997+02
+6321	10	1335	170312	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:13:53.987713+02
+6322	9	1303	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:01.145219+02
+6323	10	1343	169388	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:01.27587+02
+6324	10	1350	170316	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:08.425317+02
+6325	9	1313	170260	159636	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:11.394957+02
+6326	10	1357	170316	158728	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:15.389441+02
+6327	9	1323	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:21.634883+02
+6328	10	1364	168828	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:22.556714+02
+6329	10	1371	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:29.929262+02
+6330	9	1334	170268	159636	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:32.595839+02
+6331	10	1378	168896	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:37.008539+02
+6332	9	1345	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:43.288045+02
+6333	10	1386	164912	158728	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:44.777465+02
+6334	10	1393	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:51.571276+02
+6335	9	1355	170268	159636	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:53.586236+02
+6336	10	1400	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:14:58.601968+02
+6337	9	1365	170268	159636	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:03.620014+02
+6338	10	1407	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:05.66742+02
+6339	10	1414	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:12.630803+02
+6340	9	1375	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:13.451105+02
+6341	10	1421	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:19.593919+02
+6342	9	1385	170264	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:23.689977+02
+6343	10	1428	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:26.659523+02
+6344	10	1435	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:33.623459+02
+6345	9	1395	170260	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:33.92986+02
+6346	10	1442	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:40.688943+02
+6347	9	1406	170260	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:44.169629+02
+6348	10	1449	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:47.652214+02
+6349	9	1416	170260	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:54.513115+02
+6350	10	1456	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:15:54.581702+02
+6351	10	1463	168480	158728	-78	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:01.988252+02
+6352	9	1426	170256	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:04.753206+02
+6353	10	1470	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:09.067496+02
+6354	9	1436	170268	159636	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:14.483494+02
+6355	10	1477	170320	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:16.024562+02
+6356	10	1485	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:23.594256+02
+6357	9	1446	170268	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:24.823264+02
+6358	10	1492	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:30.557868+02
+6359	9	1456	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:34.756492+02
+6360	10	1499	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:37.62389+02
+6361	9	1466	170268	159636	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:44.893988+02
+6362	10	1506	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:45.200845+02
+6363	10	1513	170324	158728	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:52.164692+02
+6364	9	1477	170400	159636	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:55.339045+02
+6365	10	1520	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:16:59.128177+02
+6366	9	1487	170400	159636	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:05.373644+02
+6367	10	1527	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:06.192849+02
+6368	10	1534	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:13.101372+02
+6369	9	1497	170400	159636	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:15.740796+02
+6370	10	1542	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:20.631949+02
+6371	9	1508	170400	159636	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:26.365923+02
+6372	10	1549	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:27.697252+02
+6373	10	1556	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:34.660982+02
+6374	9	1518	170400	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:36.811224+02
+6375	10	1563	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:41.931158+02
+6376	9	1528	170400	159636	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:46.946061+02
+6377	10	1570	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:48.996431+02
+6378	10	1577	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:55.959854+02
+6379	9	1538	170400	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:17:56.881855+02
+6380	10	1585	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:03.435519+02
+6381	9	1550	170400	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:08.146181+02
+6382	10	1592	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:10.501869+02
+6383	10	1599	169700	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:17.522988+02
+6384	9	1560	170400	159636	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:18.697123+02
+6385	10	1606	170456	158728	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:24.734781+02
+6386	9	1570	170400	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:28.421035+02
+6388	9	1580	170268	159636	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:38.149559+02
+6391	9	1590	170268	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:48.696143+02
+6395	10	1649	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:07.231025+02
+6387	10	1613	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:31.69845+02
+6390	10	1627	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:45.829518+02
+6397	10	1656	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:14.195242+02
+6389	10	1620	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:38.661097+02
+6392	10	1634	170456	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:52.792219+02
+6394	10	1641	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:59.755783+02
+6396	9	1612	170268	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:10.00154+02
+6393	9	1600	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:18:58.936675+02
+6398	9	1622	170268	159636	-73	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:20.339786+02
+6399	10	1663	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:21.157209+02
+6400	10	1670	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:28.583776+02
+6401	9	1632	170268	159636	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:30.681491+02
+6402	10	1677	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:35.596032+02
+6403	9	1642	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:40.411219+02
+6404	10	1684	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:42.58371+02
+6405	10	1691	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:49.830426+02
+6406	9	1652	170268	159636	-73	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:50.535884+02
+6407	10	1698	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:19:56.8961+02
+6408	9	1662	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:00.684622+02
+6409	10	1705	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:03.858721+02
+6410	9	1672	170268	159636	-72	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:10.924309+02
+6411	10	1712	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:10.924788+02
+6412	10	1719	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:17.888036+02
+6413	9	1683	168948	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:21.471242+02
+6414	10	1726	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:25.055669+02
+6415	9	1693	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:31.404832+02
+6416	10	1733	168764	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:32.135389+02
+6417	10	1740	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:39.084499+02
+6418	9	1703	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:41.33752+02
+6419	10	1748	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:46.203533+02
+6420	9	1713	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:51.679838+02
+6421	10	1755	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:20:53.217024+02
+6422	10	1762	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:00.282066+02
+6423	9	1723	170268	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:01.81803+02
+6424	10	1769	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:07.450786+02
+6425	9	1733	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:11.750867+02
+6426	10	1776	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:14.516037+02
+6427	10	1783	170456	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:21.478306+02
+6428	9	1743	170268	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:21.812827+02
+6429	10	1790	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:28.804615+02
+6430	9	1754	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:32.640754+02
+6431	10	1797	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:35.814765+02
+6432	10	1804	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:43.086523+02
+6433	9	1765	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:43.137239+02
+6434	10	1811	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:50.053581+02
+6435	9	1774	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:52.712084+02
+6436	10	1818	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:21:57.114609+02
+6437	9	1784	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:02.742909+02
+6438	10	1825	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:04.083271+02
+6439	10	1832	168756	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:11.05279+02
+6440	9	1794	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:12.986609+02
+6441	10	1839	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:18.111211+02
+6442	9	1804	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:22.817313+02
+6443	10	1846	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:25.173075+02
+6444	10	1853	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:32.13553+02
+6445	9	1815	170268	159636	-72	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:33.158864+02
+6446	10	1860	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:39.201779+02
+6447	9	1825	170268	159636	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:43.297155+02
+6448	10	1867	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:46.164305+02
+6449	10	1874	168764	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:53.139201+02
+6450	9	1835	170244	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:22:53.253612+02
+6451	10	1881	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:00.193612+02
+6452	9	1844	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:02.739808+02
+6453	10	1889	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:07.414889+02
+6454	9	1855	170268	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:13.915599+02
+6455	10	1896	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:14.427162+02
+6456	10	1903	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:21.492275+02
+6457	9	1866	170268	159636	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:24.137384+02
+6458	10	1910	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:28.86559+02
+6459	9	1876	170268	159636	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:34.092351+02
+6460	10	1917	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:35.930938+02
+6461	10	1925	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:43.216109+02
+6462	9	1887	170268	159636	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:45.249755+02
+6463	10	1932	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:50.21732+02
+6464	9	1897	170268	159636	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:55.183655+02
+6465	10	1939	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:23:57.333219+02
+6466	10	1946	170324	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:04.398381+02
+6467	9	1907	170268	158368	-73	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:05.524729+02
+6468	10	1953	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:11.672809+02
+6469	9	1917	170268	158368	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:15.560077+02
+6470	10	1960	169860	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:18.529286+02
+6471	10	1967	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:25.697785+02
+6472	9	1927	170268	158368	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:25.803052+02
+6473	10	1974	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:32.763454+02
+6474	9	1938	170260	158368	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:35.972998+02
+6475	10	1981	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:40.135963+02
+6476	9	1948	170268	158368	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:46.384597+02
+6477	10	1988	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:47.201882+02
+6478	10	1995	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:54.165116+02
+6479	9	1958	170268	158368	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:24:56.315726+02
+6480	10	2002	170324	158728	-72	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:01.12803+02
+6481	9	1968	170268	158368	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:06.453479+02
+6482	10	2010	166616	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:08.705705+02
+6483	10	2017	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:15.466408+02
+6484	9	1978	170400	158368	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:17.11464+02
+6485	10	2024	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:22.4287+02
+6491	9	2009	170400	156520	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:47.517204+02
+6494	10	2059	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:58.095493+02
+6495	10	2066	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:05.128861+02
+6486	9	1989	170392	156520	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:27.548189+02
+6487	10	2031	167496	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:29.903166+02
+6488	10	2038	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:36.968911+02
+6497	10	2073	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:12.194497+02
+6489	9	1999	170392	156520	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:37.584284+02
+6490	10	2045	170456	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:43.931822+02
+6493	9	2019	170392	156520	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:57.960681+02
+6492	10	2052	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:25:50.997167+02
+6496	9	2029	170400	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:07.894074+02
+6498	9	2039	170400	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:17.316765+02
+6499	10	2080	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:19.159304+02
+6500	10	2087	170456	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:26.121128+02
+6501	9	2049	170400	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:27.452208+02
+6502	10	2094	170456	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:33.187282+02
+6503	9	2059	170400	156520	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:37.488194+02
+6504	10	2101	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:40.15093+02
+6505	10	2108	170456	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:47.115121+02
+6506	9	2069	170392	156520	-72	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:47.24601+02
+6507	10	2116	170324	158728	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:54.384995+02
+6508	9	2079	170268	156520	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:26:57.558063+02
+6509	10	2123	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:01.449057+02
+6510	9	2089	170264	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:07.388824+02
+6511	10	2130	170324	158728	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:08.412667+02
+6512	10	2137	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:15.375864+02
+6513	9	2099	170280	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:17.220735+02
+6514	10	2144	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:22.441427+02
+6515	9	2108	170268	156520	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:26.742883+02
+6516	10	2151	170312	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:29.81505+02
+6517	9	2118	170268	156520	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:36.674959+02
+6518	10	2158	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:36.766788+02
+6519	10	2165	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:43.84305+02
+6520	9	2128	170268	156520	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:46.505597+02
+6521	10	2172	168764	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:50.817588+02
+6522	9	2138	170268	156520	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:56.866323+02
+6523	10	2179	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:27:58.101505+02
+6524	10	2186	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:05.040086+02
+6525	9	2148	170260	156520	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:06.67908+02
+6526	10	2193	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:12.003898+02
+6527	9	2158	170236	156520	-72	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:16.332653+02
+6528	10	2200	170324	158728	-74	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:19.069213+02
+6529	9	2167	170260	156520	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:25.929999+02
+6530	10	2207	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:25.996949+02
+6531	10	2215	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:33.303579+02
+6532	9	2178	170268	156520	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:36.88897+02
+6533	10	2222	168764	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:40.368382+02
+6534	9	2189	170268	156520	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:47.030584+02
+6535	10	2229	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:47.43419+02
+6536	10	2236	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:54.39765+02
+6537	9	2198	170268	156520	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:28:56.64394+02
+6538	10	2243	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:01.3879+02
+6539	9	2209	170268	156520	-72	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:06.993486+02
+6540	10	2250	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:08.426732+02
+6541	10	2257	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:15.492259+02
+6542	9	2218	170260	156520	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:16.721479+02
+6543	10	2264	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:22.45515+02
+6544	9	2228	169076	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:26.961009+02
+6545	10	2271	170456	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:29.726052+02
+6546	9	2238	170268	156520	-65	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:36.484757+02
+6547	10	2278	170456	158728	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:36.627607+02
+6548	10	2285	170456	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:43.754927+02
+6549	9	2248	170268	156520	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:46.24354+02
+6550	10	2292	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:51.097832+02
+6551	9	2259	170268	156520	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:57.066461+02
+6552	10	2299	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:29:58.098046+02
+6553	10	2306	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:05.282803+02
+6554	9	2269	170260	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:07.10212+02
+6555	10	2313	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:12.119758+02
+6556	9	2279	170260	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:17.138135+02
+6557	10	2320	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:19.097841+02
+6558	10	2327	170324	158728	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:26.148806+02
+6559	9	2288	170260	156520	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:26.967571+02
+6560	10	2334	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:33.111837+02
+6561	9	2298	170260	156520	-71	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:36.493147+02
+6562	10	2341	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:40.098342+02
+6563	9	2308	170260	156520	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:46.280041+02
+6564	10	2349	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:47.345607+02
+6565	10	2356	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:54.309131+02
+6566	9	2317	170268	156520	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:30:55.948075+02
+6567	10	2363	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:01.271878+02
+6568	9	2327	170268	156520	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:05.675261+02
+6569	10	2370	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:08.337986+02
+6570	10	2377	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:15.505815+02
+6571	9	2337	170260	156520	-70	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:15.813343+02
+6572	10	2384	170324	158728	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:22.469506+02
+6573	9	2347	170260	156520	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:25.439215+02
+6574	10	2391	170324	158728	-72	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:29.432217+02
+6575	9	2357	170260	156520	-66	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:35.473816+02
+6576	10	2398	170324	158728	-68	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:36.498093+02
+6577	10	2405	170324	158728	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:43.564057+02
+6578	9	2367	170260	156520	-67	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:44.996716+02
+6579	10	2412	170324	158728	-76	UNKNOWN	t	t	129.3	0	2026-05-08 23:31:50.834273+02
+6580	9	2376	170260	156520	-69	RESPONSIVE	t	t	129.3	0	2026-05-08 23:31:54.827458+02
+6581	10	2419	170324	158728	-88	UNKNOWN	t	t	129.3	0	2026-05-08 23:31:57.797466+02
+6582	10	2424	170324	158728	-53	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:02.918621+02
+6583	9	2386	170260	156520	-75	RESPONSIVE	t	t	129.3	0	2026-05-08 23:32:04.765322+02
+6584	10	2429	170324	158728	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:07.935555+02
+6587	10	2439	170324	158728	-33	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:18.077858+02
+6588	10	2444	170324	158728	-34	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:23.090494+02
+6597	10	2470	168764	158728	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:48.493245+02
+6599	10	2475	170324	158728	-38	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:53.503537+02
+6601	9	2441	170260	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:59.750961+02
+6604	10	2490	170324	158728	-37	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:08.763516+02
+6605	10	2495	170324	158728	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:13.640994+02
+6606	9	2455	170260	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:13.775891+02
+6585	10	2434	170324	158728	-33	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:13.055167+02
+6586	9	2396	170268	156520	-64	RESPONSIVE	t	t	129.3	0	2026-05-08 23:32:14.48903+02
+6589	9	2406	170252	156520	-50	UNKNOWN	t	t	129.3	0	2026-05-08 23:32:24.933571+02
+6591	9	2413	170268	156520	-47	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:31.886702+02
+6593	10	2460	170324	158728	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:38.3494+02
+6595	10	2465	170324	158728	-37	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:43.366037+02
+6602	10	2485	170324	158728	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:03.539192+02
+6590	10	2449	170324	158728	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:28.21104+02
+6592	10	2455	170324	158728	-38	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:33.228525+02
+6594	9	2420	170268	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:38.962629+02
+6596	9	2427	168900	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:45.72788+02
+6598	9	2434	170260	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:52.786911+02
+6600	10	2480	170324	158728	-37	POWERED_OFF	t	t	129.3	0	2026-05-08 23:32:58.521011+02
+6603	9	2448	170260	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:06.81679+02
+6607	10	2500	170324	158728	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:18.796799+02
+6608	9	2463	170392	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:21.049249+02
+6609	10	2505	170324	158728	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:23.81407+02
+6610	9	2470	170392	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:28.218175+02
+6611	10	2510	170324	158728	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:28.831791+02
+6612	10	2515	170324	158728	-37	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:33.959662+02
+6613	9	2477	170400	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:35.283071+02
+6614	10	2520	170324	158728	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:38.969101+02
+6615	9	2484	170400	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:42.246484+02
+6616	10	2525	170324	158728	-35	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:44.094149+02
+6617	9	2491	170388	156520	-48	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:49.004443+02
+6618	10	2530	170324	158728	-36	POWERED_OFF	t	t	129.3	0	2026-05-08 23:33:49.051008+02
+\.
+
+
+--
+-- Data for Name: lighthouses; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.lighthouses (id, name, device_id, placement, comment, firmware_version, last_seen_at, is_active, config, group_id, created_at, canged_at) FROM stdin;
+9	Yellow	00:70:07:25:15:00	INSIDE	\N	\N	2026-05-08 23:34:11.51+02	t	{}	5	2026-05-08 22:51:30.087+02	2026-05-08 22:51:30.088128+02
+10	Red	68:FE:71:0D:D0:74	OUTSIDE	\N	\N	2026-05-08 23:34:11.561+02	t	{}	5	2026-05-08 22:52:09.26+02	2026-05-08 22:52:09.261586+02
+\.
+
+
+--
+-- Data for Name: mqtt_clients; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.mqtt_clients (id, lighthouse_id, client_id, connected_at, last_activity, is_connected, ip_address, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: processed_event_scans; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.processed_event_scans (processed_event_id, raw_scan_id) FROM stdin;
+1558035a-7c80-4dbb-b112-0839a92aee78	16247
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16247
+1558035a-7c80-4dbb-b112-0839a92aee78	16248
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16248
+1558035a-7c80-4dbb-b112-0839a92aee78	16249
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16249
+1558035a-7c80-4dbb-b112-0839a92aee78	16250
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16250
+1558035a-7c80-4dbb-b112-0839a92aee78	16251
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16251
+1558035a-7c80-4dbb-b112-0839a92aee78	16252
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16252
+1558035a-7c80-4dbb-b112-0839a92aee78	16253
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16253
+1558035a-7c80-4dbb-b112-0839a92aee78	16254
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16254
+1558035a-7c80-4dbb-b112-0839a92aee78	16255
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16255
+1558035a-7c80-4dbb-b112-0839a92aee78	16256
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16256
+1558035a-7c80-4dbb-b112-0839a92aee78	16257
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16257
+1558035a-7c80-4dbb-b112-0839a92aee78	16258
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16258
+1558035a-7c80-4dbb-b112-0839a92aee78	16259
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16259
+1558035a-7c80-4dbb-b112-0839a92aee78	16260
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16260
+1558035a-7c80-4dbb-b112-0839a92aee78	16261
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16261
+1558035a-7c80-4dbb-b112-0839a92aee78	16262
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16262
+1558035a-7c80-4dbb-b112-0839a92aee78	16263
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16263
+1558035a-7c80-4dbb-b112-0839a92aee78	16264
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16264
+1558035a-7c80-4dbb-b112-0839a92aee78	16265
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16265
+1558035a-7c80-4dbb-b112-0839a92aee78	16266
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16266
+1558035a-7c80-4dbb-b112-0839a92aee78	16267
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16267
+1558035a-7c80-4dbb-b112-0839a92aee78	16268
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16268
+1558035a-7c80-4dbb-b112-0839a92aee78	16269
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16269
+1558035a-7c80-4dbb-b112-0839a92aee78	16270
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16270
+1558035a-7c80-4dbb-b112-0839a92aee78	16271
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16271
+1558035a-7c80-4dbb-b112-0839a92aee78	16272
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16272
+1558035a-7c80-4dbb-b112-0839a92aee78	16273
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16273
+1558035a-7c80-4dbb-b112-0839a92aee78	16274
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16274
+1558035a-7c80-4dbb-b112-0839a92aee78	16275
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16275
+1558035a-7c80-4dbb-b112-0839a92aee78	16276
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16276
+1558035a-7c80-4dbb-b112-0839a92aee78	16277
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16277
+1558035a-7c80-4dbb-b112-0839a92aee78	16278
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16278
+1558035a-7c80-4dbb-b112-0839a92aee78	16279
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16279
+1558035a-7c80-4dbb-b112-0839a92aee78	16280
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16280
+1558035a-7c80-4dbb-b112-0839a92aee78	16281
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16281
+1558035a-7c80-4dbb-b112-0839a92aee78	16282
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16282
+1558035a-7c80-4dbb-b112-0839a92aee78	16283
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16283
+1558035a-7c80-4dbb-b112-0839a92aee78	16284
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16284
+1558035a-7c80-4dbb-b112-0839a92aee78	16285
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16285
+1558035a-7c80-4dbb-b112-0839a92aee78	16286
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16286
+1558035a-7c80-4dbb-b112-0839a92aee78	16287
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16287
+1558035a-7c80-4dbb-b112-0839a92aee78	16288
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16288
+1558035a-7c80-4dbb-b112-0839a92aee78	16289
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16289
+1558035a-7c80-4dbb-b112-0839a92aee78	16290
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16290
+1558035a-7c80-4dbb-b112-0839a92aee78	16291
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16291
+1558035a-7c80-4dbb-b112-0839a92aee78	16292
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16292
+1558035a-7c80-4dbb-b112-0839a92aee78	16293
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16293
+1558035a-7c80-4dbb-b112-0839a92aee78	16294
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16294
+1558035a-7c80-4dbb-b112-0839a92aee78	16295
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16295
+1558035a-7c80-4dbb-b112-0839a92aee78	16296
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16296
+1558035a-7c80-4dbb-b112-0839a92aee78	16297
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16297
+1558035a-7c80-4dbb-b112-0839a92aee78	16298
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16298
+1558035a-7c80-4dbb-b112-0839a92aee78	16299
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16299
+1558035a-7c80-4dbb-b112-0839a92aee78	16300
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16300
+1558035a-7c80-4dbb-b112-0839a92aee78	16301
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16301
+1558035a-7c80-4dbb-b112-0839a92aee78	16302
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16302
+1558035a-7c80-4dbb-b112-0839a92aee78	16303
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16303
+1558035a-7c80-4dbb-b112-0839a92aee78	16304
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16304
+1558035a-7c80-4dbb-b112-0839a92aee78	16305
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16305
+1558035a-7c80-4dbb-b112-0839a92aee78	16306
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16306
+1558035a-7c80-4dbb-b112-0839a92aee78	16307
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16307
+1558035a-7c80-4dbb-b112-0839a92aee78	16308
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16308
+1558035a-7c80-4dbb-b112-0839a92aee78	16309
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16309
+1558035a-7c80-4dbb-b112-0839a92aee78	16310
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	16310
+5acf9624-ce39-4282-8e6e-97a551260ecf	16320
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16320
+5acf9624-ce39-4282-8e6e-97a551260ecf	16321
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16321
+5acf9624-ce39-4282-8e6e-97a551260ecf	16322
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16322
+5acf9624-ce39-4282-8e6e-97a551260ecf	16323
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16323
+5acf9624-ce39-4282-8e6e-97a551260ecf	16324
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16324
+5acf9624-ce39-4282-8e6e-97a551260ecf	16326
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16326
+5acf9624-ce39-4282-8e6e-97a551260ecf	16325
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16325
+5acf9624-ce39-4282-8e6e-97a551260ecf	16327
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16327
+5acf9624-ce39-4282-8e6e-97a551260ecf	16330
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16330
+5acf9624-ce39-4282-8e6e-97a551260ecf	16329
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16329
+5acf9624-ce39-4282-8e6e-97a551260ecf	16328
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16328
+5acf9624-ce39-4282-8e6e-97a551260ecf	16332
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16332
+5acf9624-ce39-4282-8e6e-97a551260ecf	16331
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16331
+5acf9624-ce39-4282-8e6e-97a551260ecf	16334
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16334
+5acf9624-ce39-4282-8e6e-97a551260ecf	16333
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16333
+5acf9624-ce39-4282-8e6e-97a551260ecf	16335
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16335
+5acf9624-ce39-4282-8e6e-97a551260ecf	16336
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16336
+5acf9624-ce39-4282-8e6e-97a551260ecf	16337
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16337
+5acf9624-ce39-4282-8e6e-97a551260ecf	16338
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16338
+5acf9624-ce39-4282-8e6e-97a551260ecf	16340
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16340
+5acf9624-ce39-4282-8e6e-97a551260ecf	16339
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16339
+5acf9624-ce39-4282-8e6e-97a551260ecf	16342
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16342
+5acf9624-ce39-4282-8e6e-97a551260ecf	16341
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16341
+5acf9624-ce39-4282-8e6e-97a551260ecf	16343
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16343
+5acf9624-ce39-4282-8e6e-97a551260ecf	16344
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16344
+5acf9624-ce39-4282-8e6e-97a551260ecf	16346
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16346
+5acf9624-ce39-4282-8e6e-97a551260ecf	16347
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16347
+5acf9624-ce39-4282-8e6e-97a551260ecf	16345
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16345
+5acf9624-ce39-4282-8e6e-97a551260ecf	16348
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16348
+5acf9624-ce39-4282-8e6e-97a551260ecf	16349
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16349
+5acf9624-ce39-4282-8e6e-97a551260ecf	16350
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16350
+5acf9624-ce39-4282-8e6e-97a551260ecf	16351
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16351
+5acf9624-ce39-4282-8e6e-97a551260ecf	16352
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16352
+5acf9624-ce39-4282-8e6e-97a551260ecf	16353
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16353
+5acf9624-ce39-4282-8e6e-97a551260ecf	16355
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16355
+5acf9624-ce39-4282-8e6e-97a551260ecf	16354
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16354
+5acf9624-ce39-4282-8e6e-97a551260ecf	16357
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16357
+5acf9624-ce39-4282-8e6e-97a551260ecf	16356
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16356
+5acf9624-ce39-4282-8e6e-97a551260ecf	16359
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16359
+5acf9624-ce39-4282-8e6e-97a551260ecf	16358
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16358
+5acf9624-ce39-4282-8e6e-97a551260ecf	16360
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16360
+5acf9624-ce39-4282-8e6e-97a551260ecf	16311
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16311
+5acf9624-ce39-4282-8e6e-97a551260ecf	16312
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16312
+5acf9624-ce39-4282-8e6e-97a551260ecf	16313
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16313
+5acf9624-ce39-4282-8e6e-97a551260ecf	16314
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16314
+5acf9624-ce39-4282-8e6e-97a551260ecf	16315
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16315
+5acf9624-ce39-4282-8e6e-97a551260ecf	16316
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16316
+5acf9624-ce39-4282-8e6e-97a551260ecf	16317
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16317
+5acf9624-ce39-4282-8e6e-97a551260ecf	16318
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16318
+5acf9624-ce39-4282-8e6e-97a551260ecf	16319
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	16319
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16362
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16362
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16361
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16361
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16363
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16363
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16364
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16364
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16365
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16365
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16367
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16367
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16366
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16366
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16368
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16368
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16369
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16369
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16370
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16370
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16372
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16372
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16373
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16373
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16371
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16371
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16375
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16375
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16374
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16374
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16376
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16376
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16377
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16377
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16378
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16378
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16379
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16379
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16381
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16381
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16380
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16380
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16384
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16384
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16382
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16382
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16383
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16383
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16385
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16385
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16386
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16386
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16388
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16388
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16387
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16387
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16389
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16389
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16390
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16390
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16393
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16393
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16394
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16394
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16395
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16395
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16391
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16391
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16392
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16392
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16396
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16396
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16397
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16397
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16398
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16398
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16400
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16400
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16399
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16399
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16401
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16401
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16403
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16403
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16402
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16402
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16404
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16404
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16405
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16405
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16406
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16406
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16408
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16408
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16407
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16407
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16410
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16410
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16409
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16409
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16411
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16411
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16412
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16412
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16413
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16413
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16414
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16414
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16415
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16415
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16416
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16416
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16417
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16417
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16418
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16418
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16419
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16419
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16420
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16420
+bd3e2c08-a5e8-4d41-984b-839199b7e066	16421
+f06700c1-cb42-4c2c-9c1d-ad5486893272	16421
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16437
+fa184446-3002-4d88-8253-734b0ed60802	16437
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16442
+fa184446-3002-4d88-8253-734b0ed60802	16442
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16441
+fa184446-3002-4d88-8253-734b0ed60802	16441
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16444
+fa184446-3002-4d88-8253-734b0ed60802	16444
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16443
+fa184446-3002-4d88-8253-734b0ed60802	16443
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16445
+fa184446-3002-4d88-8253-734b0ed60802	16445
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16447
+fa184446-3002-4d88-8253-734b0ed60802	16447
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16446
+fa184446-3002-4d88-8253-734b0ed60802	16446
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16450
+fa184446-3002-4d88-8253-734b0ed60802	16450
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16449
+fa184446-3002-4d88-8253-734b0ed60802	16449
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16448
+fa184446-3002-4d88-8253-734b0ed60802	16448
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16452
+fa184446-3002-4d88-8253-734b0ed60802	16452
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16451
+fa184446-3002-4d88-8253-734b0ed60802	16451
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16454
+fa184446-3002-4d88-8253-734b0ed60802	16454
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16453
+fa184446-3002-4d88-8253-734b0ed60802	16453
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16456
+fa184446-3002-4d88-8253-734b0ed60802	16456
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16455
+fa184446-3002-4d88-8253-734b0ed60802	16455
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16457
+fa184446-3002-4d88-8253-734b0ed60802	16457
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16458
+fa184446-3002-4d88-8253-734b0ed60802	16458
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16459
+fa184446-3002-4d88-8253-734b0ed60802	16459
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16461
+fa184446-3002-4d88-8253-734b0ed60802	16461
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16460
+fa184446-3002-4d88-8253-734b0ed60802	16460
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16462
+fa184446-3002-4d88-8253-734b0ed60802	16462
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16463
+fa184446-3002-4d88-8253-734b0ed60802	16463
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16464
+fa184446-3002-4d88-8253-734b0ed60802	16464
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16465
+fa184446-3002-4d88-8253-734b0ed60802	16465
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16467
+fa184446-3002-4d88-8253-734b0ed60802	16467
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16466
+fa184446-3002-4d88-8253-734b0ed60802	16466
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16468
+fa184446-3002-4d88-8253-734b0ed60802	16468
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16469
+fa184446-3002-4d88-8253-734b0ed60802	16469
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16470
+fa184446-3002-4d88-8253-734b0ed60802	16470
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16471
+fa184446-3002-4d88-8253-734b0ed60802	16471
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16474
+fa184446-3002-4d88-8253-734b0ed60802	16474
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16472
+fa184446-3002-4d88-8253-734b0ed60802	16472
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16473
+fa184446-3002-4d88-8253-734b0ed60802	16473
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16422
+fa184446-3002-4d88-8253-734b0ed60802	16422
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16423
+fa184446-3002-4d88-8253-734b0ed60802	16423
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16425
+fa184446-3002-4d88-8253-734b0ed60802	16425
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16424
+fa184446-3002-4d88-8253-734b0ed60802	16424
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16426
+fa184446-3002-4d88-8253-734b0ed60802	16426
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16427
+fa184446-3002-4d88-8253-734b0ed60802	16427
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16428
+fa184446-3002-4d88-8253-734b0ed60802	16428
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16429
+fa184446-3002-4d88-8253-734b0ed60802	16429
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16430
+fa184446-3002-4d88-8253-734b0ed60802	16430
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16431
+fa184446-3002-4d88-8253-734b0ed60802	16431
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16432
+fa184446-3002-4d88-8253-734b0ed60802	16432
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16433
+fa184446-3002-4d88-8253-734b0ed60802	16433
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16434
+fa184446-3002-4d88-8253-734b0ed60802	16434
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16435
+fa184446-3002-4d88-8253-734b0ed60802	16435
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16436
+fa184446-3002-4d88-8253-734b0ed60802	16436
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16438
+fa184446-3002-4d88-8253-734b0ed60802	16438
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16440
+fa184446-3002-4d88-8253-734b0ed60802	16440
+07627fab-0f23-491a-b2fa-fec8ca138dfe	16439
+fa184446-3002-4d88-8253-734b0ed60802	16439
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16475
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16475
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16476
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16476
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16477
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16477
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16478
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16478
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16480
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16480
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16479
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16479
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16481
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16481
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16483
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16483
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16482
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16482
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16484
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16484
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16485
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16485
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16486
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16486
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16488
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16488
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16487
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16487
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16489
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16489
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16490
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16490
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16491
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16491
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16493
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16493
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16492
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16492
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16494
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16494
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16496
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16496
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16495
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16495
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16497
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16497
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16498
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16498
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16499
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16499
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16501
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16501
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16502
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16502
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16500
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16500
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16504
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16504
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16503
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16503
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16505
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16505
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16506
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16506
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16508
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16508
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16507
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16507
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16509
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16509
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16510
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16510
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16512
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16512
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16511
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16511
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16513
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16513
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16514
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16514
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16515
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16515
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16517
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16517
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16516
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16516
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16518
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16518
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16519
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16519
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16520
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16520
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16521
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16521
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16523
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16523
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16522
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16522
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16524
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16524
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16525
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16525
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16526
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16526
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16527
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16527
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16528
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16528
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	16529
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	16529
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16546
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16546
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16547
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16547
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16548
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16548
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16549
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16549
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16550
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16550
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16551
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16551
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16552
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16552
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16553
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16553
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16555
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16555
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16554
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16554
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16556
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16556
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16558
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16558
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16557
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16557
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16559
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16559
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16560
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16560
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16561
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16561
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16562
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16562
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16564
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16564
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16563
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16563
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16565
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16565
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16566
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16566
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16567
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16567
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16568
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16568
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16569
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16569
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16570
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16570
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16571
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16571
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16572
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16572
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16574
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16574
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16573
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16573
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16575
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16575
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16576
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16576
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16579
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16579
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16577
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16577
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16578
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16578
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16580
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16580
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16581
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16581
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16583
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16583
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16582
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16582
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16530
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16530
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16531
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16531
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16532
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16532
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16533
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16533
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16534
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16534
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16535
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16535
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16536
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16536
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16537
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16537
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16538
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16538
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16539
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16539
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16540
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16540
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16542
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16542
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16541
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16541
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16543
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16543
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16544
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16544
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	16545
+d525bb31-39b9-4db9-98ad-f746b1bd40de	16545
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16584
+78160d74-2651-4a4a-b3df-242014607f94	16584
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16585
+78160d74-2651-4a4a-b3df-242014607f94	16585
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16586
+78160d74-2651-4a4a-b3df-242014607f94	16586
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16587
+78160d74-2651-4a4a-b3df-242014607f94	16587
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16588
+78160d74-2651-4a4a-b3df-242014607f94	16588
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16589
+78160d74-2651-4a4a-b3df-242014607f94	16589
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16590
+78160d74-2651-4a4a-b3df-242014607f94	16590
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16591
+78160d74-2651-4a4a-b3df-242014607f94	16591
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16592
+78160d74-2651-4a4a-b3df-242014607f94	16592
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16594
+78160d74-2651-4a4a-b3df-242014607f94	16594
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16593
+78160d74-2651-4a4a-b3df-242014607f94	16593
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16595
+78160d74-2651-4a4a-b3df-242014607f94	16595
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16596
+78160d74-2651-4a4a-b3df-242014607f94	16596
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16598
+78160d74-2651-4a4a-b3df-242014607f94	16598
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16597
+78160d74-2651-4a4a-b3df-242014607f94	16597
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16599
+78160d74-2651-4a4a-b3df-242014607f94	16599
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16600
+78160d74-2651-4a4a-b3df-242014607f94	16600
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16601
+78160d74-2651-4a4a-b3df-242014607f94	16601
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16602
+78160d74-2651-4a4a-b3df-242014607f94	16602
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16604
+78160d74-2651-4a4a-b3df-242014607f94	16604
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16605
+78160d74-2651-4a4a-b3df-242014607f94	16605
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16603
+78160d74-2651-4a4a-b3df-242014607f94	16603
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16607
+78160d74-2651-4a4a-b3df-242014607f94	16607
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16606
+78160d74-2651-4a4a-b3df-242014607f94	16606
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16608
+78160d74-2651-4a4a-b3df-242014607f94	16608
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16609
+78160d74-2651-4a4a-b3df-242014607f94	16609
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16611
+78160d74-2651-4a4a-b3df-242014607f94	16611
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16610
+78160d74-2651-4a4a-b3df-242014607f94	16610
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16612
+78160d74-2651-4a4a-b3df-242014607f94	16612
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16613
+78160d74-2651-4a4a-b3df-242014607f94	16613
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16614
+78160d74-2651-4a4a-b3df-242014607f94	16614
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16615
+78160d74-2651-4a4a-b3df-242014607f94	16615
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16617
+78160d74-2651-4a4a-b3df-242014607f94	16617
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16616
+78160d74-2651-4a4a-b3df-242014607f94	16616
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16618
+78160d74-2651-4a4a-b3df-242014607f94	16618
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16619
+78160d74-2651-4a4a-b3df-242014607f94	16619
+f5f301d2-f9e8-479a-9590-1b7f442739c8	16620
+78160d74-2651-4a4a-b3df-242014607f94	16620
+43d14d7a-0526-4f1b-8971-6694f72ae745	16629
+830fd301-9478-4c01-9e61-79c243007934	16629
+43d14d7a-0526-4f1b-8971-6694f72ae745	16630
+830fd301-9478-4c01-9e61-79c243007934	16630
+43d14d7a-0526-4f1b-8971-6694f72ae745	16632
+830fd301-9478-4c01-9e61-79c243007934	16632
+43d14d7a-0526-4f1b-8971-6694f72ae745	16631
+830fd301-9478-4c01-9e61-79c243007934	16631
+43d14d7a-0526-4f1b-8971-6694f72ae745	16634
+830fd301-9478-4c01-9e61-79c243007934	16634
+43d14d7a-0526-4f1b-8971-6694f72ae745	16636
+830fd301-9478-4c01-9e61-79c243007934	16636
+43d14d7a-0526-4f1b-8971-6694f72ae745	16635
+830fd301-9478-4c01-9e61-79c243007934	16635
+43d14d7a-0526-4f1b-8971-6694f72ae745	16637
+830fd301-9478-4c01-9e61-79c243007934	16637
+43d14d7a-0526-4f1b-8971-6694f72ae745	16638
+830fd301-9478-4c01-9e61-79c243007934	16638
+43d14d7a-0526-4f1b-8971-6694f72ae745	16640
+830fd301-9478-4c01-9e61-79c243007934	16640
+43d14d7a-0526-4f1b-8971-6694f72ae745	16639
+830fd301-9478-4c01-9e61-79c243007934	16639
+43d14d7a-0526-4f1b-8971-6694f72ae745	16641
+830fd301-9478-4c01-9e61-79c243007934	16641
+43d14d7a-0526-4f1b-8971-6694f72ae745	16642
+830fd301-9478-4c01-9e61-79c243007934	16642
+43d14d7a-0526-4f1b-8971-6694f72ae745	16643
+830fd301-9478-4c01-9e61-79c243007934	16643
+43d14d7a-0526-4f1b-8971-6694f72ae745	16645
+830fd301-9478-4c01-9e61-79c243007934	16645
+43d14d7a-0526-4f1b-8971-6694f72ae745	16644
+830fd301-9478-4c01-9e61-79c243007934	16644
+43d14d7a-0526-4f1b-8971-6694f72ae745	16648
+830fd301-9478-4c01-9e61-79c243007934	16648
+43d14d7a-0526-4f1b-8971-6694f72ae745	16647
+830fd301-9478-4c01-9e61-79c243007934	16647
+43d14d7a-0526-4f1b-8971-6694f72ae745	16646
+830fd301-9478-4c01-9e61-79c243007934	16646
+43d14d7a-0526-4f1b-8971-6694f72ae745	16649
+830fd301-9478-4c01-9e61-79c243007934	16649
+43d14d7a-0526-4f1b-8971-6694f72ae745	16650
+830fd301-9478-4c01-9e61-79c243007934	16650
+43d14d7a-0526-4f1b-8971-6694f72ae745	16652
+830fd301-9478-4c01-9e61-79c243007934	16652
+43d14d7a-0526-4f1b-8971-6694f72ae745	16651
+830fd301-9478-4c01-9e61-79c243007934	16651
+43d14d7a-0526-4f1b-8971-6694f72ae745	16653
+830fd301-9478-4c01-9e61-79c243007934	16653
+43d14d7a-0526-4f1b-8971-6694f72ae745	16654
+830fd301-9478-4c01-9e61-79c243007934	16654
+43d14d7a-0526-4f1b-8971-6694f72ae745	16655
+830fd301-9478-4c01-9e61-79c243007934	16655
+43d14d7a-0526-4f1b-8971-6694f72ae745	16656
+830fd301-9478-4c01-9e61-79c243007934	16656
+43d14d7a-0526-4f1b-8971-6694f72ae745	16657
+830fd301-9478-4c01-9e61-79c243007934	16657
+43d14d7a-0526-4f1b-8971-6694f72ae745	16622
+830fd301-9478-4c01-9e61-79c243007934	16622
+43d14d7a-0526-4f1b-8971-6694f72ae745	16621
+830fd301-9478-4c01-9e61-79c243007934	16621
+43d14d7a-0526-4f1b-8971-6694f72ae745	16623
+830fd301-9478-4c01-9e61-79c243007934	16623
+43d14d7a-0526-4f1b-8971-6694f72ae745	16624
+830fd301-9478-4c01-9e61-79c243007934	16624
+43d14d7a-0526-4f1b-8971-6694f72ae745	16626
+830fd301-9478-4c01-9e61-79c243007934	16626
+43d14d7a-0526-4f1b-8971-6694f72ae745	16625
+830fd301-9478-4c01-9e61-79c243007934	16625
+43d14d7a-0526-4f1b-8971-6694f72ae745	16628
+830fd301-9478-4c01-9e61-79c243007934	16628
+43d14d7a-0526-4f1b-8971-6694f72ae745	16627
+830fd301-9478-4c01-9e61-79c243007934	16627
+43d14d7a-0526-4f1b-8971-6694f72ae745	16633
+830fd301-9478-4c01-9e61-79c243007934	16633
+492265b2-7079-48af-934c-d91b6540d327	16696
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16696
+492265b2-7079-48af-934c-d91b6540d327	16697
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16697
+492265b2-7079-48af-934c-d91b6540d327	16699
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16699
+492265b2-7079-48af-934c-d91b6540d327	16698
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16698
+492265b2-7079-48af-934c-d91b6540d327	16700
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16700
+492265b2-7079-48af-934c-d91b6540d327	16701
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16701
+492265b2-7079-48af-934c-d91b6540d327	16702
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16702
+492265b2-7079-48af-934c-d91b6540d327	16703
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16703
+492265b2-7079-48af-934c-d91b6540d327	16705
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16705
+492265b2-7079-48af-934c-d91b6540d327	16704
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16704
+492265b2-7079-48af-934c-d91b6540d327	16706
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16706
+492265b2-7079-48af-934c-d91b6540d327	16707
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16707
+492265b2-7079-48af-934c-d91b6540d327	16708
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16708
+492265b2-7079-48af-934c-d91b6540d327	16709
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16709
+492265b2-7079-48af-934c-d91b6540d327	16710
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16710
+492265b2-7079-48af-934c-d91b6540d327	16711
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16711
+492265b2-7079-48af-934c-d91b6540d327	16713
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16713
+492265b2-7079-48af-934c-d91b6540d327	16712
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16712
+492265b2-7079-48af-934c-d91b6540d327	16714
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16714
+492265b2-7079-48af-934c-d91b6540d327	16716
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16716
+492265b2-7079-48af-934c-d91b6540d327	16715
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16715
+492265b2-7079-48af-934c-d91b6540d327	16717
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16717
+492265b2-7079-48af-934c-d91b6540d327	16718
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16718
+492265b2-7079-48af-934c-d91b6540d327	16719
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16719
+492265b2-7079-48af-934c-d91b6540d327	16723
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16723
+492265b2-7079-48af-934c-d91b6540d327	16721
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16721
+492265b2-7079-48af-934c-d91b6540d327	16724
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16724
+492265b2-7079-48af-934c-d91b6540d327	16720
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16720
+492265b2-7079-48af-934c-d91b6540d327	16722
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16722
+492265b2-7079-48af-934c-d91b6540d327	16725
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16725
+492265b2-7079-48af-934c-d91b6540d327	16726
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16726
+492265b2-7079-48af-934c-d91b6540d327	16727
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16727
+492265b2-7079-48af-934c-d91b6540d327	16728
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16728
+492265b2-7079-48af-934c-d91b6540d327	16729
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16729
+492265b2-7079-48af-934c-d91b6540d327	16731
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16731
+492265b2-7079-48af-934c-d91b6540d327	16730
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16730
+492265b2-7079-48af-934c-d91b6540d327	16732
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16732
+492265b2-7079-48af-934c-d91b6540d327	16733
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16733
+492265b2-7079-48af-934c-d91b6540d327	16734
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16734
+492265b2-7079-48af-934c-d91b6540d327	16735
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16735
+492265b2-7079-48af-934c-d91b6540d327	16736
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16736
+492265b2-7079-48af-934c-d91b6540d327	16737
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16737
+492265b2-7079-48af-934c-d91b6540d327	16738
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16738
+492265b2-7079-48af-934c-d91b6540d327	16739
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16739
+492265b2-7079-48af-934c-d91b6540d327	16740
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16740
+492265b2-7079-48af-934c-d91b6540d327	16741
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16741
+492265b2-7079-48af-934c-d91b6540d327	16742
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16742
+492265b2-7079-48af-934c-d91b6540d327	16743
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16743
+492265b2-7079-48af-934c-d91b6540d327	16744
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16744
+492265b2-7079-48af-934c-d91b6540d327	16745
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16745
+492265b2-7079-48af-934c-d91b6540d327	16746
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16746
+492265b2-7079-48af-934c-d91b6540d327	16747
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16747
+492265b2-7079-48af-934c-d91b6540d327	16748
+46e89018-f350-403c-9fd7-f80ac16e8a3a	16748
+915d8915-a98c-43db-9c27-07560c7f9164	16760
+78004a18-a5e2-4499-9a29-8943b12a297b	16760
+915d8915-a98c-43db-9c27-07560c7f9164	16762
+78004a18-a5e2-4499-9a29-8943b12a297b	16762
+915d8915-a98c-43db-9c27-07560c7f9164	16763
+78004a18-a5e2-4499-9a29-8943b12a297b	16763
+915d8915-a98c-43db-9c27-07560c7f9164	16761
+78004a18-a5e2-4499-9a29-8943b12a297b	16761
+915d8915-a98c-43db-9c27-07560c7f9164	16765
+78004a18-a5e2-4499-9a29-8943b12a297b	16765
+915d8915-a98c-43db-9c27-07560c7f9164	16764
+78004a18-a5e2-4499-9a29-8943b12a297b	16764
+915d8915-a98c-43db-9c27-07560c7f9164	16766
+78004a18-a5e2-4499-9a29-8943b12a297b	16766
+915d8915-a98c-43db-9c27-07560c7f9164	16768
+78004a18-a5e2-4499-9a29-8943b12a297b	16768
+915d8915-a98c-43db-9c27-07560c7f9164	16767
+78004a18-a5e2-4499-9a29-8943b12a297b	16767
+915d8915-a98c-43db-9c27-07560c7f9164	16770
+78004a18-a5e2-4499-9a29-8943b12a297b	16770
+915d8915-a98c-43db-9c27-07560c7f9164	16769
+78004a18-a5e2-4499-9a29-8943b12a297b	16769
+915d8915-a98c-43db-9c27-07560c7f9164	16772
+78004a18-a5e2-4499-9a29-8943b12a297b	16772
+915d8915-a98c-43db-9c27-07560c7f9164	16773
+78004a18-a5e2-4499-9a29-8943b12a297b	16773
+915d8915-a98c-43db-9c27-07560c7f9164	16771
+78004a18-a5e2-4499-9a29-8943b12a297b	16771
+915d8915-a98c-43db-9c27-07560c7f9164	16774
+78004a18-a5e2-4499-9a29-8943b12a297b	16774
+915d8915-a98c-43db-9c27-07560c7f9164	16776
+78004a18-a5e2-4499-9a29-8943b12a297b	16776
+915d8915-a98c-43db-9c27-07560c7f9164	16775
+78004a18-a5e2-4499-9a29-8943b12a297b	16775
+915d8915-a98c-43db-9c27-07560c7f9164	16750
+78004a18-a5e2-4499-9a29-8943b12a297b	16750
+915d8915-a98c-43db-9c27-07560c7f9164	16749
+78004a18-a5e2-4499-9a29-8943b12a297b	16749
+915d8915-a98c-43db-9c27-07560c7f9164	16751
+78004a18-a5e2-4499-9a29-8943b12a297b	16751
+915d8915-a98c-43db-9c27-07560c7f9164	16753
+78004a18-a5e2-4499-9a29-8943b12a297b	16753
+915d8915-a98c-43db-9c27-07560c7f9164	16752
+78004a18-a5e2-4499-9a29-8943b12a297b	16752
+915d8915-a98c-43db-9c27-07560c7f9164	16754
+78004a18-a5e2-4499-9a29-8943b12a297b	16754
+915d8915-a98c-43db-9c27-07560c7f9164	16755
+78004a18-a5e2-4499-9a29-8943b12a297b	16755
+915d8915-a98c-43db-9c27-07560c7f9164	16756
+78004a18-a5e2-4499-9a29-8943b12a297b	16756
+915d8915-a98c-43db-9c27-07560c7f9164	16757
+78004a18-a5e2-4499-9a29-8943b12a297b	16757
+915d8915-a98c-43db-9c27-07560c7f9164	16758
+78004a18-a5e2-4499-9a29-8943b12a297b	16758
+915d8915-a98c-43db-9c27-07560c7f9164	16759
+78004a18-a5e2-4499-9a29-8943b12a297b	16759
+47eeaf7e-bba7-4989-94db-d98669717237	16777
+c655fb69-4f1b-4954-82fd-50970202e37d	16777
+47eeaf7e-bba7-4989-94db-d98669717237	16778
+c655fb69-4f1b-4954-82fd-50970202e37d	16778
+47eeaf7e-bba7-4989-94db-d98669717237	16779
+c655fb69-4f1b-4954-82fd-50970202e37d	16779
+47eeaf7e-bba7-4989-94db-d98669717237	16780
+c655fb69-4f1b-4954-82fd-50970202e37d	16780
+47eeaf7e-bba7-4989-94db-d98669717237	16781
+c655fb69-4f1b-4954-82fd-50970202e37d	16781
+47eeaf7e-bba7-4989-94db-d98669717237	16782
+c655fb69-4f1b-4954-82fd-50970202e37d	16782
+47eeaf7e-bba7-4989-94db-d98669717237	16784
+c655fb69-4f1b-4954-82fd-50970202e37d	16784
+47eeaf7e-bba7-4989-94db-d98669717237	16783
+c655fb69-4f1b-4954-82fd-50970202e37d	16783
+47eeaf7e-bba7-4989-94db-d98669717237	16785
+c655fb69-4f1b-4954-82fd-50970202e37d	16785
+47eeaf7e-bba7-4989-94db-d98669717237	16786
+c655fb69-4f1b-4954-82fd-50970202e37d	16786
+47eeaf7e-bba7-4989-94db-d98669717237	16787
+c655fb69-4f1b-4954-82fd-50970202e37d	16787
+47eeaf7e-bba7-4989-94db-d98669717237	16788
+c655fb69-4f1b-4954-82fd-50970202e37d	16788
+47eeaf7e-bba7-4989-94db-d98669717237	16790
+c655fb69-4f1b-4954-82fd-50970202e37d	16790
+47eeaf7e-bba7-4989-94db-d98669717237	16789
+c655fb69-4f1b-4954-82fd-50970202e37d	16789
+47eeaf7e-bba7-4989-94db-d98669717237	16791
+c655fb69-4f1b-4954-82fd-50970202e37d	16791
+47eeaf7e-bba7-4989-94db-d98669717237	16793
+c655fb69-4f1b-4954-82fd-50970202e37d	16793
+47eeaf7e-bba7-4989-94db-d98669717237	16792
+c655fb69-4f1b-4954-82fd-50970202e37d	16792
+47eeaf7e-bba7-4989-94db-d98669717237	16795
+c655fb69-4f1b-4954-82fd-50970202e37d	16795
+47eeaf7e-bba7-4989-94db-d98669717237	16794
+c655fb69-4f1b-4954-82fd-50970202e37d	16794
+47eeaf7e-bba7-4989-94db-d98669717237	16796
+c655fb69-4f1b-4954-82fd-50970202e37d	16796
+47eeaf7e-bba7-4989-94db-d98669717237	16797
+c655fb69-4f1b-4954-82fd-50970202e37d	16797
+47eeaf7e-bba7-4989-94db-d98669717237	16799
+c655fb69-4f1b-4954-82fd-50970202e37d	16799
+47eeaf7e-bba7-4989-94db-d98669717237	16798
+c655fb69-4f1b-4954-82fd-50970202e37d	16798
+47eeaf7e-bba7-4989-94db-d98669717237	16801
+c655fb69-4f1b-4954-82fd-50970202e37d	16801
+47eeaf7e-bba7-4989-94db-d98669717237	16800
+c655fb69-4f1b-4954-82fd-50970202e37d	16800
+47eeaf7e-bba7-4989-94db-d98669717237	16804
+c655fb69-4f1b-4954-82fd-50970202e37d	16804
+47eeaf7e-bba7-4989-94db-d98669717237	16805
+c655fb69-4f1b-4954-82fd-50970202e37d	16805
+47eeaf7e-bba7-4989-94db-d98669717237	16806
+c655fb69-4f1b-4954-82fd-50970202e37d	16806
+47eeaf7e-bba7-4989-94db-d98669717237	16802
+c655fb69-4f1b-4954-82fd-50970202e37d	16802
+47eeaf7e-bba7-4989-94db-d98669717237	16803
+c655fb69-4f1b-4954-82fd-50970202e37d	16803
+47eeaf7e-bba7-4989-94db-d98669717237	16807
+c655fb69-4f1b-4954-82fd-50970202e37d	16807
+47eeaf7e-bba7-4989-94db-d98669717237	16808
+c655fb69-4f1b-4954-82fd-50970202e37d	16808
+47eeaf7e-bba7-4989-94db-d98669717237	16809
+c655fb69-4f1b-4954-82fd-50970202e37d	16809
+47eeaf7e-bba7-4989-94db-d98669717237	16811
+c655fb69-4f1b-4954-82fd-50970202e37d	16811
+47eeaf7e-bba7-4989-94db-d98669717237	16810
+c655fb69-4f1b-4954-82fd-50970202e37d	16810
+47eeaf7e-bba7-4989-94db-d98669717237	16812
+c655fb69-4f1b-4954-82fd-50970202e37d	16812
+47eeaf7e-bba7-4989-94db-d98669717237	16813
+c655fb69-4f1b-4954-82fd-50970202e37d	16813
+47eeaf7e-bba7-4989-94db-d98669717237	16814
+c655fb69-4f1b-4954-82fd-50970202e37d	16814
+47eeaf7e-bba7-4989-94db-d98669717237	16815
+c655fb69-4f1b-4954-82fd-50970202e37d	16815
+47eeaf7e-bba7-4989-94db-d98669717237	16816
+c655fb69-4f1b-4954-82fd-50970202e37d	16816
+47eeaf7e-bba7-4989-94db-d98669717237	16817
+c655fb69-4f1b-4954-82fd-50970202e37d	16817
+47eeaf7e-bba7-4989-94db-d98669717237	16818
+c655fb69-4f1b-4954-82fd-50970202e37d	16818
+47eeaf7e-bba7-4989-94db-d98669717237	16820
+c655fb69-4f1b-4954-82fd-50970202e37d	16820
+47eeaf7e-bba7-4989-94db-d98669717237	16819
+c655fb69-4f1b-4954-82fd-50970202e37d	16819
+47eeaf7e-bba7-4989-94db-d98669717237	16821
+c655fb69-4f1b-4954-82fd-50970202e37d	16821
+47eeaf7e-bba7-4989-94db-d98669717237	16822
+c655fb69-4f1b-4954-82fd-50970202e37d	16822
+47eeaf7e-bba7-4989-94db-d98669717237	16823
+c655fb69-4f1b-4954-82fd-50970202e37d	16823
+47eeaf7e-bba7-4989-94db-d98669717237	16824
+c655fb69-4f1b-4954-82fd-50970202e37d	16824
+47eeaf7e-bba7-4989-94db-d98669717237	16825
+c655fb69-4f1b-4954-82fd-50970202e37d	16825
+47eeaf7e-bba7-4989-94db-d98669717237	16827
+c655fb69-4f1b-4954-82fd-50970202e37d	16827
+47eeaf7e-bba7-4989-94db-d98669717237	16826
+c655fb69-4f1b-4954-82fd-50970202e37d	16826
+47eeaf7e-bba7-4989-94db-d98669717237	16828
+c655fb69-4f1b-4954-82fd-50970202e37d	16828
+47eeaf7e-bba7-4989-94db-d98669717237	16829
+c655fb69-4f1b-4954-82fd-50970202e37d	16829
+47eeaf7e-bba7-4989-94db-d98669717237	16830
+c655fb69-4f1b-4954-82fd-50970202e37d	16830
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16839
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16839
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16840
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16840
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16842
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16842
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16841
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16841
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16843
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16843
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16844
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16844
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16845
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16845
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16846
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16846
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16847
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16847
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16850
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16850
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16849
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16849
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16848
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16848
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16851
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16851
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16852
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16852
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16853
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16853
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16831
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16831
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16832
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16832
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16833
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16833
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16834
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16834
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16835
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16835
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16836
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16836
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16837
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16837
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	16838
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	16838
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16854
+17c6c66a-d448-405e-8376-78a10353e48d	16854
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16855
+17c6c66a-d448-405e-8376-78a10353e48d	16855
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16856
+17c6c66a-d448-405e-8376-78a10353e48d	16856
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16857
+17c6c66a-d448-405e-8376-78a10353e48d	16857
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16858
+17c6c66a-d448-405e-8376-78a10353e48d	16858
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16859
+17c6c66a-d448-405e-8376-78a10353e48d	16859
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16860
+17c6c66a-d448-405e-8376-78a10353e48d	16860
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16861
+17c6c66a-d448-405e-8376-78a10353e48d	16861
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16862
+17c6c66a-d448-405e-8376-78a10353e48d	16862
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16864
+17c6c66a-d448-405e-8376-78a10353e48d	16864
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16863
+17c6c66a-d448-405e-8376-78a10353e48d	16863
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16865
+17c6c66a-d448-405e-8376-78a10353e48d	16865
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16866
+17c6c66a-d448-405e-8376-78a10353e48d	16866
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16867
+17c6c66a-d448-405e-8376-78a10353e48d	16867
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16869
+17c6c66a-d448-405e-8376-78a10353e48d	16869
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16868
+17c6c66a-d448-405e-8376-78a10353e48d	16868
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16870
+17c6c66a-d448-405e-8376-78a10353e48d	16870
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16872
+17c6c66a-d448-405e-8376-78a10353e48d	16872
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16871
+17c6c66a-d448-405e-8376-78a10353e48d	16871
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16873
+17c6c66a-d448-405e-8376-78a10353e48d	16873
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16874
+17c6c66a-d448-405e-8376-78a10353e48d	16874
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16875
+17c6c66a-d448-405e-8376-78a10353e48d	16875
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16876
+17c6c66a-d448-405e-8376-78a10353e48d	16876
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	16877
+17c6c66a-d448-405e-8376-78a10353e48d	16877
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16897
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16897
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16898
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16898
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16899
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16899
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16901
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16901
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16900
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16900
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16902
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16902
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16906
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16906
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16904
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16904
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16912
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16912
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16911
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16911
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16913
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16913
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16914
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16914
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16916
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16916
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16915
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16915
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16917
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16917
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16918
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16918
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16919
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16919
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16920
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16920
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16921
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16921
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16922
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16922
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16923
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16923
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16878
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16878
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16879
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16879
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16881
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16881
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16880
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16880
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16883
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16883
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16882
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16882
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16885
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16885
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16884
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16884
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16887
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16887
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16886
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16886
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16888
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16888
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16889
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16889
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16891
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16891
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16890
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16890
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16892
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16892
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16893
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16893
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16894
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16894
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16895
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16895
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16896
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16896
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16903
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16903
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16907
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16907
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16905
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16905
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16908
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16908
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16910
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16910
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	16909
+9582f52a-fb9b-4b63-a585-f30dc338d6df	16909
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16924
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16924
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16926
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16926
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16925
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16925
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16928
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16928
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16927
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16927
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16930
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16930
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16929
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16929
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16931
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16931
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16932
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16932
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16933
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16933
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16934
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16934
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16936
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16936
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16935
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16935
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16937
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16937
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16938
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16938
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16939
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16939
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16940
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16940
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16941
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16941
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16942
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16942
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16945
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16945
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16944
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16944
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16943
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16943
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16946
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16946
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16947
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16947
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16949
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16949
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16948
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16948
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16950
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16950
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16951
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16951
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16952
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16952
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16953
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16953
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16955
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16955
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	16954
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	16954
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16961
+d6adad2e-0fca-4f94-a962-1014656e5f17	16961
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16960
+d6adad2e-0fca-4f94-a962-1014656e5f17	16960
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16962
+d6adad2e-0fca-4f94-a962-1014656e5f17	16962
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16963
+d6adad2e-0fca-4f94-a962-1014656e5f17	16963
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16964
+d6adad2e-0fca-4f94-a962-1014656e5f17	16964
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16965
+d6adad2e-0fca-4f94-a962-1014656e5f17	16965
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16966
+d6adad2e-0fca-4f94-a962-1014656e5f17	16966
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16967
+d6adad2e-0fca-4f94-a962-1014656e5f17	16967
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16968
+d6adad2e-0fca-4f94-a962-1014656e5f17	16968
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16970
+d6adad2e-0fca-4f94-a962-1014656e5f17	16970
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16971
+d6adad2e-0fca-4f94-a962-1014656e5f17	16971
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16969
+d6adad2e-0fca-4f94-a962-1014656e5f17	16969
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16973
+d6adad2e-0fca-4f94-a962-1014656e5f17	16973
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16972
+d6adad2e-0fca-4f94-a962-1014656e5f17	16972
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16975
+d6adad2e-0fca-4f94-a962-1014656e5f17	16975
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16974
+d6adad2e-0fca-4f94-a962-1014656e5f17	16974
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16976
+d6adad2e-0fca-4f94-a962-1014656e5f17	16976
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16977
+d6adad2e-0fca-4f94-a962-1014656e5f17	16977
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16956
+d6adad2e-0fca-4f94-a962-1014656e5f17	16956
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16957
+d6adad2e-0fca-4f94-a962-1014656e5f17	16957
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16959
+d6adad2e-0fca-4f94-a962-1014656e5f17	16959
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	16958
+d6adad2e-0fca-4f94-a962-1014656e5f17	16958
+165ff473-c634-4fd9-9d7b-b01e274862a4	16978
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16978
+165ff473-c634-4fd9-9d7b-b01e274862a4	16979
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16979
+165ff473-c634-4fd9-9d7b-b01e274862a4	16980
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16980
+165ff473-c634-4fd9-9d7b-b01e274862a4	16981
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16981
+165ff473-c634-4fd9-9d7b-b01e274862a4	16982
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16982
+165ff473-c634-4fd9-9d7b-b01e274862a4	16983
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16983
+165ff473-c634-4fd9-9d7b-b01e274862a4	16984
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16984
+165ff473-c634-4fd9-9d7b-b01e274862a4	16985
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16985
+165ff473-c634-4fd9-9d7b-b01e274862a4	16986
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16986
+165ff473-c634-4fd9-9d7b-b01e274862a4	16987
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16987
+165ff473-c634-4fd9-9d7b-b01e274862a4	16988
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16988
+165ff473-c634-4fd9-9d7b-b01e274862a4	16989
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16989
+165ff473-c634-4fd9-9d7b-b01e274862a4	16990
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16990
+165ff473-c634-4fd9-9d7b-b01e274862a4	16991
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16991
+165ff473-c634-4fd9-9d7b-b01e274862a4	16992
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	16992
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	17709
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	17709
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	17710
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	17710
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	17712
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	17712
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	17711
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	17711
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	17714
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	17714
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	17713
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	17713
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	17715
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	17715
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	17708
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	17708
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	16996
+e24e53c9-754e-4031-9ea9-0fb6471cd150	16996
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	16997
+e24e53c9-754e-4031-9ea9-0fb6471cd150	16997
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	16998
+e24e53c9-754e-4031-9ea9-0fb6471cd150	16998
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	16999
+e24e53c9-754e-4031-9ea9-0fb6471cd150	16999
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17001
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17001
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17000
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17000
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17008
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17008
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17007
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17007
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17009
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17009
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17010
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17010
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17012
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17012
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17011
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17011
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	16993
+e24e53c9-754e-4031-9ea9-0fb6471cd150	16993
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	16995
+e24e53c9-754e-4031-9ea9-0fb6471cd150	16995
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	16994
+e24e53c9-754e-4031-9ea9-0fb6471cd150	16994
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17002
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17002
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17003
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17003
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17004
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17004
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17005
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17005
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	17006
+e24e53c9-754e-4031-9ea9-0fb6471cd150	17006
+94882288-01e6-4067-bdb2-1b04d5310c85	17014
+33716916-1b6f-4b00-b02c-04dcbd947100	17014
+94882288-01e6-4067-bdb2-1b04d5310c85	17013
+33716916-1b6f-4b00-b02c-04dcbd947100	17013
+94882288-01e6-4067-bdb2-1b04d5310c85	17015
+33716916-1b6f-4b00-b02c-04dcbd947100	17015
+94882288-01e6-4067-bdb2-1b04d5310c85	17017
+33716916-1b6f-4b00-b02c-04dcbd947100	17017
+94882288-01e6-4067-bdb2-1b04d5310c85	17016
+33716916-1b6f-4b00-b02c-04dcbd947100	17016
+94882288-01e6-4067-bdb2-1b04d5310c85	17018
+33716916-1b6f-4b00-b02c-04dcbd947100	17018
+94882288-01e6-4067-bdb2-1b04d5310c85	17019
+33716916-1b6f-4b00-b02c-04dcbd947100	17019
+94882288-01e6-4067-bdb2-1b04d5310c85	17021
+33716916-1b6f-4b00-b02c-04dcbd947100	17021
+94882288-01e6-4067-bdb2-1b04d5310c85	17020
+33716916-1b6f-4b00-b02c-04dcbd947100	17020
+94882288-01e6-4067-bdb2-1b04d5310c85	17023
+33716916-1b6f-4b00-b02c-04dcbd947100	17023
+94882288-01e6-4067-bdb2-1b04d5310c85	17022
+33716916-1b6f-4b00-b02c-04dcbd947100	17022
+94882288-01e6-4067-bdb2-1b04d5310c85	17025
+33716916-1b6f-4b00-b02c-04dcbd947100	17025
+94882288-01e6-4067-bdb2-1b04d5310c85	17024
+33716916-1b6f-4b00-b02c-04dcbd947100	17024
+94882288-01e6-4067-bdb2-1b04d5310c85	17028
+33716916-1b6f-4b00-b02c-04dcbd947100	17028
+94882288-01e6-4067-bdb2-1b04d5310c85	17027
+33716916-1b6f-4b00-b02c-04dcbd947100	17027
+94882288-01e6-4067-bdb2-1b04d5310c85	17031
+33716916-1b6f-4b00-b02c-04dcbd947100	17031
+94882288-01e6-4067-bdb2-1b04d5310c85	17026
+33716916-1b6f-4b00-b02c-04dcbd947100	17026
+94882288-01e6-4067-bdb2-1b04d5310c85	17029
+33716916-1b6f-4b00-b02c-04dcbd947100	17029
+94882288-01e6-4067-bdb2-1b04d5310c85	17030
+33716916-1b6f-4b00-b02c-04dcbd947100	17030
+94882288-01e6-4067-bdb2-1b04d5310c85	17033
+33716916-1b6f-4b00-b02c-04dcbd947100	17033
+94882288-01e6-4067-bdb2-1b04d5310c85	17032
+33716916-1b6f-4b00-b02c-04dcbd947100	17032
+94882288-01e6-4067-bdb2-1b04d5310c85	17034
+33716916-1b6f-4b00-b02c-04dcbd947100	17034
+94882288-01e6-4067-bdb2-1b04d5310c85	17036
+33716916-1b6f-4b00-b02c-04dcbd947100	17036
+94882288-01e6-4067-bdb2-1b04d5310c85	17035
+33716916-1b6f-4b00-b02c-04dcbd947100	17035
+94882288-01e6-4067-bdb2-1b04d5310c85	17038
+33716916-1b6f-4b00-b02c-04dcbd947100	17038
+94882288-01e6-4067-bdb2-1b04d5310c85	17037
+33716916-1b6f-4b00-b02c-04dcbd947100	17037
+94882288-01e6-4067-bdb2-1b04d5310c85	17039
+33716916-1b6f-4b00-b02c-04dcbd947100	17039
+94882288-01e6-4067-bdb2-1b04d5310c85	17040
+33716916-1b6f-4b00-b02c-04dcbd947100	17040
+94882288-01e6-4067-bdb2-1b04d5310c85	17041
+33716916-1b6f-4b00-b02c-04dcbd947100	17041
+94882288-01e6-4067-bdb2-1b04d5310c85	17042
+33716916-1b6f-4b00-b02c-04dcbd947100	17042
+94882288-01e6-4067-bdb2-1b04d5310c85	17043
+33716916-1b6f-4b00-b02c-04dcbd947100	17043
+94882288-01e6-4067-bdb2-1b04d5310c85	17044
+33716916-1b6f-4b00-b02c-04dcbd947100	17044
+94882288-01e6-4067-bdb2-1b04d5310c85	17045
+33716916-1b6f-4b00-b02c-04dcbd947100	17045
+94882288-01e6-4067-bdb2-1b04d5310c85	17047
+33716916-1b6f-4b00-b02c-04dcbd947100	17047
+94882288-01e6-4067-bdb2-1b04d5310c85	17046
+33716916-1b6f-4b00-b02c-04dcbd947100	17046
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17052
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17052
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17053
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17053
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17054
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17054
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17056
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17056
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17055
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17055
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17057
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17057
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17058
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17058
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17059
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17059
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17060
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17060
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17061
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17061
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17062
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17062
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17048
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17048
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17050
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17050
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17049
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17049
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	17051
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	17051
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17063
+c0267c79-7773-458f-90a1-87c0aa25e92e	17063
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17064
+c0267c79-7773-458f-90a1-87c0aa25e92e	17064
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17065
+c0267c79-7773-458f-90a1-87c0aa25e92e	17065
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17067
+c0267c79-7773-458f-90a1-87c0aa25e92e	17067
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17068
+c0267c79-7773-458f-90a1-87c0aa25e92e	17068
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17066
+c0267c79-7773-458f-90a1-87c0aa25e92e	17066
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17073
+c0267c79-7773-458f-90a1-87c0aa25e92e	17073
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17072
+c0267c79-7773-458f-90a1-87c0aa25e92e	17072
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17074
+c0267c79-7773-458f-90a1-87c0aa25e92e	17074
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17076
+c0267c79-7773-458f-90a1-87c0aa25e92e	17076
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17075
+c0267c79-7773-458f-90a1-87c0aa25e92e	17075
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17078
+c0267c79-7773-458f-90a1-87c0aa25e92e	17078
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17077
+c0267c79-7773-458f-90a1-87c0aa25e92e	17077
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17079
+c0267c79-7773-458f-90a1-87c0aa25e92e	17079
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17080
+c0267c79-7773-458f-90a1-87c0aa25e92e	17080
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17081
+c0267c79-7773-458f-90a1-87c0aa25e92e	17081
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17082
+c0267c79-7773-458f-90a1-87c0aa25e92e	17082
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17083
+c0267c79-7773-458f-90a1-87c0aa25e92e	17083
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17085
+c0267c79-7773-458f-90a1-87c0aa25e92e	17085
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17084
+c0267c79-7773-458f-90a1-87c0aa25e92e	17084
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17086
+c0267c79-7773-458f-90a1-87c0aa25e92e	17086
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17069
+c0267c79-7773-458f-90a1-87c0aa25e92e	17069
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17070
+c0267c79-7773-458f-90a1-87c0aa25e92e	17070
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17071
+c0267c79-7773-458f-90a1-87c0aa25e92e	17071
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17087
+c0267c79-7773-458f-90a1-87c0aa25e92e	17087
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17088
+c0267c79-7773-458f-90a1-87c0aa25e92e	17088
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17089
+c0267c79-7773-458f-90a1-87c0aa25e92e	17089
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17090
+c0267c79-7773-458f-90a1-87c0aa25e92e	17090
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17091
+c0267c79-7773-458f-90a1-87c0aa25e92e	17091
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17092
+c0267c79-7773-458f-90a1-87c0aa25e92e	17092
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17093
+c0267c79-7773-458f-90a1-87c0aa25e92e	17093
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17094
+c0267c79-7773-458f-90a1-87c0aa25e92e	17094
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17095
+c0267c79-7773-458f-90a1-87c0aa25e92e	17095
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17096
+c0267c79-7773-458f-90a1-87c0aa25e92e	17096
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17097
+c0267c79-7773-458f-90a1-87c0aa25e92e	17097
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17098
+c0267c79-7773-458f-90a1-87c0aa25e92e	17098
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17099
+c0267c79-7773-458f-90a1-87c0aa25e92e	17099
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17100
+c0267c79-7773-458f-90a1-87c0aa25e92e	17100
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17101
+c0267c79-7773-458f-90a1-87c0aa25e92e	17101
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	17102
+c0267c79-7773-458f-90a1-87c0aa25e92e	17102
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17117
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17117
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17118
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17118
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17120
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17120
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17119
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17119
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17121
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17121
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17123
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17123
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17125
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17125
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17126
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17126
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17127
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17127
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17128
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17128
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17129
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17129
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17130
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17130
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17131
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17131
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17132
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17132
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17133
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17133
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17134
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17134
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17135
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17135
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17136
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17136
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17137
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17137
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17138
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17138
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17139
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17139
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17103
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17103
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17105
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17105
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17104
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17104
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17106
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17106
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17107
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17107
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17109
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17109
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17108
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17108
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17110
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17110
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17111
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17111
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17112
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17112
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17113
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17113
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17115
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17115
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17114
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17114
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17116
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17116
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17122
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17122
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	17124
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	17124
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17148
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17148
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17149
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17149
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17150
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17150
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17151
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17151
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17152
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17152
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17153
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17153
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17154
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17154
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17155
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17155
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17156
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17156
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17157
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17157
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17158
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17158
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17159
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17159
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17160
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17160
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17161
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17161
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17163
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17163
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17162
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17162
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17166
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17166
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17164
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17164
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17165
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17165
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17168
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17168
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17167
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17167
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17170
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17170
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17169
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17169
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17172
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17172
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17171
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17171
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17173
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17173
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17174
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17174
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17175
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17175
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17176
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17176
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17177
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17177
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17178
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17178
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17179
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17179
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17180
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17180
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17181
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17181
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17182
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17182
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17183
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17183
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17185
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17185
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17184
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17184
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17186
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17186
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17187
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17187
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17188
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17188
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17189
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17189
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17190
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17190
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17192
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17192
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17191
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17191
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17193
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17193
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17194
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17194
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17195
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17195
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17196
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17196
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17197
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17197
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17199
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17199
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17198
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17198
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17200
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17200
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17202
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17202
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17201
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17201
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	17203
+f42fb75f-bad8-473f-895d-38c4ea0656d0	17203
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17204
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17204
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17205
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17205
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17217
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17217
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17216
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17216
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17220
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17220
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17219
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17219
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17218
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17218
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17221
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17221
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17222
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17222
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17223
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17223
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17224
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17224
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17225
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17225
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17228
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17228
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17226
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17226
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17227
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17227
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17230
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17230
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17229
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17229
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17232
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17232
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17231
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17231
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17233
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17233
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17234
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17234
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17236
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17236
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17235
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17235
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17206
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17206
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17207
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17207
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17208
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17208
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17209
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17209
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17210
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17210
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17211
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17211
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17212
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17212
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17214
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17214
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17213
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17213
+1093ff35-2c47-45e1-9ee8-e21f822d6755	17215
+002b1a8d-6a28-4b61-8c2c-bc852c483225	17215
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17237
+d36760ce-705f-4cae-bff8-57c9ed922f33	17237
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17238
+d36760ce-705f-4cae-bff8-57c9ed922f33	17238
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17239
+d36760ce-705f-4cae-bff8-57c9ed922f33	17239
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17240
+d36760ce-705f-4cae-bff8-57c9ed922f33	17240
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17242
+d36760ce-705f-4cae-bff8-57c9ed922f33	17242
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17241
+d36760ce-705f-4cae-bff8-57c9ed922f33	17241
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17244
+d36760ce-705f-4cae-bff8-57c9ed922f33	17244
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17243
+d36760ce-705f-4cae-bff8-57c9ed922f33	17243
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17245
+d36760ce-705f-4cae-bff8-57c9ed922f33	17245
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17246
+d36760ce-705f-4cae-bff8-57c9ed922f33	17246
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17248
+d36760ce-705f-4cae-bff8-57c9ed922f33	17248
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17247
+d36760ce-705f-4cae-bff8-57c9ed922f33	17247
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17250
+d36760ce-705f-4cae-bff8-57c9ed922f33	17250
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17249
+d36760ce-705f-4cae-bff8-57c9ed922f33	17249
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17252
+d36760ce-705f-4cae-bff8-57c9ed922f33	17252
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17253
+d36760ce-705f-4cae-bff8-57c9ed922f33	17253
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17251
+d36760ce-705f-4cae-bff8-57c9ed922f33	17251
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17254
+d36760ce-705f-4cae-bff8-57c9ed922f33	17254
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17255
+d36760ce-705f-4cae-bff8-57c9ed922f33	17255
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17256
+d36760ce-705f-4cae-bff8-57c9ed922f33	17256
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17257
+d36760ce-705f-4cae-bff8-57c9ed922f33	17257
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17259
+d36760ce-705f-4cae-bff8-57c9ed922f33	17259
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17258
+d36760ce-705f-4cae-bff8-57c9ed922f33	17258
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17261
+d36760ce-705f-4cae-bff8-57c9ed922f33	17261
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17260
+d36760ce-705f-4cae-bff8-57c9ed922f33	17260
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17263
+d36760ce-705f-4cae-bff8-57c9ed922f33	17263
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17262
+d36760ce-705f-4cae-bff8-57c9ed922f33	17262
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17264
+d36760ce-705f-4cae-bff8-57c9ed922f33	17264
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17265
+d36760ce-705f-4cae-bff8-57c9ed922f33	17265
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17266
+d36760ce-705f-4cae-bff8-57c9ed922f33	17266
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17267
+d36760ce-705f-4cae-bff8-57c9ed922f33	17267
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17269
+d36760ce-705f-4cae-bff8-57c9ed922f33	17269
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17268
+d36760ce-705f-4cae-bff8-57c9ed922f33	17268
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17270
+d36760ce-705f-4cae-bff8-57c9ed922f33	17270
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17271
+d36760ce-705f-4cae-bff8-57c9ed922f33	17271
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17273
+d36760ce-705f-4cae-bff8-57c9ed922f33	17273
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17272
+d36760ce-705f-4cae-bff8-57c9ed922f33	17272
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17274
+d36760ce-705f-4cae-bff8-57c9ed922f33	17274
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17275
+d36760ce-705f-4cae-bff8-57c9ed922f33	17275
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17277
+d36760ce-705f-4cae-bff8-57c9ed922f33	17277
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17276
+d36760ce-705f-4cae-bff8-57c9ed922f33	17276
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17278
+d36760ce-705f-4cae-bff8-57c9ed922f33	17278
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17279
+d36760ce-705f-4cae-bff8-57c9ed922f33	17279
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17280
+d36760ce-705f-4cae-bff8-57c9ed922f33	17280
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17282
+d36760ce-705f-4cae-bff8-57c9ed922f33	17282
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17281
+d36760ce-705f-4cae-bff8-57c9ed922f33	17281
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17283
+d36760ce-705f-4cae-bff8-57c9ed922f33	17283
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17284
+d36760ce-705f-4cae-bff8-57c9ed922f33	17284
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17285
+d36760ce-705f-4cae-bff8-57c9ed922f33	17285
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17286
+d36760ce-705f-4cae-bff8-57c9ed922f33	17286
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	17287
+d36760ce-705f-4cae-bff8-57c9ed922f33	17287
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17306
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17306
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17307
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17307
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17308
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17308
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17309
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17309
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17311
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17311
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17310
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17310
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17313
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17313
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17312
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17312
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17288
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17288
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17289
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17289
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17290
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17290
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17291
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17291
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17292
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17292
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17294
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17294
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17293
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17293
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17295
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17295
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17296
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17296
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17298
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17298
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17297
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17297
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17299
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17299
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17300
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17300
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17301
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17301
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17302
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17302
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17303
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17303
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17305
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17305
+b5235f31-06d6-43fc-964a-378bfafcd9fd	17304
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	17304
+36e0c700-e98e-46f7-8956-96257631d6ae	17314
+0e895694-7c1c-43cc-9b24-85d0491419de	17314
+36e0c700-e98e-46f7-8956-96257631d6ae	17315
+0e895694-7c1c-43cc-9b24-85d0491419de	17315
+36e0c700-e98e-46f7-8956-96257631d6ae	17317
+0e895694-7c1c-43cc-9b24-85d0491419de	17317
+36e0c700-e98e-46f7-8956-96257631d6ae	17316
+0e895694-7c1c-43cc-9b24-85d0491419de	17316
+36e0c700-e98e-46f7-8956-96257631d6ae	17318
+0e895694-7c1c-43cc-9b24-85d0491419de	17318
+36e0c700-e98e-46f7-8956-96257631d6ae	17319
+0e895694-7c1c-43cc-9b24-85d0491419de	17319
+36e0c700-e98e-46f7-8956-96257631d6ae	17320
+0e895694-7c1c-43cc-9b24-85d0491419de	17320
+36e0c700-e98e-46f7-8956-96257631d6ae	17322
+0e895694-7c1c-43cc-9b24-85d0491419de	17322
+36e0c700-e98e-46f7-8956-96257631d6ae	17321
+0e895694-7c1c-43cc-9b24-85d0491419de	17321
+36e0c700-e98e-46f7-8956-96257631d6ae	17324
+0e895694-7c1c-43cc-9b24-85d0491419de	17324
+36e0c700-e98e-46f7-8956-96257631d6ae	17323
+0e895694-7c1c-43cc-9b24-85d0491419de	17323
+36e0c700-e98e-46f7-8956-96257631d6ae	17326
+0e895694-7c1c-43cc-9b24-85d0491419de	17326
+36e0c700-e98e-46f7-8956-96257631d6ae	17325
+0e895694-7c1c-43cc-9b24-85d0491419de	17325
+36e0c700-e98e-46f7-8956-96257631d6ae	17327
+0e895694-7c1c-43cc-9b24-85d0491419de	17327
+36e0c700-e98e-46f7-8956-96257631d6ae	17328
+0e895694-7c1c-43cc-9b24-85d0491419de	17328
+36e0c700-e98e-46f7-8956-96257631d6ae	17329
+0e895694-7c1c-43cc-9b24-85d0491419de	17329
+36e0c700-e98e-46f7-8956-96257631d6ae	17330
+0e895694-7c1c-43cc-9b24-85d0491419de	17330
+36e0c700-e98e-46f7-8956-96257631d6ae	17331
+0e895694-7c1c-43cc-9b24-85d0491419de	17331
+36e0c700-e98e-46f7-8956-96257631d6ae	17332
+0e895694-7c1c-43cc-9b24-85d0491419de	17332
+36e0c700-e98e-46f7-8956-96257631d6ae	17333
+0e895694-7c1c-43cc-9b24-85d0491419de	17333
+36e0c700-e98e-46f7-8956-96257631d6ae	17334
+0e895694-7c1c-43cc-9b24-85d0491419de	17334
+36e0c700-e98e-46f7-8956-96257631d6ae	17335
+0e895694-7c1c-43cc-9b24-85d0491419de	17335
+36e0c700-e98e-46f7-8956-96257631d6ae	17336
+0e895694-7c1c-43cc-9b24-85d0491419de	17336
+36e0c700-e98e-46f7-8956-96257631d6ae	17337
+0e895694-7c1c-43cc-9b24-85d0491419de	17337
+36e0c700-e98e-46f7-8956-96257631d6ae	17338
+0e895694-7c1c-43cc-9b24-85d0491419de	17338
+36e0c700-e98e-46f7-8956-96257631d6ae	17339
+0e895694-7c1c-43cc-9b24-85d0491419de	17339
+36e0c700-e98e-46f7-8956-96257631d6ae	17340
+0e895694-7c1c-43cc-9b24-85d0491419de	17340
+36e0c700-e98e-46f7-8956-96257631d6ae	17341
+0e895694-7c1c-43cc-9b24-85d0491419de	17341
+36e0c700-e98e-46f7-8956-96257631d6ae	17342
+0e895694-7c1c-43cc-9b24-85d0491419de	17342
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17354
+c13d4a81-f106-4872-8960-484757c97300	17354
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17355
+c13d4a81-f106-4872-8960-484757c97300	17355
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17357
+c13d4a81-f106-4872-8960-484757c97300	17357
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17356
+c13d4a81-f106-4872-8960-484757c97300	17356
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17359
+c13d4a81-f106-4872-8960-484757c97300	17359
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17358
+c13d4a81-f106-4872-8960-484757c97300	17358
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17360
+c13d4a81-f106-4872-8960-484757c97300	17360
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17361
+c13d4a81-f106-4872-8960-484757c97300	17361
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17362
+c13d4a81-f106-4872-8960-484757c97300	17362
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17363
+c13d4a81-f106-4872-8960-484757c97300	17363
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17364
+c13d4a81-f106-4872-8960-484757c97300	17364
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17365
+c13d4a81-f106-4872-8960-484757c97300	17365
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17366
+c13d4a81-f106-4872-8960-484757c97300	17366
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17367
+c13d4a81-f106-4872-8960-484757c97300	17367
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17369
+c13d4a81-f106-4872-8960-484757c97300	17369
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17368
+c13d4a81-f106-4872-8960-484757c97300	17368
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17370
+c13d4a81-f106-4872-8960-484757c97300	17370
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17371
+c13d4a81-f106-4872-8960-484757c97300	17371
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17372
+c13d4a81-f106-4872-8960-484757c97300	17372
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17375
+c13d4a81-f106-4872-8960-484757c97300	17375
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17373
+c13d4a81-f106-4872-8960-484757c97300	17373
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17374
+c13d4a81-f106-4872-8960-484757c97300	17374
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17376
+c13d4a81-f106-4872-8960-484757c97300	17376
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17343
+c13d4a81-f106-4872-8960-484757c97300	17343
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17344
+c13d4a81-f106-4872-8960-484757c97300	17344
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17345
+c13d4a81-f106-4872-8960-484757c97300	17345
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17346
+c13d4a81-f106-4872-8960-484757c97300	17346
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17347
+c13d4a81-f106-4872-8960-484757c97300	17347
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17348
+c13d4a81-f106-4872-8960-484757c97300	17348
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17349
+c13d4a81-f106-4872-8960-484757c97300	17349
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17350
+c13d4a81-f106-4872-8960-484757c97300	17350
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17351
+c13d4a81-f106-4872-8960-484757c97300	17351
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17352
+c13d4a81-f106-4872-8960-484757c97300	17352
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	17353
+c13d4a81-f106-4872-8960-484757c97300	17353
+cc81778e-b86f-461a-a93f-08a849820b14	17377
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17377
+cc81778e-b86f-461a-a93f-08a849820b14	17378
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17378
+cc81778e-b86f-461a-a93f-08a849820b14	17379
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17379
+cc81778e-b86f-461a-a93f-08a849820b14	17380
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17380
+cc81778e-b86f-461a-a93f-08a849820b14	17381
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17381
+cc81778e-b86f-461a-a93f-08a849820b14	17383
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17383
+cc81778e-b86f-461a-a93f-08a849820b14	17382
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17382
+cc81778e-b86f-461a-a93f-08a849820b14	17384
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17384
+cc81778e-b86f-461a-a93f-08a849820b14	17386
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17386
+cc81778e-b86f-461a-a93f-08a849820b14	17385
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17385
+cc81778e-b86f-461a-a93f-08a849820b14	17387
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17387
+cc81778e-b86f-461a-a93f-08a849820b14	17389
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17389
+cc81778e-b86f-461a-a93f-08a849820b14	17388
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17388
+cc81778e-b86f-461a-a93f-08a849820b14	17390
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17390
+cc81778e-b86f-461a-a93f-08a849820b14	17391
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17391
+cc81778e-b86f-461a-a93f-08a849820b14	17392
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17392
+cc81778e-b86f-461a-a93f-08a849820b14	17393
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17393
+cc81778e-b86f-461a-a93f-08a849820b14	17395
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17395
+cc81778e-b86f-461a-a93f-08a849820b14	17394
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17394
+cc81778e-b86f-461a-a93f-08a849820b14	17396
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17396
+cc81778e-b86f-461a-a93f-08a849820b14	17398
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17398
+cc81778e-b86f-461a-a93f-08a849820b14	17397
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17397
+cc81778e-b86f-461a-a93f-08a849820b14	17399
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17399
+cc81778e-b86f-461a-a93f-08a849820b14	17401
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17401
+cc81778e-b86f-461a-a93f-08a849820b14	17400
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17400
+cc81778e-b86f-461a-a93f-08a849820b14	17402
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17402
+cc81778e-b86f-461a-a93f-08a849820b14	17404
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17404
+cc81778e-b86f-461a-a93f-08a849820b14	17403
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17403
+cc81778e-b86f-461a-a93f-08a849820b14	17405
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17405
+cc81778e-b86f-461a-a93f-08a849820b14	17406
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17406
+cc81778e-b86f-461a-a93f-08a849820b14	17407
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17407
+cc81778e-b86f-461a-a93f-08a849820b14	17408
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17408
+cc81778e-b86f-461a-a93f-08a849820b14	17409
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17409
+cc81778e-b86f-461a-a93f-08a849820b14	17410
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17410
+cc81778e-b86f-461a-a93f-08a849820b14	17411
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17411
+cc81778e-b86f-461a-a93f-08a849820b14	17412
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	17412
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17432
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17432
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17433
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17433
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17434
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17434
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17435
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17435
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17436
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17436
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17439
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17439
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17438
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17438
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17437
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17437
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17440
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17440
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17441
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17441
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17442
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17442
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17443
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17443
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17444
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17444
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17446
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17446
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17445
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17445
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17448
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17448
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17447
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17447
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17449
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17449
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17450
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17450
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17452
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17452
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17451
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17451
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17453
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17453
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17454
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17454
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17456
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17456
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17455
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17455
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17457
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17457
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17458
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17458
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17459
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17459
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17460
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17460
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17461
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17461
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17462
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17462
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17463
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17463
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17464
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17464
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17465
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17465
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17466
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17466
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17467
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17467
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17413
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17413
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17414
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17414
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17415
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17415
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17417
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17417
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17416
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17416
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17418
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17418
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17419
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17419
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17420
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17420
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17421
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17421
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17422
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17422
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17423
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17423
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17424
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17424
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17425
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17425
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17426
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17426
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17427
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17427
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17428
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17428
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17429
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17429
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17430
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17430
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	17431
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	17431
+564cfb5b-0cf0-4279-b62b-390420dd7296	17468
+035dc78e-27f4-42ec-9283-5f83b64aef09	17468
+564cfb5b-0cf0-4279-b62b-390420dd7296	17469
+035dc78e-27f4-42ec-9283-5f83b64aef09	17469
+564cfb5b-0cf0-4279-b62b-390420dd7296	17470
+035dc78e-27f4-42ec-9283-5f83b64aef09	17470
+564cfb5b-0cf0-4279-b62b-390420dd7296	17471
+035dc78e-27f4-42ec-9283-5f83b64aef09	17471
+564cfb5b-0cf0-4279-b62b-390420dd7296	17473
+035dc78e-27f4-42ec-9283-5f83b64aef09	17473
+564cfb5b-0cf0-4279-b62b-390420dd7296	17472
+035dc78e-27f4-42ec-9283-5f83b64aef09	17472
+564cfb5b-0cf0-4279-b62b-390420dd7296	17474
+035dc78e-27f4-42ec-9283-5f83b64aef09	17474
+564cfb5b-0cf0-4279-b62b-390420dd7296	17476
+035dc78e-27f4-42ec-9283-5f83b64aef09	17476
+564cfb5b-0cf0-4279-b62b-390420dd7296	17477
+035dc78e-27f4-42ec-9283-5f83b64aef09	17477
+564cfb5b-0cf0-4279-b62b-390420dd7296	17475
+035dc78e-27f4-42ec-9283-5f83b64aef09	17475
+564cfb5b-0cf0-4279-b62b-390420dd7296	17479
+035dc78e-27f4-42ec-9283-5f83b64aef09	17479
+564cfb5b-0cf0-4279-b62b-390420dd7296	17478
+035dc78e-27f4-42ec-9283-5f83b64aef09	17478
+564cfb5b-0cf0-4279-b62b-390420dd7296	17480
+035dc78e-27f4-42ec-9283-5f83b64aef09	17480
+564cfb5b-0cf0-4279-b62b-390420dd7296	17481
+035dc78e-27f4-42ec-9283-5f83b64aef09	17481
+564cfb5b-0cf0-4279-b62b-390420dd7296	17482
+035dc78e-27f4-42ec-9283-5f83b64aef09	17482
+564cfb5b-0cf0-4279-b62b-390420dd7296	17483
+035dc78e-27f4-42ec-9283-5f83b64aef09	17483
+564cfb5b-0cf0-4279-b62b-390420dd7296	17484
+035dc78e-27f4-42ec-9283-5f83b64aef09	17484
+564cfb5b-0cf0-4279-b62b-390420dd7296	17486
+035dc78e-27f4-42ec-9283-5f83b64aef09	17486
+564cfb5b-0cf0-4279-b62b-390420dd7296	17485
+035dc78e-27f4-42ec-9283-5f83b64aef09	17485
+564cfb5b-0cf0-4279-b62b-390420dd7296	17487
+035dc78e-27f4-42ec-9283-5f83b64aef09	17487
+564cfb5b-0cf0-4279-b62b-390420dd7296	17489
+035dc78e-27f4-42ec-9283-5f83b64aef09	17489
+564cfb5b-0cf0-4279-b62b-390420dd7296	17488
+035dc78e-27f4-42ec-9283-5f83b64aef09	17488
+564cfb5b-0cf0-4279-b62b-390420dd7296	17490
+035dc78e-27f4-42ec-9283-5f83b64aef09	17490
+564cfb5b-0cf0-4279-b62b-390420dd7296	17491
+035dc78e-27f4-42ec-9283-5f83b64aef09	17491
+564cfb5b-0cf0-4279-b62b-390420dd7296	17492
+035dc78e-27f4-42ec-9283-5f83b64aef09	17492
+564cfb5b-0cf0-4279-b62b-390420dd7296	17493
+035dc78e-27f4-42ec-9283-5f83b64aef09	17493
+61c92078-ac8d-49b1-820d-716db288a87e	17716
+efd8831d-648d-415c-b743-083430078d2d	17716
+61c92078-ac8d-49b1-820d-716db288a87e	17717
+efd8831d-648d-415c-b743-083430078d2d	17717
+61c92078-ac8d-49b1-820d-716db288a87e	17720
+efd8831d-648d-415c-b743-083430078d2d	17720
+61c92078-ac8d-49b1-820d-716db288a87e	17719
+efd8831d-648d-415c-b743-083430078d2d	17719
+61c92078-ac8d-49b1-820d-716db288a87e	17718
+efd8831d-648d-415c-b743-083430078d2d	17718
+61c92078-ac8d-49b1-820d-716db288a87e	17721
+efd8831d-648d-415c-b743-083430078d2d	17721
+61c92078-ac8d-49b1-820d-716db288a87e	17722
+efd8831d-648d-415c-b743-083430078d2d	17722
+61c92078-ac8d-49b1-820d-716db288a87e	17723
+efd8831d-648d-415c-b743-083430078d2d	17723
+61c92078-ac8d-49b1-820d-716db288a87e	17724
+efd8831d-648d-415c-b743-083430078d2d	17724
+61c92078-ac8d-49b1-820d-716db288a87e	17725
+efd8831d-648d-415c-b743-083430078d2d	17725
+61c92078-ac8d-49b1-820d-716db288a87e	17726
+efd8831d-648d-415c-b743-083430078d2d	17726
+61c92078-ac8d-49b1-820d-716db288a87e	17727
+efd8831d-648d-415c-b743-083430078d2d	17727
+61c92078-ac8d-49b1-820d-716db288a87e	17728
+efd8831d-648d-415c-b743-083430078d2d	17728
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17494
+069b5320-050d-40e2-9f60-12b01c245ed1	17494
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17501
+069b5320-050d-40e2-9f60-12b01c245ed1	17501
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17502
+069b5320-050d-40e2-9f60-12b01c245ed1	17502
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17504
+069b5320-050d-40e2-9f60-12b01c245ed1	17504
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17503
+069b5320-050d-40e2-9f60-12b01c245ed1	17503
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17505
+069b5320-050d-40e2-9f60-12b01c245ed1	17505
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17506
+069b5320-050d-40e2-9f60-12b01c245ed1	17506
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17507
+069b5320-050d-40e2-9f60-12b01c245ed1	17507
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17508
+069b5320-050d-40e2-9f60-12b01c245ed1	17508
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17509
+069b5320-050d-40e2-9f60-12b01c245ed1	17509
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17510
+069b5320-050d-40e2-9f60-12b01c245ed1	17510
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17511
+069b5320-050d-40e2-9f60-12b01c245ed1	17511
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17512
+069b5320-050d-40e2-9f60-12b01c245ed1	17512
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17513
+069b5320-050d-40e2-9f60-12b01c245ed1	17513
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17496
+069b5320-050d-40e2-9f60-12b01c245ed1	17496
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17495
+069b5320-050d-40e2-9f60-12b01c245ed1	17495
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17498
+069b5320-050d-40e2-9f60-12b01c245ed1	17498
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17497
+069b5320-050d-40e2-9f60-12b01c245ed1	17497
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17499
+069b5320-050d-40e2-9f60-12b01c245ed1	17499
+0d7124ee-504a-4b45-8c6d-ec38622ec064	17500
+069b5320-050d-40e2-9f60-12b01c245ed1	17500
+4312197e-576f-4fb4-b50e-81894a78e1c3	17514
+2ac760cf-e2cf-44bc-a740-b759e8421513	17514
+4312197e-576f-4fb4-b50e-81894a78e1c3	17515
+2ac760cf-e2cf-44bc-a740-b759e8421513	17515
+4312197e-576f-4fb4-b50e-81894a78e1c3	17516
+2ac760cf-e2cf-44bc-a740-b759e8421513	17516
+4312197e-576f-4fb4-b50e-81894a78e1c3	17517
+2ac760cf-e2cf-44bc-a740-b759e8421513	17517
+4312197e-576f-4fb4-b50e-81894a78e1c3	17518
+2ac760cf-e2cf-44bc-a740-b759e8421513	17518
+4312197e-576f-4fb4-b50e-81894a78e1c3	17519
+2ac760cf-e2cf-44bc-a740-b759e8421513	17519
+4312197e-576f-4fb4-b50e-81894a78e1c3	17520
+2ac760cf-e2cf-44bc-a740-b759e8421513	17520
+4312197e-576f-4fb4-b50e-81894a78e1c3	17521
+2ac760cf-e2cf-44bc-a740-b759e8421513	17521
+4312197e-576f-4fb4-b50e-81894a78e1c3	17522
+2ac760cf-e2cf-44bc-a740-b759e8421513	17522
+4312197e-576f-4fb4-b50e-81894a78e1c3	17523
+2ac760cf-e2cf-44bc-a740-b759e8421513	17523
+4312197e-576f-4fb4-b50e-81894a78e1c3	17524
+2ac760cf-e2cf-44bc-a740-b759e8421513	17524
+4312197e-576f-4fb4-b50e-81894a78e1c3	17525
+2ac760cf-e2cf-44bc-a740-b759e8421513	17525
+4312197e-576f-4fb4-b50e-81894a78e1c3	17526
+2ac760cf-e2cf-44bc-a740-b759e8421513	17526
+4312197e-576f-4fb4-b50e-81894a78e1c3	17527
+2ac760cf-e2cf-44bc-a740-b759e8421513	17527
+4312197e-576f-4fb4-b50e-81894a78e1c3	17528
+2ac760cf-e2cf-44bc-a740-b759e8421513	17528
+4312197e-576f-4fb4-b50e-81894a78e1c3	17529
+2ac760cf-e2cf-44bc-a740-b759e8421513	17529
+4312197e-576f-4fb4-b50e-81894a78e1c3	17530
+2ac760cf-e2cf-44bc-a740-b759e8421513	17530
+4312197e-576f-4fb4-b50e-81894a78e1c3	17531
+2ac760cf-e2cf-44bc-a740-b759e8421513	17531
+4312197e-576f-4fb4-b50e-81894a78e1c3	17532
+2ac760cf-e2cf-44bc-a740-b759e8421513	17532
+4312197e-576f-4fb4-b50e-81894a78e1c3	17533
+2ac760cf-e2cf-44bc-a740-b759e8421513	17533
+4312197e-576f-4fb4-b50e-81894a78e1c3	17534
+2ac760cf-e2cf-44bc-a740-b759e8421513	17534
+4312197e-576f-4fb4-b50e-81894a78e1c3	17535
+2ac760cf-e2cf-44bc-a740-b759e8421513	17535
+4312197e-576f-4fb4-b50e-81894a78e1c3	17536
+2ac760cf-e2cf-44bc-a740-b759e8421513	17536
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17541
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17541
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17542
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17542
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17544
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17544
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17543
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17543
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17546
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17546
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17545
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17545
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17547
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17547
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17549
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17549
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17548
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17548
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17550
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17550
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17537
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17537
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17538
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17538
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17539
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17539
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	17540
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	17540
+46964baa-51cc-4391-88b7-08c39c390d49	17551
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17551
+46964baa-51cc-4391-88b7-08c39c390d49	17553
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17553
+46964baa-51cc-4391-88b7-08c39c390d49	17552
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17552
+46964baa-51cc-4391-88b7-08c39c390d49	17554
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17554
+46964baa-51cc-4391-88b7-08c39c390d49	17555
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17555
+46964baa-51cc-4391-88b7-08c39c390d49	17556
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17556
+46964baa-51cc-4391-88b7-08c39c390d49	17557
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17557
+46964baa-51cc-4391-88b7-08c39c390d49	17558
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17558
+46964baa-51cc-4391-88b7-08c39c390d49	17559
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17559
+46964baa-51cc-4391-88b7-08c39c390d49	17561
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17561
+46964baa-51cc-4391-88b7-08c39c390d49	17560
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17560
+46964baa-51cc-4391-88b7-08c39c390d49	17563
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17563
+46964baa-51cc-4391-88b7-08c39c390d49	17562
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17562
+46964baa-51cc-4391-88b7-08c39c390d49	17565
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17565
+46964baa-51cc-4391-88b7-08c39c390d49	17564
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17564
+46964baa-51cc-4391-88b7-08c39c390d49	17567
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17567
+46964baa-51cc-4391-88b7-08c39c390d49	17566
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17566
+46964baa-51cc-4391-88b7-08c39c390d49	17568
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17568
+46964baa-51cc-4391-88b7-08c39c390d49	17569
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17569
+46964baa-51cc-4391-88b7-08c39c390d49	17571
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17571
+46964baa-51cc-4391-88b7-08c39c390d49	17570
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17570
+46964baa-51cc-4391-88b7-08c39c390d49	17572
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17572
+46964baa-51cc-4391-88b7-08c39c390d49	17573
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17573
+46964baa-51cc-4391-88b7-08c39c390d49	17575
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17575
+46964baa-51cc-4391-88b7-08c39c390d49	17574
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17574
+46964baa-51cc-4391-88b7-08c39c390d49	17576
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17576
+46964baa-51cc-4391-88b7-08c39c390d49	17577
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17577
+46964baa-51cc-4391-88b7-08c39c390d49	17578
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17578
+46964baa-51cc-4391-88b7-08c39c390d49	17580
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17580
+46964baa-51cc-4391-88b7-08c39c390d49	17579
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17579
+46964baa-51cc-4391-88b7-08c39c390d49	17581
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17581
+46964baa-51cc-4391-88b7-08c39c390d49	17582
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17582
+46964baa-51cc-4391-88b7-08c39c390d49	17583
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17583
+46964baa-51cc-4391-88b7-08c39c390d49	17585
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17585
+46964baa-51cc-4391-88b7-08c39c390d49	17584
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17584
+46964baa-51cc-4391-88b7-08c39c390d49	17586
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17586
+46964baa-51cc-4391-88b7-08c39c390d49	17587
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17587
+46964baa-51cc-4391-88b7-08c39c390d49	17588
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17588
+46964baa-51cc-4391-88b7-08c39c390d49	17590
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17590
+46964baa-51cc-4391-88b7-08c39c390d49	17589
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17589
+46964baa-51cc-4391-88b7-08c39c390d49	17591
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17591
+46964baa-51cc-4391-88b7-08c39c390d49	17593
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17593
+46964baa-51cc-4391-88b7-08c39c390d49	17592
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17592
+46964baa-51cc-4391-88b7-08c39c390d49	17594
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17594
+46964baa-51cc-4391-88b7-08c39c390d49	17595
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17595
+46964baa-51cc-4391-88b7-08c39c390d49	17597
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17597
+46964baa-51cc-4391-88b7-08c39c390d49	17596
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17596
+46964baa-51cc-4391-88b7-08c39c390d49	17598
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17598
+46964baa-51cc-4391-88b7-08c39c390d49	17600
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17600
+46964baa-51cc-4391-88b7-08c39c390d49	17599
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17599
+46964baa-51cc-4391-88b7-08c39c390d49	17601
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17601
+46964baa-51cc-4391-88b7-08c39c390d49	17602
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17602
+46964baa-51cc-4391-88b7-08c39c390d49	17603
+10a848c0-d1f2-4836-96e8-3c5725f5c287	17603
+45acdb63-2762-4e68-8d99-7411f7721cb0	17612
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17612
+45acdb63-2762-4e68-8d99-7411f7721cb0	17613
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17613
+45acdb63-2762-4e68-8d99-7411f7721cb0	17616
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17616
+45acdb63-2762-4e68-8d99-7411f7721cb0	17614
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17614
+45acdb63-2762-4e68-8d99-7411f7721cb0	17615
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17615
+45acdb63-2762-4e68-8d99-7411f7721cb0	17618
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17618
+45acdb63-2762-4e68-8d99-7411f7721cb0	17617
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17617
+45acdb63-2762-4e68-8d99-7411f7721cb0	17620
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17620
+45acdb63-2762-4e68-8d99-7411f7721cb0	17619
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17619
+45acdb63-2762-4e68-8d99-7411f7721cb0	17621
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17621
+45acdb63-2762-4e68-8d99-7411f7721cb0	17622
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17622
+45acdb63-2762-4e68-8d99-7411f7721cb0	17623
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17623
+45acdb63-2762-4e68-8d99-7411f7721cb0	17604
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17604
+45acdb63-2762-4e68-8d99-7411f7721cb0	17606
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17606
+45acdb63-2762-4e68-8d99-7411f7721cb0	17605
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17605
+45acdb63-2762-4e68-8d99-7411f7721cb0	17607
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17607
+45acdb63-2762-4e68-8d99-7411f7721cb0	17608
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17608
+45acdb63-2762-4e68-8d99-7411f7721cb0	17610
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17610
+45acdb63-2762-4e68-8d99-7411f7721cb0	17609
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17609
+45acdb63-2762-4e68-8d99-7411f7721cb0	17611
+e66122ca-26d6-458e-8ec5-7a62a77b3019	17611
+66345e63-bc2f-4898-8d25-708181e8c1c9	17624
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17624
+66345e63-bc2f-4898-8d25-708181e8c1c9	17626
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17626
+66345e63-bc2f-4898-8d25-708181e8c1c9	17625
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17625
+66345e63-bc2f-4898-8d25-708181e8c1c9	17627
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17627
+66345e63-bc2f-4898-8d25-708181e8c1c9	17628
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17628
+66345e63-bc2f-4898-8d25-708181e8c1c9	17629
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17629
+66345e63-bc2f-4898-8d25-708181e8c1c9	17630
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17630
+66345e63-bc2f-4898-8d25-708181e8c1c9	17631
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17631
+66345e63-bc2f-4898-8d25-708181e8c1c9	17633
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17633
+66345e63-bc2f-4898-8d25-708181e8c1c9	17632
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17632
+66345e63-bc2f-4898-8d25-708181e8c1c9	17635
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17635
+66345e63-bc2f-4898-8d25-708181e8c1c9	17634
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17634
+66345e63-bc2f-4898-8d25-708181e8c1c9	17637
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17637
+66345e63-bc2f-4898-8d25-708181e8c1c9	17636
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17636
+66345e63-bc2f-4898-8d25-708181e8c1c9	17638
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17638
+66345e63-bc2f-4898-8d25-708181e8c1c9	17639
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17639
+66345e63-bc2f-4898-8d25-708181e8c1c9	17641
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17641
+66345e63-bc2f-4898-8d25-708181e8c1c9	17640
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17640
+66345e63-bc2f-4898-8d25-708181e8c1c9	17642
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17642
+66345e63-bc2f-4898-8d25-708181e8c1c9	17643
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17643
+66345e63-bc2f-4898-8d25-708181e8c1c9	17644
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17644
+66345e63-bc2f-4898-8d25-708181e8c1c9	17645
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17645
+66345e63-bc2f-4898-8d25-708181e8c1c9	17647
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17647
+66345e63-bc2f-4898-8d25-708181e8c1c9	17646
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17646
+66345e63-bc2f-4898-8d25-708181e8c1c9	17648
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17648
+66345e63-bc2f-4898-8d25-708181e8c1c9	17650
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17650
+66345e63-bc2f-4898-8d25-708181e8c1c9	17649
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17649
+66345e63-bc2f-4898-8d25-708181e8c1c9	17651
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17651
+66345e63-bc2f-4898-8d25-708181e8c1c9	17652
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17652
+66345e63-bc2f-4898-8d25-708181e8c1c9	17653
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17653
+66345e63-bc2f-4898-8d25-708181e8c1c9	17654
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17654
+66345e63-bc2f-4898-8d25-708181e8c1c9	17656
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17656
+66345e63-bc2f-4898-8d25-708181e8c1c9	17655
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	17655
+542ec236-3cfe-4ccb-8056-26901886c0a8	17660
+5588640e-8c40-43f2-8233-9c70682fb26b	17660
+542ec236-3cfe-4ccb-8056-26901886c0a8	17661
+5588640e-8c40-43f2-8233-9c70682fb26b	17661
+542ec236-3cfe-4ccb-8056-26901886c0a8	17662
+5588640e-8c40-43f2-8233-9c70682fb26b	17662
+542ec236-3cfe-4ccb-8056-26901886c0a8	17664
+5588640e-8c40-43f2-8233-9c70682fb26b	17664
+542ec236-3cfe-4ccb-8056-26901886c0a8	17663
+5588640e-8c40-43f2-8233-9c70682fb26b	17663
+542ec236-3cfe-4ccb-8056-26901886c0a8	17665
+5588640e-8c40-43f2-8233-9c70682fb26b	17665
+542ec236-3cfe-4ccb-8056-26901886c0a8	17666
+5588640e-8c40-43f2-8233-9c70682fb26b	17666
+542ec236-3cfe-4ccb-8056-26901886c0a8	17667
+5588640e-8c40-43f2-8233-9c70682fb26b	17667
+542ec236-3cfe-4ccb-8056-26901886c0a8	17668
+5588640e-8c40-43f2-8233-9c70682fb26b	17668
+542ec236-3cfe-4ccb-8056-26901886c0a8	17670
+5588640e-8c40-43f2-8233-9c70682fb26b	17670
+542ec236-3cfe-4ccb-8056-26901886c0a8	17669
+5588640e-8c40-43f2-8233-9c70682fb26b	17669
+542ec236-3cfe-4ccb-8056-26901886c0a8	17672
+5588640e-8c40-43f2-8233-9c70682fb26b	17672
+542ec236-3cfe-4ccb-8056-26901886c0a8	17671
+5588640e-8c40-43f2-8233-9c70682fb26b	17671
+542ec236-3cfe-4ccb-8056-26901886c0a8	17676
+5588640e-8c40-43f2-8233-9c70682fb26b	17676
+542ec236-3cfe-4ccb-8056-26901886c0a8	17677
+5588640e-8c40-43f2-8233-9c70682fb26b	17677
+542ec236-3cfe-4ccb-8056-26901886c0a8	17678
+5588640e-8c40-43f2-8233-9c70682fb26b	17678
+542ec236-3cfe-4ccb-8056-26901886c0a8	17679
+5588640e-8c40-43f2-8233-9c70682fb26b	17679
+542ec236-3cfe-4ccb-8056-26901886c0a8	17681
+5588640e-8c40-43f2-8233-9c70682fb26b	17681
+542ec236-3cfe-4ccb-8056-26901886c0a8	17682
+5588640e-8c40-43f2-8233-9c70682fb26b	17682
+542ec236-3cfe-4ccb-8056-26901886c0a8	17680
+5588640e-8c40-43f2-8233-9c70682fb26b	17680
+542ec236-3cfe-4ccb-8056-26901886c0a8	17683
+5588640e-8c40-43f2-8233-9c70682fb26b	17683
+542ec236-3cfe-4ccb-8056-26901886c0a8	17684
+5588640e-8c40-43f2-8233-9c70682fb26b	17684
+542ec236-3cfe-4ccb-8056-26901886c0a8	17685
+5588640e-8c40-43f2-8233-9c70682fb26b	17685
+542ec236-3cfe-4ccb-8056-26901886c0a8	17686
+5588640e-8c40-43f2-8233-9c70682fb26b	17686
+542ec236-3cfe-4ccb-8056-26901886c0a8	17673
+5588640e-8c40-43f2-8233-9c70682fb26b	17673
+542ec236-3cfe-4ccb-8056-26901886c0a8	17674
+5588640e-8c40-43f2-8233-9c70682fb26b	17674
+542ec236-3cfe-4ccb-8056-26901886c0a8	17675
+5588640e-8c40-43f2-8233-9c70682fb26b	17675
+542ec236-3cfe-4ccb-8056-26901886c0a8	17688
+5588640e-8c40-43f2-8233-9c70682fb26b	17688
+542ec236-3cfe-4ccb-8056-26901886c0a8	17687
+5588640e-8c40-43f2-8233-9c70682fb26b	17687
+542ec236-3cfe-4ccb-8056-26901886c0a8	17689
+5588640e-8c40-43f2-8233-9c70682fb26b	17689
+542ec236-3cfe-4ccb-8056-26901886c0a8	17690
+5588640e-8c40-43f2-8233-9c70682fb26b	17690
+542ec236-3cfe-4ccb-8056-26901886c0a8	17691
+5588640e-8c40-43f2-8233-9c70682fb26b	17691
+542ec236-3cfe-4ccb-8056-26901886c0a8	17692
+5588640e-8c40-43f2-8233-9c70682fb26b	17692
+542ec236-3cfe-4ccb-8056-26901886c0a8	17693
+5588640e-8c40-43f2-8233-9c70682fb26b	17693
+542ec236-3cfe-4ccb-8056-26901886c0a8	17694
+5588640e-8c40-43f2-8233-9c70682fb26b	17694
+542ec236-3cfe-4ccb-8056-26901886c0a8	17695
+5588640e-8c40-43f2-8233-9c70682fb26b	17695
+542ec236-3cfe-4ccb-8056-26901886c0a8	17696
+5588640e-8c40-43f2-8233-9c70682fb26b	17696
+542ec236-3cfe-4ccb-8056-26901886c0a8	17698
+5588640e-8c40-43f2-8233-9c70682fb26b	17698
+542ec236-3cfe-4ccb-8056-26901886c0a8	17697
+5588640e-8c40-43f2-8233-9c70682fb26b	17697
+542ec236-3cfe-4ccb-8056-26901886c0a8	17700
+5588640e-8c40-43f2-8233-9c70682fb26b	17700
+542ec236-3cfe-4ccb-8056-26901886c0a8	17699
+5588640e-8c40-43f2-8233-9c70682fb26b	17699
+542ec236-3cfe-4ccb-8056-26901886c0a8	17701
+5588640e-8c40-43f2-8233-9c70682fb26b	17701
+542ec236-3cfe-4ccb-8056-26901886c0a8	17702
+5588640e-8c40-43f2-8233-9c70682fb26b	17702
+542ec236-3cfe-4ccb-8056-26901886c0a8	17703
+5588640e-8c40-43f2-8233-9c70682fb26b	17703
+542ec236-3cfe-4ccb-8056-26901886c0a8	17704
+5588640e-8c40-43f2-8233-9c70682fb26b	17704
+542ec236-3cfe-4ccb-8056-26901886c0a8	17705
+5588640e-8c40-43f2-8233-9c70682fb26b	17705
+542ec236-3cfe-4ccb-8056-26901886c0a8	17706
+5588640e-8c40-43f2-8233-9c70682fb26b	17706
+542ec236-3cfe-4ccb-8056-26901886c0a8	17707
+5588640e-8c40-43f2-8233-9c70682fb26b	17707
+d4178cac-65cb-442f-aa4d-8652bacd9792	17735
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17735
+d4178cac-65cb-442f-aa4d-8652bacd9792	17734
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17734
+d4178cac-65cb-442f-aa4d-8652bacd9792	17737
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17737
+d4178cac-65cb-442f-aa4d-8652bacd9792	17736
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17736
+d4178cac-65cb-442f-aa4d-8652bacd9792	17738
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17738
+d4178cac-65cb-442f-aa4d-8652bacd9792	17739
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17739
+d4178cac-65cb-442f-aa4d-8652bacd9792	17729
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17729
+d4178cac-65cb-442f-aa4d-8652bacd9792	17730
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17730
+d4178cac-65cb-442f-aa4d-8652bacd9792	17732
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17732
+d4178cac-65cb-442f-aa4d-8652bacd9792	17731
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17731
+d4178cac-65cb-442f-aa4d-8652bacd9792	17733
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	17733
+\.
+
+
+--
+-- Data for Name: processed_events; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.processed_events (id, algorithm_id, direction, tag_epc, user_id, group_id, confidence, centroid_separation_factor, cluster_size_factor, bilateral_coverage_factor, rssi_trend_consistency_factor, "timestamp", cluster_started_at, cluster_ended_at, metadata, synced_to_integration, created_at, navigo3_record_id) FROM stdin;
+1558035a-7c80-4dbb-b112-0839a92aee78	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.31770816	0.49562475	1	0.64102566	\N	2026-05-08 23:12:38.74+02	2026-05-08 23:12:36.441+02	2026-05-08 23:12:43.074+02	{"centroidDeltaMs": 3287.47900390625, "insideScanCount": 25, "insideCentroidMs": 1778274762028.12, "outsideScanCount": 39, "clusterDurationMs": 6633, "outsideCentroidMs": 1778274758740.641}	t	2026-05-08 23:12:47.934375+02	\N
+7821e82b-c717-4bd1-8d91-a7cfec1814c4	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.064445	0.58716553	1	0.2195122	0.5	2026-05-08 23:13:08.053+02	2026-05-08 23:13:07.495+02	2026-05-08 23:13:12.578+02	{"rssiTrend": {"inside": {"r2": 0.05516361907055545, "slope": 0.001677725640832005}, "outside": {"r2": 0.019352885587041846, "slope": -0.0006419782698671138}}, "rssiWeights": {"inside": [0.54, 0.43999999999999995, 0.48, 0.42000000000000004, 0.52, 0.43999999999999995, 0.56, 0.52, 0.52], "outside": [0.33999999999999997, 0.48, 0.38, 0.4, 0.28, 0.45999999999999996, 0.31999999999999995, 0.5, 0.56, 0.56, 0.5800000000000001, 0.6599999999999999, 0.6, 0.5, 0.64, 0.45999999999999996, 0.48, 0.38, 0.5, 0.45999999999999996, 0.5, 0.52, 0.4, 0.45999999999999996, 0.52, 0.4, 0.45999999999999996, 0.4, 0.45999999999999996, 0.36, 0.43999999999999995, 0.38, 0.4, 0.4, 0.43999999999999995, 0.4, 0.43999999999999995, 0.54, 0.38, 0.43999999999999995, 0.31999999999999995]}, "centroidDeltaMs": 2984.5625, "insideScanCount": 9, "insideCentroidMs": 1778274788053.739, "outsideScanCount": 41, "clusterDurationMs": 5083, "outsideCentroidMs": 1778274791038.3015}	f	2026-05-08 23:13:17.970853+02	\N
+5acf9624-ce39-4282-8e6e-97a551260ecf	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.13023852	0.59330887	1	0.2195122	\N	2026-05-08 23:13:08.046+02	2026-05-08 23:13:07.495+02	2026-05-08 23:13:12.578+02	{"centroidDeltaMs": 3015.788818359375, "insideScanCount": 9, "insideCentroidMs": 1778274788046.3333, "outsideScanCount": 41, "clusterDurationMs": 5083, "outsideCentroidMs": 1778274791062.122}	t	2026-05-08 23:13:17.970853+02	\N
+f06700c1-cb42-4c2c-9c1d-ad5486893272	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.23051357	0.54335344	1	0.8484849	0.5	2026-05-08 23:13:40.224+02	2026-05-08 23:13:38.829+02	2026-05-08 23:13:44.994+02	{"rssiTrend": {"inside": {"r2": 0.06957284609020675, "slope": 0.001096380744609437}, "outside": {"r2": 0.08439551289365355, "slope": 0.002560042647330034}}, "rssiWeights": {"inside": [0.54, 0.43999999999999995, 0.52, 0.5800000000000001, 0.45999999999999996, 0.43999999999999995, 0.42000000000000004, 0.52, 0.56, 0.52, 0.56, 0.52, 0.56, 0.54, 0.6599999999999999, 0.5, 0.6599999999999999, 0.5, 0.56, 0.5, 0.5, 0.64, 0.7, 0.5800000000000001, 0.45999999999999996, 0.52, 0.52, 0.52], "outside": [0.42000000000000004, 0.31999999999999995, 0.36, 0.4, 0.5, 0.64, 0.43999999999999995, 0.6, 0.62, 0.56, 0.64, 0.6799999999999999, 0.64, 0.7, 0.7, 0.7, 0.78, 0.8, 0.64, 0.74, 0.7, 0.64, 0.7, 0.6799999999999999, 0.76, 0.64, 0.5800000000000001, 0.62, 0.56, 0.52, 0.43999999999999995, 0.4, 0.45999999999999996]}, "centroidDeltaMs": 3349.77392578125, "insideScanCount": 28, "insideCentroidMs": 1778274823574.6013, "outsideScanCount": 33, "clusterDurationMs": 6165, "outsideCentroidMs": 1778274820224.8274}	f	2026-05-08 23:13:49.99556+02	\N
+bd3e2c08-a5e8-4d41-984b-839199b7e066	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.46350938	0.54627895	1	0.8484849	\N	2026-05-08 23:13:40.18+02	2026-05-08 23:13:38.829+02	2026-05-08 23:13:44.994+02	{"centroidDeltaMs": 3367.8095703125, "insideScanCount": 28, "insideCentroidMs": 1778274823548.1428, "outsideScanCount": 33, "clusterDurationMs": 6165, "outsideCentroidMs": 1778274820180.3333}	t	2026-05-08 23:13:49.99556+02	\N
+fa184446-3002-4d88-8253-734b0ed60802	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.14190693	0.55186033	1	0.51428574	0.5	2026-05-08 23:13:58.068+02	2026-05-08 23:13:57.293+02	2026-05-08 23:14:01.485+02	{"rssiTrend": {"inside": {"r2": 0.4026931763230345, "slope": 0.003138810255318326}, "outside": {"r2": 0.03708166268071955, "slope": 0.0011874590133572598}}, "rssiWeights": {"inside": [0.48, 0.54, 0.43999999999999995, 0.43999999999999995, 0.54, 0.5, 0.52, 0.5, 0.52, 0.5, 0.56, 0.48, 0.52, 0.5800000000000001, 0.56, 0.5, 0.5800000000000001, 0.64], "outside": [0.38, 0.4, 0.48, 0.4, 0.33999999999999997, 0.38, 0.42000000000000004, 0.45999999999999996, 0.52, 0.45999999999999996, 0.56, 0.56, 0.56, 0.54, 0.43999999999999995, 0.62, 0.5800000000000001, 0.56, 0.56, 0.52, 0.5, 0.56, 0.56, 0.5800000000000001, 0.62, 0.62, 0.42000000000000004, 0.5, 0.56, 0.52, 0.52, 0.5800000000000001, 0.26, 0.42000000000000004, 0.33999999999999997]}, "centroidDeltaMs": 2313.3984375, "insideScanCount": 18, "insideCentroidMs": 1778274838068.2527, "outsideScanCount": 35, "clusterDurationMs": 4192, "outsideCentroidMs": 1778274840381.6511}	f	2026-05-08 23:14:06.00843+02	\N
+07627fab-0f23-491a-b2fa-fec8ca138dfe	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.28435332	0.5529092	1	0.51428574	\N	2026-05-08 23:13:58.038+02	2026-05-08 23:13:57.293+02	2026-05-08 23:14:01.485+02	{"centroidDeltaMs": 2317.79541015625, "insideScanCount": 18, "insideCentroidMs": 1778274838038.8333, "outsideScanCount": 35, "clusterDurationMs": 4192, "outsideCentroidMs": 1778274840356.6287}	t	2026-05-08 23:14:06.00843+02	\N
+0f1e1815-71ec-471c-9d1e-0fc4105fb035	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.22457573	0.5194268	1	0.61764705	0.7	2026-05-08 23:14:22.557+02	2026-05-08 23:14:20.828+02	2026-05-08 23:14:26.702+02	{"rssiTrend": {"inside": {"r2": 0.10870158054005918, "slope": 0.0015124356640744115}, "outside": {"r2": 0.006938686794927484, "slope": 0.0003828945682107087}}, "rssiWeights": {"inside": [0.52, 0.45999999999999996, 0.45999999999999996, 0.52, 0.52, 0.45999999999999996, 0.5800000000000001, 0.5, 0.43999999999999995, 0.5800000000000001, 0.62, 0.5800000000000001, 0.56, 0.5800000000000001, 0.52, 0.4, 0.64, 0.6, 0.45999999999999996, 0.56, 0.56], "outside": [0.33999999999999997, 0.4, 0.54, 0.52, 0.4, 0.21999999999999997, 0.4, 0.4, 0.43999999999999995, 0.38, 0.33999999999999997, 0.38, 0.43999999999999995, 0.56, 0.5, 0.5, 0.5, 0.52, 0.5, 0.56, 0.56, 0.56, 0.56, 0.45999999999999996, 0.38, 0.4, 0.38, 0.4, 0.45999999999999996, 0.33999999999999997, 0.43999999999999995, 0.4, 0.36, 0.38]}, "centroidDeltaMs": 3051.11328125, "insideScanCount": 21, "insideCentroidMs": 1778274865608.7134, "outsideScanCount": 34, "clusterDurationMs": 5874, "outsideCentroidMs": 1778274862557.6}	f	2026-05-08 23:14:32.038472+02	\N
+b9a8471c-2ce1-4381-9ffa-25714ab5ad41	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.31940857	0.5171377	1	0.61764705	\N	2026-05-08 23:14:22.544+02	2026-05-08 23:14:20.828+02	2026-05-08 23:14:26.702+02	{"centroidDeltaMs": 3037.666748046875, "insideScanCount": 21, "insideCentroidMs": 1778274865581.6667, "outsideScanCount": 34, "clusterDurationMs": 5874, "outsideCentroidMs": 1778274862544}	t	2026-05-08 23:14:32.038472+02	\N
+78160d74-2651-4a4a-b3df-242014607f94	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.114921294	0.5432643	1	0.42307693	0.5	2026-05-08 23:16:00.937+02	2026-05-08 23:15:59.528+02	2026-05-08 23:16:03.611+02	{"rssiTrend": {"inside": {"r2": 0.04243224987939154, "slope": 0.0012929270578370849}, "outside": {"r2": 0.4593741506974185, "slope": 0.005436560215107921}}, "rssiWeights": {"inside": [0.43999999999999995, 0.38, 0.45999999999999996, 0.45999999999999996, 0.4, 0.48, 0.42000000000000004, 0.43999999999999995, 0.4, 0.4, 0.52], "outside": [0.31999999999999995, 0.48, 0.31999999999999995, 0.28, 0.4, 0.45999999999999996, 0.56, 0.45999999999999996, 0.56, 0.54, 0.5, 0.56, 0.6599999999999999, 0.62, 0.52, 0.72, 0.6, 0.62, 0.64, 0.64, 0.62, 0.5800000000000001, 0.56, 0.56, 0.45999999999999996, 0.5]}, "centroidDeltaMs": 2218.148193359375, "insideScanCount": 11, "insideCentroidMs": 1778274963155.5132, "outsideScanCount": 26, "clusterDurationMs": 4083, "outsideCentroidMs": 1778274960937.365}	f	2026-05-08 23:16:08.13235+02	\N
+78004a18-a5e2-4499-9a29-8943b12a297b	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.20531406	0.6346071	1	0.64705884	0.5	2026-05-08 23:17:33.462+02	2026-05-08 23:17:33.009+02	2026-05-08 23:17:35.978+02	{"rssiTrend": {"inside": {"r2": 0.08966804103875603, "slope": -0.002984718996494534}, "outside": {"r2": 0.13151869807861105, "slope": -0.0047497850560042415}}, "rssiWeights": {"inside": [0.43999999999999995, 0.43999999999999995, 0.43999999999999995, 0.38, 0.4, 0.5, 0.52, 0.5, 0.43999999999999995, 0.4, 0.26], "outside": [0.4, 0.43999999999999995, 0.45999999999999996, 0.4, 0.43999999999999995, 0.43999999999999995, 0.45999999999999996, 0.6, 0.6599999999999999, 0.38, 0.54, 0.33999999999999997, 0.28, 0.45999999999999996, 0.28, 0.31999999999999995, 0.31999999999999995]}, "centroidDeltaMs": 1884.1484375, "insideScanCount": 11, "insideCentroidMs": 1778275053462.0679, "outsideScanCount": 17, "clusterDurationMs": 2969, "outsideCentroidMs": 1778275055346.2163}	f	2026-05-08 23:17:40.219721+02	\N
+915d8915-a98c-43db-9c27-07560c7f9164	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.4144965	0.64058554	1	0.64705884	\N	2026-05-08 23:17:33.478+02	2026-05-08 23:17:33.009+02	2026-05-08 23:17:35.978+02	{"centroidDeltaMs": 1901.8984375, "insideScanCount": 11, "insideCentroidMs": 1778275053478.4546, "outsideScanCount": 17, "clusterDurationMs": 2969, "outsideCentroidMs": 1778275055380.353}	t	2026-05-08 23:17:40.219721+02	\N
+c655fb69-4f1b-4954-82fd-50970202e37d	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.21417232	0.46129423	1	0.9285714	0.5	2026-05-08 23:17:58.255+02	2026-05-08 23:17:56.828+02	2026-05-08 23:18:02.108+02	{"rssiTrend": {"inside": {"r2": 0.009858252366021003, "slope": -0.00044833333987300987}, "outside": {"r2": 0.001017938246598793, "slope": 0.00027387601095470415}}, "rssiWeights": {"inside": [0.5, 0.43999999999999995, 0.52, 0.62, 0.6599999999999999, 0.6799999999999999, 0.56, 0.56, 0.7, 0.64, 0.7, 0.64, 0.62, 0.7, 0.6599999999999999, 0.54, 0.64, 0.5800000000000001, 0.54, 0.5, 0.56, 0.56, 0.54, 0.62, 0.54, 0.45999999999999996], "outside": [0.45999999999999996, 0.52, 0.5, 0.56, 0.5, 0.48, 0.6799999999999999, 0.56, 0.78, 0.84, 0.76, 0.76, 0.74, 0.8200000000000001, 0.8, 0.6799999999999999, 0.74, 0.56, 0.64, 0.5800000000000001, 0.4, 0.6, 0.45999999999999996, 0.5800000000000001, 0.6599999999999999, 0.43999999999999995, 0.5, 0.52]}, "centroidDeltaMs": 2435.633544921875, "insideScanCount": 26, "insideCentroidMs": 1778275080690.883, "outsideScanCount": 28, "clusterDurationMs": 5280, "outsideCentroidMs": 1778275078255.2495}	f	2026-05-08 23:18:06.232721+02	\N
+47eeaf7e-bba7-4989-94db-d98669717237	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.4309572	0.46410778	1	0.9285714	\N	2026-05-08 23:17:58.25+02	2026-05-08 23:17:56.828+02	2026-05-08 23:18:02.108+02	{"centroidDeltaMs": 2450.489013671875, "insideScanCount": 26, "insideCentroidMs": 1778275080700.8462, "outsideScanCount": 28, "clusterDurationMs": 5280, "outsideCentroidMs": 1778275078250.3572}	t	2026-05-08 23:18:06.232721+02	\N
+e24e53c9-754e-4031-9ea9-0fb6471cd150	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.11232595	0.4212223	1	0.6666667	0.4	2026-05-08 23:20:20.796+02	2026-05-08 23:20:20.393+02	2026-05-08 23:20:21.728+02	{"rssiTrend": {"inside": {"r2": 0.669352583163974, "slope": 0.019013783878908175}, "outside": {"r2": 0.37627256535983644, "slope": 0.008447488584474886}}, "rssiWeights": {"inside": [0.31999999999999995, 0.45999999999999996, 0.5, 0.52, 0.43999999999999995, 0.64, 0.6599999999999999, 0.64], "outside": [0.48, 0.33999999999999997, 0.38, 0.43999999999999995, 0.52, 0.43999999999999995, 0.6, 0.52, 0.5800000000000001, 0.62, 0.48, 0.56]}, "centroidDeltaMs": 562.331787109375, "insideScanCount": 8, "insideCentroidMs": 1778275220796.7083, "outsideScanCount": 12, "clusterDurationMs": 1335, "outsideCentroidMs": 1778275221359.04}	f	2026-05-08 23:20:26.321674+02	\N
+33716916-1b6f-4b00-b02c-04dcbd947100	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.25729865	0.6110843	1	0.84210527	0.5	2026-05-08 23:20:41.343+02	2026-05-08 23:20:40.478+02	2026-05-08 23:20:44.873+02	{"rssiTrend": {"inside": {"r2": 0.00004114934238386159, "slope": -0.000045627494281778886}, "outside": {"r2": 0.034807245930653874, "slope": 0.0012873642992383845}}, "rssiWeights": {"inside": [0.45999999999999996, 0.45999999999999996, 0.56, 0.56, 0.52, 0.6599999999999999, 0.6599999999999999, 0.6799999999999999, 0.64, 0.7, 0.56, 0.64, 0.5800000000000001, 0.56, 0.64, 0.56, 0.45999999999999996, 0.5, 0.54], "outside": [0.33999999999999997, 0.4, 0.4, 0.52, 0.31999999999999995, 0.4, 0.5, 0.38, 0.52, 0.43999999999999995, 0.43999999999999995, 0.33999999999999997, 0.42000000000000004, 0.4, 0.48, 0.4]}, "centroidDeltaMs": 2685.71533203125, "insideScanCount": 19, "insideCentroidMs": 1778275244028.9385, "outsideScanCount": 16, "clusterDurationMs": 4395, "outsideCentroidMs": 1778275241343.2231}	f	2026-05-08 23:20:50.333964+02	\N
+94882288-01e6-4067-bdb2-1b04d5310c85	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.5168899	0.6138068	1	0.84210527	\N	2026-05-08 23:20:41.331+02	2026-05-08 23:20:40.478+02	2026-05-08 23:20:44.873+02	{"centroidDeltaMs": 2697.680908203125, "insideScanCount": 19, "insideCentroidMs": 1778275244029.3684, "outsideScanCount": 16, "clusterDurationMs": 4395, "outsideCentroidMs": 1778275241331.6875}	t	2026-05-08 23:20:50.333964+02	\N
+37bd99c2-258a-44fd-aed0-a8bdae3ad185	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.28890488	0.7944884	1	0.36363637	\N	2026-05-08 23:21:00.464+02	2026-05-08 23:21:00.311+02	2026-05-08 23:21:02.828+02	{"centroidDeltaMs": 1999.727294921875, "insideScanCount": 4, "insideCentroidMs": 1778275260464, "outsideScanCount": 11, "clusterDurationMs": 2517, "outsideCentroidMs": 1778275262463.7273}	t	2026-05-08 23:21:08.342956+02	\N
+ffdf216f-aa9b-46e4-8431-7615f8e52e7d	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.32673284	0.42883685	1	0.7619048	\N	2026-05-08 23:21:37.092+02	2026-05-08 23:21:36.301+02	2026-05-08 23:21:38.835+02	{"centroidDeltaMs": 1086.672607421875, "insideScanCount": 16, "insideCentroidMs": 1778275297092.375, "outsideScanCount": 21, "clusterDurationMs": 2534, "outsideCentroidMs": 1778275298179.0476}	t	2026-05-08 23:21:44.36185+02	\N
+f5f301d2-f9e8-479a-9590-1b7f442739c8	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.23878703	0.5644057	1	0.42307693	\N	2026-05-08 23:16:00.845+02	2026-05-08 23:15:59.528+02	2026-05-08 23:16:03.611+02	{"centroidDeltaMs": 2304.468505859375, "insideScanCount": 11, "insideCentroidMs": 1778274963149.5454, "outsideScanCount": 26, "clusterDurationMs": 4083, "outsideCentroidMs": 1778274960845.077}	t	2026-05-08 23:16:08.13235+02	\N
+830fd301-9478-4c01-9e61-79c243007934	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.095865704	0.5964977	1	0.32142857	0.5	2026-05-08 23:16:19.122+02	2026-05-08 23:16:18.758+02	2026-05-08 23:16:22.178+02	{"rssiTrend": {"inside": {"r2": 0.00139236637268092, "slope": -0.0004568053289154075}, "outside": {"r2": 0.07194293793266104, "slope": 0.0021058508631133163}}, "rssiWeights": {"inside": [0.56, 0.42000000000000004, 0.5800000000000001, 0.5800000000000001, 0.5800000000000001, 0.5800000000000001, 0.5, 0.5800000000000001, 0.43999999999999995], "outside": [0.36, 0.33999999999999997, 0.30000000000000004, 0.42000000000000004, 0.38, 0.54, 0.43999999999999995, 0.45999999999999996, 0.43999999999999995, 0.6, 0.42000000000000004, 0.6, 0.54, 0.56, 0.64, 0.62, 0.6599999999999999, 0.56, 0.5800000000000001, 0.5, 0.48, 0.6, 0.52, 0.43999999999999995, 0.52, 0.4, 0.33999999999999997, 0.33999999999999997]}, "centroidDeltaMs": 2040.022216796875, "insideScanCount": 9, "insideCentroidMs": 1778274979122.0293, "outsideScanCount": 28, "clusterDurationMs": 3420, "outsideCentroidMs": 1778274981162.0515}	f	2026-05-08 23:16:28.155799+02	\N
+43d14d7a-0526-4f1b-8971-6694f72ae745	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.18823136	0.5856087	1	0.32142857	\N	2026-05-08 23:16:19.123+02	2026-05-08 23:16:18.758+02	2026-05-08 23:16:22.178+02	{"centroidDeltaMs": 2002.78173828125, "insideScanCount": 9, "insideCentroidMs": 1778274979123.111, "outsideScanCount": 28, "clusterDurationMs": 3420, "outsideCentroidMs": 1778274981125.8928}	t	2026-05-08 23:16:28.155799+02	\N
+9582f52a-fb9b-4b63-a585-f30dc338d6df	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.21976058	0.5232395	1	0.84	0.5	2026-05-08 23:19:01.428+02	2026-05-08 23:19:00.144+02	2026-05-08 23:19:04.478+02	{"rssiTrend": {"inside": {"r2": 0.031028236605307624, "slope": -0.0011572459227156538}, "outside": {"r2": 0.03372749181494494, "slope": 0.0019183420801307603}}, "rssiWeights": {"inside": [0.38, 0.45999999999999996, 0.52, 0.52, 0.5800000000000001, 0.5800000000000001, 0.72, 0.5800000000000001, 0.74, 0.64, 0.72, 0.72, 0.72, 0.7, 0.62, 0.5800000000000001, 0.5, 0.5800000000000001, 0.6, 0.5, 0.54, 0.45999999999999996, 0.42000000000000004, 0.43999999999999995, 0.5], "outside": [0.6, 0.45999999999999996, 0.56, 0.5, 0.45999999999999996, 0.52, 0.64, 0.62, 0.56, 0.64, 0.7, 0.62, 0.7, 0.8, 0.7, 0.54, 0.52, 0.43999999999999995, 0.6799999999999999, 0.5800000000000001, 0.45999999999999996]}, "centroidDeltaMs": 2267.719970703125, "insideScanCount": 25, "insideCentroidMs": 1778275141428.4194, "outsideScanCount": 21, "clusterDurationMs": 4334, "outsideCentroidMs": 1778275143696.1394}	f	2026-05-08 23:19:10.276329+02	\N
+f36a833d-51a2-4a29-bd6b-5e348d0d4b8d	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.4320794	0.5143802	1	0.84	\N	2026-05-08 23:19:01.453+02	2026-05-08 23:19:00.144+02	2026-05-08 23:19:04.478+02	{"centroidDeltaMs": 2229.323974609375, "insideScanCount": 25, "insideCentroidMs": 1778275141453.2, "outsideScanCount": 21, "clusterDurationMs": 4334, "outsideCentroidMs": 1778275143682.524}	t	2026-05-08 23:19:10.276329+02	\N
+dd5b15b1-dbd8-4a09-b1b3-c55417187942	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.1172944	0.806399	1	0.36363637	0.4	2026-05-08 23:21:00.469+02	2026-05-08 23:21:00.311+02	2026-05-08 23:21:02.828+02	{"rssiTrend": {"inside": {"r2": 0.12414351069907825, "slope": 0.00907333035847092}, "outside": {"r2": 0.5573193519543713, "slope": 0.010191140540050552}}, "rssiWeights": {"inside": [0.28, 0.42000000000000004, 0.31999999999999995, 0.31999999999999995], "outside": [0.33999999999999997, 0.31999999999999995, 0.4, 0.45999999999999996, 0.4, 0.56, 0.54, 0.43999999999999995, 0.54, 0.48, 0.48]}, "centroidDeltaMs": 2029.706298828125, "insideScanCount": 4, "insideCentroidMs": 1778275260469.4626, "outsideScanCount": 11, "clusterDurationMs": 2517, "outsideCentroidMs": 1778275262499.169}	f	2026-05-08 23:21:08.342956+02	\N
+c0267c79-7773-458f-90a1-87c0aa25e92e	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.24495952	0.5414895	1	0.9047619	0.5	2026-05-08 23:21:22.182+02	2026-05-08 23:21:21.278+02	2026-05-08 23:21:25.355+02	{"rssiTrend": {"inside": {"r2": 0.08268169046285467, "slope": 0.0019551080156813613}, "outside": {"r2": 0.06914599754091899, "slope": -0.0030549500960190545}}, "rssiWeights": {"inside": [0.31999999999999995, 0.64, 0.33999999999999997, 0.4, 0.4, 0.43999999999999995, 0.45999999999999996, 0.43999999999999995, 0.4, 0.4, 0.6, 0.43999999999999995, 0.64, 0.5800000000000001, 0.45999999999999996, 0.5, 0.45999999999999996, 0.54, 0.38], "outside": [0.43999999999999995, 0.38, 0.52, 0.64, 0.76, 0.6799999999999999, 0.7, 0.72, 0.6599999999999999, 0.62, 0.64, 0.5, 0.62, 0.56, 0.43999999999999995, 0.6599999999999999, 0.52, 0.5, 0.54, 0.38, 0.4]}, "centroidDeltaMs": 2207.652587890625, "insideScanCount": 19, "insideCentroidMs": 1778275284390.131, "outsideScanCount": 21, "clusterDurationMs": 4077, "outsideCentroidMs": 1778275282182.4785}	f	2026-05-08 23:21:30.357159+02	\N
+cabf5bbc-bf5b-46aa-a95c-52239efd6c51	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.47562036	0.52568567	1	0.9047619	\N	2026-05-08 23:21:22.208+02	2026-05-08 23:21:21.278+02	2026-05-08 23:21:25.355+02	{"centroidDeltaMs": 2143.220458984375, "insideScanCount": 19, "insideCentroidMs": 1778275284351.3157, "outsideScanCount": 21, "clusterDurationMs": 4077, "outsideCentroidMs": 1778275282208.0952}	t	2026-05-08 23:21:30.357159+02	\N
+b5235f31-06d6-43fc-964a-378bfafcd9fd	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.26129952	0.58792394	1	0.44444445	\N	2026-05-08 23:23:56.083+02	2026-05-08 23:23:55.066+02	2026-05-08 23:23:58.028+02	{"centroidDeltaMs": 1741.4306640625, "insideScanCount": 18, "insideCentroidMs": 1778275436083.9443, "outsideScanCount": 8, "clusterDurationMs": 2962, "outsideCentroidMs": 1778275437825.375}	t	2026-05-08 23:24:02.439694+02	\N
+cc81778e-b86f-461a-a93f-08a849820b14	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.5025971	0.70363593	1	0.71428573	\N	2026-05-08 23:25:06.668+02	2026-05-08 23:25:05.978+02	2026-05-08 23:25:12.017+02	{"centroidDeltaMs": 4249.25732421875, "insideScanCount": 21, "insideCentroidMs": 1778275510917.524, "outsideScanCount": 15, "clusterDurationMs": 6039, "outsideCentroidMs": 1778275506668.2666}	t	2026-05-08 23:25:16.486894+02	\N
+cc6dd0fe-c240-4b2b-bf04-7ab1f0b953c5	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.15449859	0.48203564	1	0.64102566	0.5	2026-05-08 23:12:38.853+02	2026-05-08 23:12:36.441+02	2026-05-08 23:12:43.074+02	{"rssiTrend": {"inside": {"r2": 0.07836127695877304, "slope": 0.0012619183804178033}, "outside": {"r2": 0.2545940242858745, "slope": 0.002187848316813241}}, "rssiWeights": {"inside": [0.45999999999999996, 0.43999999999999995, 0.5, 0.45999999999999996, 0.4, 0.56, 0.45999999999999996, 0.6, 0.43999999999999995, 0.52, 0.56, 0.56, 0.56, 0.5800000000000001, 0.5800000000000001, 0.5800000000000001, 0.62, 0.5800000000000001, 0.5800000000000001, 0.52, 0.5800000000000001, 0.45999999999999996, 0.52, 0.43999999999999995, 0.45999999999999996], "outside": [0.19999999999999996, 0.45999999999999996, 0.28, 0.43999999999999995, 0.4, 0.33999999999999997, 0.45999999999999996, 0.43999999999999995, 0.4, 0.4, 0.43999999999999995, 0.43999999999999995, 0.4, 0.4, 0.38, 0.33999999999999997, 0.43999999999999995, 0.43999999999999995, 0.43999999999999995, 0.4, 0.6, 0.43999999999999995, 0.5800000000000001, 0.62, 0.56, 0.64, 0.56, 0.64, 0.52, 0.52, 0.5, 0.43999999999999995, 0.43999999999999995, 0.43999999999999995, 0.48, 0.33999999999999997, 0.54, 0.52, 0.38]}, "centroidDeltaMs": 3197.34228515625, "insideScanCount": 25, "insideCentroidMs": 1778274762051.1042, "outsideScanCount": 39, "clusterDurationMs": 6633, "outsideCentroidMs": 1778274758853.762}	f	2026-05-08 23:12:47.934375+02	\N
+46e89018-f350-403c-9fd7-f80ac16e8a3a	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.21971878	0.456339	1	0.962963	0.5	2026-05-08 23:17:14.645+02	2026-05-08 23:17:13.178+02	2026-05-08 23:17:18.294+02	{"rssiTrend": {"inside": {"r2": 0.029917797154204617, "slope": -0.0007989292282921938}, "outside": {"r2": 0.03472438914338294, "slope": -0.0013616873888826423}}, "rssiWeights": {"inside": [0.54, 0.56, 0.5800000000000001, 0.56, 0.64, 0.5800000000000001, 0.7, 0.43999999999999995, 0.45999999999999996, 0.52, 0.56, 0.6, 0.52, 0.6799999999999999, 0.52, 0.6599999999999999, 0.6599999999999999, 0.5800000000000001, 0.5800000000000001, 0.6, 0.5, 0.5800000000000001, 0.45999999999999996, 0.5, 0.5, 0.56], "outside": [0.5, 0.45999999999999996, 0.5800000000000001, 0.56, 0.6799999999999999, 0.64, 0.72, 0.6799999999999999, 0.64, 0.5800000000000001, 0.7, 0.78, 0.74, 0.74, 0.62, 0.72, 0.56, 0.7, 0.56, 0.56, 0.6, 0.56, 0.48, 0.52, 0.5, 0.52, 0.4]}, "centroidDeltaMs": 2334.63037109375, "insideScanCount": 26, "insideCentroidMs": 1778275036980.6191, "outsideScanCount": 27, "clusterDurationMs": 5116, "outsideCentroidMs": 1778275034645.9888}	f	2026-05-08 23:17:24.203993+02	\N
+492265b2-7079-48af-934c-d91b6540d327	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.43851322	0.4553791	1	0.962963	\N	2026-05-08 23:17:14.665+02	2026-05-08 23:17:13.178+02	2026-05-08 23:17:18.294+02	{"centroidDeltaMs": 2329.719482421875, "insideScanCount": 26, "insideCentroidMs": 1778275036995.423, "outsideScanCount": 27, "clusterDurationMs": 5116, "outsideCentroidMs": 1778275034665.7036}	t	2026-05-08 23:17:24.203993+02	\N
+d6adad2e-0fca-4f94-a962-1014656e5f17	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.11733293	0.52799815	1	0.22222222	1	2026-05-08 23:19:44.506+02	2026-05-08 23:19:44.244+02	2026-05-08 23:19:46.028+02	{"rssiTrend": {"inside": {"r2": 0.10413850990215212, "slope": -0.004836764914886691}, "outside": {"r2": 0.20900129891647823, "slope": 0.00476313776918405}}, "rssiWeights": {"inside": [0.62, 0.45999999999999996, 0.56, 0.5], "outside": [0.31999999999999995, 0.48, 0.5, 0.4, 0.52, 0.52, 0.45999999999999996, 0.52, 0.54, 0.56, 0.64, 0.5, 0.64, 0.62, 0.5800000000000001, 0.5800000000000001, 0.56, 0.33999999999999997]}, "centroidDeltaMs": 941.94873046875, "insideScanCount": 4, "insideCentroidMs": 1778275184506.355, "outsideScanCount": 18, "clusterDurationMs": 1784, "outsideCentroidMs": 1778275185448.3037}	f	2026-05-08 23:19:50.298739+02	\N
+1c665467-e1f3-44ea-9fa9-2718ab8f1141	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.11222872	0.50502926	1	0.22222222	\N	2026-05-08 23:19:44.513+02	2026-05-08 23:19:44.244+02	2026-05-08 23:19:46.028+02	{"centroidDeltaMs": 900.97216796875, "insideScanCount": 4, "insideCentroidMs": 1778275184513.75, "outsideScanCount": 18, "clusterDurationMs": 1784, "outsideCentroidMs": 1778275185414.7222}	t	2026-05-08 23:19:50.298739+02	\N
+2da30c3b-f05b-4be0-aa58-5f783f1d96da	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.38807854	0.6335976	1	0.875	0.7	2026-05-08 23:20:05.538+02	2026-05-08 23:20:05.228+02	2026-05-08 23:20:07.36+02	{"rssiTrend": {"inside": {"r2": 0.02175630844517462, "slope": 0.0022976541781318687}, "outside": {"r2": 0.15521704498343192, "slope": -0.0055161282522487665}}, "rssiWeights": {"inside": [0.43999999999999995, 0.5800000000000001, 0.5800000000000001, 0.64, 0.6599999999999999, 0.7, 0.43999999999999995, 0.5800000000000001], "outside": [0.43999999999999995, 0.31999999999999995, 0.45999999999999996, 0.45999999999999996, 0.45999999999999996, 0.33999999999999997, 0.33999999999999997]}, "centroidDeltaMs": 1350.830078125, "insideScanCount": 8, "insideCentroidMs": 1778275206888.887, "outsideScanCount": 7, "clusterDurationMs": 2132, "outsideCentroidMs": 1778275205538.057}	f	2026-05-08 23:20:12.311927+02	\N
+165ff473-c634-4fd9-9d7b-b01e274862a4	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.5464133	0.6244723	1	0.875	\N	2026-05-08 23:20:05.551+02	2026-05-08 23:20:05.228+02	2026-05-08 23:20:07.36+02	{"centroidDeltaMs": 1331.375, "insideScanCount": 8, "insideCentroidMs": 1778275206882.375, "outsideScanCount": 7, "clusterDurationMs": 2132, "outsideCentroidMs": 1778275205551}	t	2026-05-08 23:20:12.311927+02	\N
+9887b746-a5eb-4978-ba4f-6218ef7bd3da	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.38916457	0.44903606	1	0.8666667	\N	2026-05-08 23:23:03.806+02	2026-05-08 23:23:01.928+02	2026-05-08 23:23:08.095+02	{"centroidDeltaMs": 2769.205322265625, "insideScanCount": 30, "insideCentroidMs": 1778275386576.1667, "outsideScanCount": 26, "clusterDurationMs": 6167, "outsideCentroidMs": 1778275383806.9614}	t	2026-05-08 23:23:12.411279+02	\N
+66345e63-bc2f-4898-8d25-708181e8c1c9	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.5276058	0.6331269	1	0.8333333	\N	2026-05-08 23:29:23.504+02	2026-05-08 23:29:22.778+02	2026-05-08 23:29:26.546+02	{"centroidDeltaMs": 2385.622314453125, "insideScanCount": 15, "insideCentroidMs": 1778275765890.0667, "outsideScanCount": 18, "clusterDurationMs": 3768, "outsideCentroidMs": 1778275763504.4443}	t	2026-05-08 23:29:30.720564+02	\N
+d525bb31-39b9-4db9-98ad-f746b1bd40de	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.10961915	0.520691	1	0.42105263	0.5	2026-05-08 23:14:40.501+02	2026-05-08 23:14:39.443+02	2026-05-08 23:14:44.378+02	{"rssiTrend": {"inside": {"r2": 0.05857857692683521, "slope": 0.0015674671875814264}, "outside": {"r2": 0.023687939254079193, "slope": -0.0007153418329450425}}, "rssiWeights": {"inside": [0.28, 0.36, 0.38, 0.43999999999999995, 0.38, 0.36, 0.43999999999999995, 0.45999999999999996, 0.45999999999999996, 0.38, 0.52, 0.42000000000000004, 0.42000000000000004, 0.5, 0.36, 0.26], "outside": [0.31999999999999995, 0.33999999999999997, 0.31999999999999995, 0.38, 0.33999999999999997, 0.31999999999999995, 0.43999999999999995, 0.4, 0.31999999999999995, 0.33999999999999997, 0.48, 0.48, 0.5, 0.52, 0.52, 0.54, 0.43999999999999995, 0.45999999999999996, 0.43999999999999995, 0.45999999999999996, 0.43999999999999995, 0.45999999999999996, 0.45999999999999996, 0.43999999999999995, 0.43999999999999995, 0.43999999999999995, 0.45999999999999996, 0.31999999999999995, 0.4, 0.28, 0.31999999999999995, 0.31999999999999995, 0.4, 0.31999999999999995, 0.36, 0.42000000000000004, 0.26, 0.26]}, "centroidDeltaMs": 2569.60986328125, "insideScanCount": 16, "insideCentroidMs": 1778274880501.1216, "outsideScanCount": 38, "clusterDurationMs": 4935, "outsideCentroidMs": 1778274883070.7314}	f	2026-05-08 23:14:50.056764+02	\N
+ce383e8c-55d4-48e5-a63b-e2f88ca4d337	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.22314969	0.52998054	1	0.42105263	\N	2026-05-08 23:14:40.479+02	2026-05-08 23:14:39.443+02	2026-05-08 23:14:44.378+02	{"centroidDeltaMs": 2615.453857421875, "insideScanCount": 16, "insideCentroidMs": 1778274880479.125, "outsideScanCount": 38, "clusterDurationMs": 4935, "outsideCentroidMs": 1778274883094.5789}	t	2026-05-08 23:14:50.056764+02	\N
+8df5efe4-e960-441c-a5b4-3ca24791ee2f	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.35771513	0.67071587	1	0.53333336	1	2026-05-08 23:18:15.525+02	2026-05-08 23:18:15.161+02	2026-05-08 23:18:17.979+02	{"rssiTrend": {"inside": {"r2": 0.16616028253801374, "slope": -0.002392557356272949}, "outside": {"r2": 0.2272075335890913, "slope": 0.004589167915269654}}, "rssiWeights": {"inside": [0.52, 0.52, 0.45999999999999996, 0.45999999999999996, 0.52, 0.5, 0.45999999999999996, 0.45999999999999996], "outside": [0.43999999999999995, 0.52, 0.45999999999999996, 0.38, 0.56, 0.56, 0.52, 0.52, 0.5, 0.64, 0.64, 0.5, 0.6, 0.43999999999999995, 0.54]}, "centroidDeltaMs": 1890.077392578125, "insideScanCount": 8, "insideCentroidMs": 1778275095525.8462, "outsideScanCount": 15, "clusterDurationMs": 2818, "outsideCentroidMs": 1778275097415.9236}	f	2026-05-08 23:18:22.244815+02	\N
+67192bf4-fa27-4e80-bfc1-5cf77bb2919a	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.35211733	0.66022	1	0.53333336	\N	2026-05-08 23:18:15.531+02	2026-05-08 23:18:15.161+02	2026-05-08 23:18:17.979+02	{"centroidDeltaMs": 1860.5, "insideScanCount": 8, "insideCentroidMs": 1778275095531.5, "outsideScanCount": 15, "clusterDurationMs": 2818, "outsideCentroidMs": 1778275097392}	t	2026-05-08 23:18:22.244815+02	\N
+17c6c66a-d448-405e-8376-78a10353e48d	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.2197045	0.7323483	1	0.6	0.5	2026-05-08 23:18:40.518+02	2026-05-08 23:18:40.028+02	2026-05-08 23:18:44.851+02	{"rssiTrend": {"inside": {"r2": 0.023155878397709828, "slope": -0.0010535760049706939}, "outside": {"r2": 0.4040191936915354, "slope": 0.008938435839715236}}, "rssiWeights": {"inside": [0.5, 0.43999999999999995, 0.5, 0.5, 0.64, 0.56, 0.54, 0.64, 0.52, 0.64, 0.5, 0.45999999999999996, 0.52, 0.45999999999999996, 0.43999999999999995], "outside": [0.45999999999999996, 0.43999999999999995, 0.52, 0.38, 0.52, 0.56, 0.45999999999999996, 0.6, 0.5800000000000001]}, "centroidDeltaMs": 3532.115966796875, "insideScanCount": 15, "insideCentroidMs": 1778275124051.094, "outsideScanCount": 9, "clusterDurationMs": 4823, "outsideCentroidMs": 1778275120518.978}	f	2026-05-08 23:18:50.260528+02	\N
+f09ba4bf-b295-48b1-a2d3-9edadda9fc44	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.44317645	0.7386274	1	0.6	\N	2026-05-08 23:18:40.498+02	2026-05-08 23:18:40.028+02	2026-05-08 23:18:44.851+02	{"centroidDeltaMs": 3562.39990234375, "insideScanCount": 15, "insideCentroidMs": 1778275124060.4, "outsideScanCount": 9, "clusterDurationMs": 4823, "outsideCentroidMs": 1778275120498}	t	2026-05-08 23:18:50.260528+02	\N
+9d94df7f-21ad-4f10-8cd1-8eade1e86027	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.11025984	0.5635503	1	0.39130434	0.5	2026-05-08 23:19:26.749+02	2026-05-08 23:19:25.778+02	2026-05-08 23:19:28.801+02	{"rssiTrend": {"inside": {"r2": 0.0020620635342907256, "slope": 0.00045648734728581685}, "outside": {"r2": 0.001339609394738428, "slope": -0.0002320054982137437}}, "rssiWeights": {"inside": [0.6599999999999999, 0.56, 0.56, 0.62, 0.6799999999999999, 0.56, 0.5800000000000001, 0.6799999999999999, 0.56], "outside": [0.54, 0.56, 0.54, 0.43999999999999995, 0.52, 0.5800000000000001, 0.5800000000000001, 0.54, 0.74, 0.62, 0.64, 0.64, 0.64, 0.5800000000000001, 0.62, 0.5800000000000001, 0.54, 0.5800000000000001, 0.56, 0.43999999999999995, 0.56, 0.6, 0.43999999999999995]}, "centroidDeltaMs": 1703.612548828125, "insideScanCount": 9, "insideCentroidMs": 1778275168453.293, "outsideScanCount": 23, "clusterDurationMs": 3023, "outsideCentroidMs": 1778275166749.6804}	f	2026-05-08 23:19:34.292494+02	\N
+530e1031-6e4b-44ee-a20d-c1015ccc5c48	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.22008957	0.5624511	1	0.39130434	\N	2026-05-08 23:19:26.752+02	2026-05-08 23:19:25.778+02	2026-05-08 23:19:28.801+02	{"centroidDeltaMs": 1700.289794921875, "insideScanCount": 9, "insideCentroidMs": 1778275168452.3333, "outsideScanCount": 23, "clusterDurationMs": 3023, "outsideCentroidMs": 1778275166752.0435}	t	2026-05-08 23:19:34.292494+02	\N
+96e8fcde-58d2-4e39-b5e4-9c0ff22532cc	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.2860799	0.42911986	1	0.6666667	\N	2026-05-08 23:20:20.755+02	2026-05-08 23:20:20.393+02	2026-05-08 23:20:21.728+02	{"centroidDeltaMs": 572.875, "insideScanCount": 8, "insideCentroidMs": 1778275220755.125, "outsideScanCount": 12, "clusterDurationMs": 1335, "outsideCentroidMs": 1778275221328}	t	2026-05-08 23:20:26.321674+02	\N
+1093ff35-2c47-45e1-9ee8-e21f822d6755	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.24574354	0.5652101	1	0.4347826	\N	2026-05-08 23:23:22.316+02	2026-05-08 23:23:21.899+02	2026-05-08 23:23:24.878+02	{"centroidDeltaMs": 1683.760986328125, "insideScanCount": 10, "insideCentroidMs": 1778275402316.5, "outsideScanCount": 23, "clusterDurationMs": 2979, "outsideCentroidMs": 1778275404000.261}	t	2026-05-08 23:23:30.424607+02	\N
+8023cf57-0751-4732-9d8a-b60b14c0aa8a	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.1341733	0.44025618	1	0.7619048	0.4	2026-05-08 23:21:37.127+02	2026-05-08 23:21:36.301+02	2026-05-08 23:21:38.835+02	{"rssiTrend": {"inside": {"r2": 0.22711253774792384, "slope": 0.004266610756530877}, "outside": {"r2": 0.4230993027468357, "slope": 0.0074491172870485055}}, "rssiWeights": {"inside": [0.31999999999999995, 0.52, 0.4, 0.56, 0.54, 0.6, 0.5800000000000001, 0.45999999999999996, 0.56, 0.62, 0.62, 0.5800000000000001, 0.62, 0.62, 0.52, 0.45999999999999996], "outside": [0.4, 0.31999999999999995, 0.38, 0.43999999999999995, 0.4, 0.33999999999999997, 0.43999999999999995, 0.31999999999999995, 0.38, 0.6, 0.5800000000000001, 0.64, 0.5, 0.5800000000000001, 0.62, 0.5800000000000001, 0.5800000000000001, 0.56, 0.6, 0.5, 0.42000000000000004]}, "centroidDeltaMs": 1115.609130859375, "insideScanCount": 16, "insideCentroidMs": 1778275297127.9158, "outsideScanCount": 21, "clusterDurationMs": 2534, "outsideCentroidMs": 1778275298243.525}	f	2026-05-08 23:21:44.36185+02	\N
+f42fb75f-bad8-473f-895d-38c4ea0656d0	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.1945609	0.44898668	1	0.8666667	0.5	2026-05-08 23:23:03.842+02	2026-05-08 23:23:01.928+02	2026-05-08 23:23:08.095+02	{"rssiTrend": {"inside": {"r2": 0.07958026827364273, "slope": 0.0010180702838863457}, "outside": {"r2": 0.12837543615712577, "slope": 0.002398660179773462}}, "rssiWeights": {"inside": [0.38, 0.5, 0.5, 0.45999999999999996, 0.54, 0.52, 0.45999999999999996, 0.38, 0.52, 0.5800000000000001, 0.48, 0.52, 0.6599999999999999, 0.5, 0.56, 0.52, 0.5, 0.43999999999999995, 0.45999999999999996, 0.5800000000000001, 0.56, 0.54, 0.5800000000000001, 0.5800000000000001, 0.5, 0.64, 0.62, 0.48, 0.45999999999999996, 0.4], "outside": [0.33999999999999997, 0.31999999999999995, 0.52, 0.56, 0.72, 0.62, 0.62, 0.54, 0.56, 0.43999999999999995, 0.43999999999999995, 0.5800000000000001, 0.64, 0.5800000000000001, 0.56, 0.45999999999999996, 0.56, 0.56, 0.56, 0.52, 0.52, 0.64, 0.5800000000000001, 0.56, 0.56, 0.52]}, "centroidDeltaMs": 2768.90087890625, "insideScanCount": 30, "insideCentroidMs": 1778275386611.885, "outsideScanCount": 26, "clusterDurationMs": 6167, "outsideCentroidMs": 1778275383842.9841}	f	2026-05-08 23:23:12.411279+02	\N
+d36760ce-705f-4cae-bff8-57c9ed922f33	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.18884414	0.45979443	1	0.8214286	0.5	2026-05-08 23:23:38.839+02	2026-05-08 23:23:37.328+02	2026-05-08 23:23:42.445+02	{"rssiTrend": {"inside": {"r2": 0.08179626543285268, "slope": 0.0008432854681344057}, "outside": {"r2": 0.05827666837032042, "slope": 0.0019308925032639028}}, "rssiWeights": {"inside": [0.5, 0.45999999999999996, 0.5800000000000001, 0.52, 0.5, 0.52, 0.6, 0.5800000000000001, 0.56, 0.5800000000000001, 0.64, 0.5800000000000001, 0.64, 0.56, 0.5800000000000001, 0.6, 0.5800000000000001, 0.56, 0.62, 0.5800000000000001, 0.54, 0.5, 0.52], "outside": [0.33999999999999997, 0.33999999999999997, 0.4, 0.43999999999999995, 0.5800000000000001, 0.56, 0.6599999999999999, 0.64, 0.6799999999999999, 0.5800000000000001, 0.5800000000000001, 0.62, 0.62, 0.74, 0.74, 0.7, 0.7, 0.64, 0.62, 0.52, 0.45999999999999996, 0.45999999999999996, 0.64, 0.43999999999999995, 0.43999999999999995, 0.45999999999999996, 0.54, 0.54]}, "centroidDeltaMs": 2352.76806640625, "insideScanCount": 23, "insideCentroidMs": 1778275421192.7554, "outsideScanCount": 28, "clusterDurationMs": 5117, "outsideCentroidMs": 1778275418839.9873}	f	2026-05-08 23:23:48.429731+02	\N
+6d45fc92-b037-4f6d-80e6-4cfa63f09aaa	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.38029295	0.46296534	1	0.8214286	\N	2026-05-08 23:23:38.805+02	2026-05-08 23:23:37.328+02	2026-05-08 23:23:42.445+02	{"centroidDeltaMs": 2368.99365234375, "insideScanCount": 23, "insideCentroidMs": 1778275421174.5652, "outsideScanCount": 28, "clusterDurationMs": 5117, "outsideCentroidMs": 1778275418805.5715}	t	2026-05-08 23:23:48.429731+02	\N
+2ac760cf-e2cf-44bc-a740-b759e8421513	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.03433405	0.686681	1	0.1	0.5	2026-05-08 23:27:25.738+02	2026-05-08 23:27:24.878+02	2026-05-08 23:27:27.624+02	{"rssiTrend": {"inside": {"r2": 0, "slope": 0}, "outside": {"r2": 0.012869098365344112, "slope": 0.000748271635161205}}, "rssiWeights": {"inside": [0.52], "outside": [0.56, 0.6599999999999999, 0.62, 0.6799999999999999, 0.72, 0.56, 0.6799999999999999, 0.56, 0.56, 0.48, 0.62, 0.64, 0.62, 0.62, 0.5800000000000001, 0.5800000000000001, 0.56, 0.78, 0.62, 0.6799999999999999, 0.6799999999999999, 0.62]}, "centroidDeltaMs": 1885.6259765625, "insideScanCount": 1, "insideCentroidMs": 1778275647624, "outsideScanCount": 22, "clusterDurationMs": 2746, "outsideCentroidMs": 1778275645738.374}	f	2026-05-08 23:27:32.608204+02	\N
+4312197e-576f-4fb4-b50e-81894a78e1c3	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.06888036	0.68880355	1	0.1	\N	2026-05-08 23:27:25.732+02	2026-05-08 23:27:24.878+02	2026-05-08 23:27:27.624+02	{"centroidDeltaMs": 1891.45458984375, "insideScanCount": 1, "insideCentroidMs": 1778275647624, "outsideScanCount": 22, "clusterDurationMs": 2746, "outsideCentroidMs": 1778275645732.5454}	t	2026-05-08 23:27:32.608204+02	\N
+f6c4b40f-98c4-4d69-be98-daf9b2a747ba	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.15769836	0.7884918	1	0.4	0.5	2026-05-08 23:27:57.901+02	2026-05-08 23:27:57.743+02	2026-05-08 23:28:00.578+02	{"rssiTrend": {"inside": {"r2": 0.0014555114812727643, "slope": 0.0007042797490037849}, "outside": {"r2": 0.14430356661756139, "slope": -0.0035074945282651633}}, "rssiWeights": {"inside": [0.43999999999999995, 0.43999999999999995, 0.33999999999999997, 0.43999999999999995], "outside": [0.5800000000000001, 0.6599999999999999, 0.5, 0.56, 0.5800000000000001, 0.52, 0.62, 0.5800000000000001, 0.5, 0.52]}, "centroidDeltaMs": 2235.374267578125, "insideScanCount": 4, "insideCentroidMs": 1778275677901.2173, "outsideScanCount": 10, "clusterDurationMs": 2835, "outsideCentroidMs": 1778275680136.5916}	f	2026-05-08 23:28:04.62667+02	\N
+01be5cc8-eb5e-4a1f-ab79-9171493c4541	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.3167619	0.7919048	1	0.4	\N	2026-05-08 23:27:57.9+02	2026-05-08 23:27:57.743+02	2026-05-08 23:28:00.578+02	{"centroidDeltaMs": 2245.050048828125, "insideScanCount": 4, "insideCentroidMs": 1778275677900.75, "outsideScanCount": 10, "clusterDurationMs": 2835, "outsideCentroidMs": 1778275680145.8}	t	2026-05-08 23:28:04.62667+02	\N
+45acdb63-2762-4e68-8d99-7411f7721cb0	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.4617938	0.69269073	1	0.6666667	\N	2026-05-08 23:28:43.424+02	2026-05-08 23:28:43.067+02	2026-05-08 23:28:45.728+02	{"centroidDeltaMs": 1843.25, "insideScanCount": 8, "insideCentroidMs": 1778275723424.25, "outsideScanCount": 12, "clusterDurationMs": 2661, "outsideCentroidMs": 1778275725267.5}	t	2026-05-08 23:28:50.672401+02	\N
+002b1a8d-6a28-4b61-8c2c-bc852c483225	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.18700762	0.6144536	1	0.4347826	0.7	2026-05-08 23:23:22.318+02	2026-05-08 23:23:21.899+02	2026-05-08 23:23:24.878+02	{"rssiTrend": {"inside": {"r2": 0.002084805862531569, "slope": 0.0006170757641265035}, "outside": {"r2": 0.629178614914609, "slope": 0.007378800960472742}}, "rssiWeights": {"inside": [0.38, 0.56, 0.64, 0.64, 0.62, 0.62, 0.62, 0.43999999999999995, 0.62, 0.54], "outside": [0.21999999999999997, 0.16000000000000003, 0.42000000000000004, 0.43999999999999995, 0.52, 0.52, 0.45999999999999996, 0.6, 0.5, 0.56, 0.56, 0.5, 0.6799999999999999, 0.6599999999999999, 0.5800000000000001, 0.62, 0.56, 0.78, 0.64, 0.6799999999999999, 0.56, 0.43999999999999995, 0.5]}, "centroidDeltaMs": 1830.457275390625, "insideScanCount": 10, "insideCentroidMs": 1778275402318.6936, "outsideScanCount": 23, "clusterDurationMs": 2979, "outsideCentroidMs": 1778275404149.151}	f	2026-05-08 23:23:30.424607+02	\N
+36ef6540-51a7-4ed9-8041-a0518b7b23a1	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.10074179	0.56667256	1	0.44444445	0.4	2026-05-08 23:23:56.152+02	2026-05-08 23:23:55.066+02	2026-05-08 23:23:58.028+02	{"rssiTrend": {"inside": {"r2": 0.4343329571385629, "slope": 0.004788899804894164}, "outside": {"r2": 0.4951321708327011, "slope": 0.009104157562871444}}, "rssiWeights": {"inside": [0.54, 0.43999999999999995, 0.4, 0.43999999999999995, 0.4, 0.52, 0.43999999999999995, 0.56, 0.56, 0.5800000000000001, 0.52, 0.5800000000000001, 0.62, 0.6799999999999999, 0.6799999999999999, 0.6799999999999999, 0.45999999999999996, 0.5800000000000001], "outside": [0.62, 0.62, 0.62, 0.6799999999999999, 0.62, 0.7, 0.7, 0.7]}, "centroidDeltaMs": 1678.484130859375, "insideScanCount": 18, "insideCentroidMs": 1778275436152.8613, "outsideScanCount": 8, "clusterDurationMs": 2962, "outsideCentroidMs": 1778275437831.3455}	f	2026-05-08 23:24:02.439694+02	\N
+0e895694-7c1c-43cc-9b24-85d0491419de	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.13530183	0.6013414	1	0.45	0.5	2026-05-08 23:24:18.264+02	2026-05-08 23:24:17.378+02	2026-05-08 23:24:20.847+02	{"rssiTrend": {"inside": {"r2": 0.00017178120545813247, "slope": 0.00007254505091015137}, "outside": {"r2": 0.017124369183540655, "slope": 0.0008793114881589854}}, "rssiWeights": {"inside": [0.54, 0.45999999999999996, 0.43999999999999995, 0.5, 0.52, 0.52, 0.52, 0.5, 0.45999999999999996], "outside": [0.43999999999999995, 0.5, 0.62, 0.56, 0.5800000000000001, 0.62, 0.5, 0.5, 0.6599999999999999, 0.56, 0.5800000000000001, 0.62, 0.5, 0.56, 0.62, 0.56, 0.6599999999999999, 0.6, 0.5, 0.45999999999999996]}, "centroidDeltaMs": 2086.053466796875, "insideScanCount": 9, "insideCentroidMs": 1778275460350.1392, "outsideScanCount": 20, "clusterDurationMs": 3469, "outsideCentroidMs": 1778275458264.0857}	f	2026-05-08 23:24:26.45598+02	\N
+36e0c700-e98e-46f7-8956-96257631d6ae	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.2714644	0.60325426	1	0.45	\N	2026-05-08 23:24:18.257+02	2026-05-08 23:24:17.378+02	2026-05-08 23:24:20.847+02	{"centroidDeltaMs": 2092.68896484375, "insideScanCount": 9, "insideCentroidMs": 1778275460349.889, "outsideScanCount": 20, "clusterDurationMs": 3469, "outsideCentroidMs": 1778275458257.2}	t	2026-05-08 23:24:26.45598+02	\N
+c13d4a81-f106-4872-8960-484757c97300	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.15919009	0.665704	1	0.47826087	0.5	2026-05-08 23:24:32.778+02	2026-05-08 23:24:31.944+02	2026-05-08 23:24:37.028+02	{"rssiTrend": {"inside": {"r2": 0.0055365492039883835, "slope": -0.0005565383014011221}, "outside": {"r2": 0.00003183985827437397, "slope": -0.00004051834121693804}}, "rssiWeights": {"inside": [0.4, 0.31999999999999995, 0.26, 0.4, 0.33999999999999997, 0.33999999999999997, 0.33999999999999997, 0.38, 0.45999999999999996, 0.21999999999999997, 0.36], "outside": [0.16000000000000003, 0.4, 0.38, 0.38, 0.38, 0.5, 0.43999999999999995, 0.43999999999999995, 0.33999999999999997, 0.31999999999999995, 0.48, 0.48, 0.48, 0.54, 0.43999999999999995, 0.4, 0.38, 0.31999999999999995, 0.36, 0.33999999999999997, 0.28, 0.33999999999999997, 0.4]}, "centroidDeltaMs": 3384.439208984375, "insideScanCount": 11, "insideCentroidMs": 1778275472778.4246, "outsideScanCount": 23, "clusterDurationMs": 5084, "outsideCentroidMs": 1778275476162.8638}	f	2026-05-08 23:24:42.465294+02	\N
+30b131f8-24b2-46b8-81bb-26721ae9b1bc	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.31790048	0.664701	1	0.47826087	\N	2026-05-08 23:24:32.784+02	2026-05-08 23:24:31.944+02	2026-05-08 23:24:37.028+02	{"centroidDeltaMs": 3379.33984375, "insideScanCount": 11, "insideCentroidMs": 1778275472784.182, "outsideScanCount": 23, "clusterDurationMs": 5084, "outsideCentroidMs": 1778275476163.5217}	t	2026-05-08 23:24:42.465294+02	\N
+2f2f06ed-26f3-4984-8c8d-0b22a669f5b4	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.16163796	0.6125228	1	0.5277778	0.5	2026-05-08 23:25:25.153+02	2026-05-08 23:25:23.844+02	2026-05-08 23:25:29.978+02	{"rssiTrend": {"inside": {"r2": 0.012105258281411069, "slope": -0.0009785714168049505}, "outside": {"r2": 0.019764924680366613, "slope": 0.0008425166184847432}}, "rssiWeights": {"inside": [0.52, 0.43999999999999995, 0.45999999999999996, 0.43999999999999995, 0.5, 0.72, 0.64, 0.56, 0.52, 0.56, 0.56, 0.56, 0.56, 0.72, 0.52, 0.6, 0.64, 0.31999999999999995, 0.19999999999999996], "outside": [0.4, 0.4, 0.48, 0.4, 0.45999999999999996, 0.43999999999999995, 0.54, 0.38, 0.5800000000000001, 0.52, 0.5800000000000001, 0.56, 0.6, 0.72, 0.54, 0.5800000000000001, 0.5800000000000001, 0.5800000000000001, 0.56, 0.6599999999999999, 0.5, 0.6, 0.6, 0.45999999999999996, 0.5800000000000001, 0.45999999999999996, 0.52, 0.56, 0.56, 0.56, 0.56, 0.64, 0.5, 0.31999999999999995, 0.5, 0.31999999999999995]}, "centroidDeltaMs": 3757.21484375, "insideScanCount": 19, "insideCentroidMs": 1778275525153.1592, "outsideScanCount": 36, "clusterDurationMs": 6134, "outsideCentroidMs": 1778275528910.374}	f	2026-05-08 23:25:34.500879+02	\N
+0e223fe7-c84b-4740-8ff5-a5ac6bcdba48	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.3202411	0.6067726	1	0.5277778	\N	2026-05-08 23:25:25.17+02	2026-05-08 23:25:23.844+02	2026-05-08 23:25:29.978+02	{"centroidDeltaMs": 3721.943115234375, "insideScanCount": 19, "insideCentroidMs": 1778275525170.4736, "outsideScanCount": 36, "clusterDurationMs": 6134, "outsideCentroidMs": 1778275528892.4167}	t	2026-05-08 23:25:34.500879+02	\N
+0d7124ee-504a-4b45-8c6d-ec38622ec064	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.22929668	0.5350256	1	0.42857143	\N	2026-05-08 23:26:49.079+02	2026-05-08 23:26:48.926+02	2026-05-08 23:26:50.378+02	{"centroidDeltaMs": 776.857177734375, "insideScanCount": 6, "insideCentroidMs": 1778275609079, "outsideScanCount": 14, "clusterDurationMs": 1452, "outsideCentroidMs": 1778275609855.8572}	t	2026-05-08 23:26:54.577227+02	\N
+e5858bd9-3362-4e0b-85d4-e3ec7c954bb8	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.200389	0.7013615	1	0.71428573	0.4	2026-05-08 23:25:06.651+02	2026-05-08 23:25:05.978+02	2026-05-08 23:25:12.017+02	{"rssiTrend": {"inside": {"r2": 0.11896648523784026, "slope": -0.0017079747208847908}, "outside": {"r2": 0.11330389665649776, "slope": -0.0028939723927187116}}, "rssiWeights": {"inside": [0.48, 0.42000000000000004, 0.45999999999999996, 0.4, 0.54, 0.43999999999999995, 0.6, 0.43999999999999995, 0.5800000000000001, 0.56, 0.45999999999999996, 0.52, 0.42000000000000004, 0.43999999999999995, 0.45999999999999996, 0.43999999999999995, 0.5, 0.43999999999999995, 0.4, 0.4, 0.33999999999999997], "outside": [0.4, 0.45999999999999996, 0.54, 0.56, 0.38, 0.4, 0.38, 0.45999999999999996, 0.45999999999999996, 0.45999999999999996, 0.45999999999999996, 0.43999999999999995, 0.45999999999999996, 0.33999999999999997, 0.33999999999999997]}, "centroidDeltaMs": 4235.52197265625, "insideScanCount": 21, "insideCentroidMs": 1778275510886.739, "outsideScanCount": 15, "clusterDurationMs": 6039, "outsideCentroidMs": 1778275506651.217}	f	2026-05-08 23:25:16.486894+02	\N
+035dc78e-27f4-42ec-9283-5f83b64aef09	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.15238522	0.30477044	1	1	0.5	2026-05-08 23:25:53.984+02	2026-05-08 23:25:51.136+02	2026-05-08 23:25:56.266+02	{"rssiTrend": {"inside": {"r2": 0.09553961755605533, "slope": 0.0033074361678475704}, "outside": {"r2": 0.4128922405776624, "slope": 0.002733324855243598}}, "rssiWeights": {"inside": [0.45999999999999996, 0.52, 0.45999999999999996, 0.45999999999999996, 0.62, 0.52, 0.7, 0.6799999999999999, 0.6799999999999999, 0.5, 0.5800000000000001, 0.45999999999999996, 0.5800000000000001], "outside": [0.33999999999999997, 0.38, 0.54, 0.45999999999999996, 0.5, 0.45999999999999996, 0.56, 0.6799999999999999, 0.64, 0.64, 0.45999999999999996, 0.5, 0.43999999999999995]}, "centroidDeltaMs": 1563.472412109375, "insideScanCount": 13, "insideCentroidMs": 1778275555548.0996, "outsideScanCount": 13, "clusterDurationMs": 5130, "outsideCentroidMs": 1778275553984.6272}	f	2026-05-08 23:26:00.520579+02	\N
+564cfb5b-0cf0-4279-b62b-390420dd7296	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.32865497	0.32865497	1	1	\N	2026-05-08 23:25:53.842+02	2026-05-08 23:25:51.136+02	2026-05-08 23:25:56.266+02	{"centroidDeltaMs": 1686, "insideScanCount": 13, "insideCentroidMs": 1778275555528.2307, "outsideScanCount": 13, "clusterDurationMs": 5130, "outsideCentroidMs": 1778275553842.2307}	t	2026-05-08 23:26:00.520579+02	\N
+069b5320-050d-40e2-9f60-12b01c245ed1	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.24438548	0.5702328	1	0.42857143	1	2026-05-08 23:26:49.067+02	2026-05-08 23:26:48.926+02	2026-05-08 23:26:50.378+02	{"rssiTrend": {"inside": {"r2": 0.5317144296789056, "slope": -0.015124676386428669}, "outside": {"r2": 0.42454821871175485, "slope": 0.010268330257036828}}, "rssiWeights": {"inside": [0.6799999999999999, 0.56, 0.64, 0.64, 0.56, 0.5], "outside": [0.38, 0.33999999999999997, 0.38, 0.45999999999999996, 0.38, 0.56, 0.5800000000000001, 0.54, 0.45999999999999996, 0.48, 0.62, 0.5800000000000001, 0.6599999999999999, 0.43999999999999995]}, "centroidDeltaMs": 827.97802734375, "insideScanCount": 6, "insideCentroidMs": 1778275609067.8381, "outsideScanCount": 14, "clusterDurationMs": 1452, "outsideCentroidMs": 1778275609895.8162}	f	2026-05-08 23:26:54.577227+02	\N
+10a848c0-d1f2-4836-96e8-3c5725f5c287	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.18292743	0.5533939	1	0.4722222	0.7	2026-05-08 23:28:27.746+02	2026-05-08 23:28:27.129+02	2026-05-08 23:28:32.244+02	{"rssiTrend": {"inside": {"r2": 0.0050149331694633315, "slope": 0.000283163896251899}, "outside": {"r2": 0.11474444845259424, "slope": -0.0037568007810263233}}, "rssiWeights": {"inside": [0.26, 0.33999999999999997, 0.28, 0.38, 0.4, 0.4, 0.52, 0.45999999999999996, 0.45999999999999996, 0.52, 0.48, 0.56, 0.43999999999999995, 0.5, 0.6, 0.56, 0.6, 0.5, 0.43999999999999995, 0.43999999999999995, 0.45999999999999996, 0.43999999999999995, 0.5, 0.38, 0.42000000000000004, 0.52, 0.43999999999999995, 0.43999999999999995, 0.45999999999999996, 0.48, 0.43999999999999995, 0.31999999999999995, 0.43999999999999995, 0.52, 0.31999999999999995, 0.33999999999999997], "outside": [0.6599999999999999, 0.6599999999999999, 0.64, 0.7, 0.72, 0.7, 0.52, 0.5, 0.45999999999999996, 0.5800000000000001, 0.6599999999999999, 0.6799999999999999, 0.6799999999999999, 0.62, 0.64, 0.45999999999999996, 0.5800000000000001]}, "centroidDeltaMs": 2830.60986328125, "insideScanCount": 36, "insideCentroidMs": 1778275710577.3152, "outsideScanCount": 17, "clusterDurationMs": 5115, "outsideCentroidMs": 1778275707746.7053}	f	2026-05-08 23:28:36.65667+02	\N
+46964baa-51cc-4391-88b7-08c39c390d49	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.2585792	0.5475795	1	0.4722222	\N	2026-05-08 23:28:27.763+02	2026-05-08 23:28:27.129+02	2026-05-08 23:28:32.244+02	{"centroidDeltaMs": 2800.869140625, "insideScanCount": 36, "insideCentroidMs": 1778275710564.2222, "outsideScanCount": 17, "clusterDurationMs": 5115, "outsideCentroidMs": 1778275707763.353}	t	2026-05-08 23:28:36.65667+02	\N
+efd8831d-648d-415c-b743-083430078d2d	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.041292224	0.82584447	1	0.1	0.5	2026-05-08 23:31:08.858+02	2026-05-08 23:31:08.381+02	2026-05-08 23:31:11.122+02	{"rssiTrend": {"inside": {"r2": 0, "slope": 0}, "outside": {"r2": 0.026006374059885262, "slope": 0.0010936128356725085}}, "rssiWeights": {"inside": [0.56], "outside": [0.43999999999999995, 0.43999999999999995, 0.43999999999999995, 0.52, 0.43999999999999995, 0.56, 0.43999999999999995, 0.52, 0.5, 0.45999999999999996, 0.45999999999999996, 0.43999999999999995]}, "centroidDeltaMs": 2263.6396484375, "insideScanCount": 1, "insideCentroidMs": 1778275871122, "outsideScanCount": 12, "clusterDurationMs": 2741, "outsideCentroidMs": 1778275868858.3604}	f	2026-05-08 23:31:16.824394+02	\N
+61c92078-ac8d-49b1-820d-716db288a87e	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.082734406	0.82734406	1	0.1	\N	2026-05-08 23:31:08.854+02	2026-05-08 23:31:08.381+02	2026-05-08 23:31:11.122+02	{"centroidDeltaMs": 2267.75, "insideScanCount": 1, "insideCentroidMs": 1778275871122, "outsideScanCount": 12, "clusterDurationMs": 2741, "outsideCentroidMs": 1778275868854.25}	t	2026-05-08 23:31:16.824394+02	\N
+e66122ca-26d6-458e-8ec5-7a62a77b3019	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.23149861	0.69449586	1	0.6666667	0.5	2026-05-08 23:28:43.428+02	2026-05-08 23:28:43.067+02	2026-05-08 23:28:45.728+02	{"rssiTrend": {"inside": {"r2": 0.05839712586281198, "slope": 0.0015274902137154484}, "outside": {"r2": 0.026209787277160834, "slope": 0.0022753986279238567}}, "rssiWeights": {"inside": [0.45999999999999996, 0.5, 0.52, 0.43999999999999995, 0.43999999999999995, 0.5, 0.52, 0.5], "outside": [0.33999999999999997, 0.43999999999999995, 0.45999999999999996, 0.5, 0.5, 0.48, 0.6, 0.45999999999999996, 0.62, 0.42000000000000004, 0.31999999999999995, 0.48]}, "centroidDeltaMs": 1848.053466796875, "insideScanCount": 8, "insideCentroidMs": 1778275723428.0925, "outsideScanCount": 12, "clusterDurationMs": 2661, "outsideCentroidMs": 1778275725276.146}	f	2026-05-08 23:28:50.672401+02	\N
+8c9cfe8a-df16-4a94-90e5-dc67011ba3a4	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.047892787	0.8939986	0.75	0.14285715	0.5	2026-05-08 23:30:43.344+02	2026-05-08 23:30:43.344+02	2026-05-08 23:30:45.878+02	{"rssiTrend": {"inside": {"r2": 0, "slope": 0}, "outside": {"r2": 0.5972525484746876, "slope": 0.00578336137316623}}, "rssiWeights": {"inside": [0.42000000000000004], "outside": [0.4, 0.43999999999999995, 0.48, 0.43999999999999995, 0.43999999999999995, 0.48, 0.48]}, "centroidDeltaMs": 2265.392578125, "insideScanCount": 1, "insideCentroidMs": 1778275843344, "outsideScanCount": 7, "clusterDurationMs": 2534, "outsideCentroidMs": 1778275845609.3926}	f	2026-05-08 23:30:50.801036+02	\N
+f4bf6530-98b9-4e5a-ae80-2ee3efc6aea4	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.09540655	0.8904611	0.75	0.14285715	\N	2026-05-08 23:30:43.344+02	2026-05-08 23:30:43.344+02	2026-05-08 23:30:45.878+02	{"centroidDeltaMs": 2256.428466796875, "insideScanCount": 1, "insideCentroidMs": 1778275843344, "outsideScanCount": 7, "clusterDurationMs": 2534, "outsideCentroidMs": 1778275845600.4285}	t	2026-05-08 23:30:50.801036+02	\N
+477bf9d6-f4cd-478f-a1ef-37e4947a1154	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.26101702	0.6264409	1	0.8333333	0.5	2026-05-08 23:29:23.507+02	2026-05-08 23:29:22.778+02	2026-05-08 23:29:26.546+02	{"rssiTrend": {"inside": {"r2": 0.06076261916168846, "slope": -0.0024811543881768615}, "outside": {"r2": 0.0033309996721591073, "slope": 0.0005155172743031762}}, "rssiWeights": {"inside": [0.31999999999999995, 0.43999999999999995, 0.45999999999999996, 0.54, 0.45999999999999996, 0.54, 0.6, 0.43999999999999995, 0.5800000000000001, 0.52, 0.45999999999999996, 0.43999999999999995, 0.4, 0.33999999999999997, 0.28], "outside": [0.43999999999999995, 0.6, 0.5800000000000001, 0.5, 0.45999999999999996, 0.33999999999999997, 0.52, 0.6, 0.56, 0.6599999999999999, 0.5800000000000001, 0.5800000000000001, 0.5, 0.56, 0.52, 0.43999999999999995, 0.45999999999999996, 0.56]}, "centroidDeltaMs": 2360.42919921875, "insideScanCount": 15, "insideCentroidMs": 1778275765868.3108, "outsideScanCount": 18, "clusterDurationMs": 3768, "outsideCentroidMs": 1778275763507.8816}	f	2026-05-08 23:29:30.720564+02	\N
+5588640e-8c40-43f2-8233-9c70682fb26b	rssi_weighted_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.24257568	0.48515135	1	1	0.5	2026-05-08 23:29:47.368+02	2026-05-08 23:29:46.478+02	2026-05-08 23:29:50.706+02	{"rssiTrend": {"inside": {"r2": 0.015230886687425005, "slope": 0.0005573030770571638}, "outside": {"r2": 0.00022677330704079512, "slope": 0.00009361202114650624}}, "rssiWeights": {"inside": [0.5, 0.45999999999999996, 0.45999999999999996, 0.5, 0.62, 0.64, 0.56, 0.56, 0.6, 0.56, 0.45999999999999996, 0.6599999999999999, 0.64, 0.56, 0.5, 0.45999999999999996, 0.56, 0.52, 0.5800000000000001, 0.52, 0.62, 0.6799999999999999, 0.5, 0.48], "outside": [0.45999999999999996, 0.5, 0.43999999999999995, 0.5800000000000001, 0.5800000000000001, 0.5, 0.33999999999999997, 0.38, 0.43999999999999995, 0.52, 0.54, 0.45999999999999996, 0.43999999999999995, 0.43999999999999995, 0.45999999999999996, 0.43999999999999995, 0.5, 0.56, 0.6, 0.43999999999999995, 0.52, 0.54, 0.45999999999999996, 0.38]}, "centroidDeltaMs": 2051.219970703125, "insideScanCount": 24, "insideCentroidMs": 1778275789420.0132, "outsideScanCount": 24, "clusterDurationMs": 4228, "outsideCentroidMs": 1778275787368.7932}	f	2026-05-08 23:29:54.73868+02	\N
+542ec236-3cfe-4ccb-8056-26901886c0a8	temporal_centroid	in	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.4827637	0.4827637	1	1	\N	2026-05-08 23:29:47.367+02	2026-05-08 23:29:46.478+02	2026-05-08 23:29:50.706+02	{"centroidDeltaMs": 2041.125, "insideScanCount": 24, "insideCentroidMs": 1778275789408.8333, "outsideScanCount": 24, "clusterDurationMs": 4228, "outsideCentroidMs": 1778275787367.7083}	t	2026-05-08 23:29:54.73868+02	\N
+9cb7af4b-367e-4eea-9c88-55d4b04a7bdf	rssi_weighted_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.3453644	0.8288745	1	0.8333333	0.5	2026-05-08 23:31:27.995+02	2026-05-08 23:31:27.743+02	2026-05-08 23:31:30.128+02	{"rssiTrend": {"inside": {"r2": 0.018545929091928093, "slope": 0.0035807291666666665}, "outside": {"r2": 0.15652173913043477, "slope": -0.01}}, "rssiWeights": {"inside": [0.43999999999999995, 0.6599999999999999, 0.5800000000000001, 0.43999999999999995, 0.54], "outside": [0.64, 0.45999999999999996, 0.56, 0.54, 0.52, 0.45999999999999996]}, "centroidDeltaMs": 1976.86572265625, "insideScanCount": 5, "insideCentroidMs": 1778275887995.4739, "outsideScanCount": 6, "clusterDurationMs": 2385, "outsideCentroidMs": 1778275889972.3396}	f	2026-05-08 23:31:34.837482+02	\N
+d4178cac-65cb-442f-aa4d-8652bacd9792	temporal_centroid	out	E28011704000021D53DAB0CB	f908224d-2e38-409a-bc7f-81902406f95b	5	0.6939203	0.8327044	1	0.8333333	\N	2026-05-08 23:31:27.992+02	2026-05-08 23:31:27.743+02	2026-05-08 23:31:30.128+02	{"centroidDeltaMs": 1986, "insideScanCount": 5, "insideCentroidMs": 1778275887992, "outsideScanCount": 6, "clusterDurationMs": 2385, "outsideCentroidMs": 1778275889978}	t	2026-05-08 23:31:34.837482+02	\N
+\.
+
+
+--
+-- Data for Name: raw_scans; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.raw_scans (id, lighthouse_id, epc, epc_length, rssi_dbm, antenna_id, frequency, sequence_number, detection_confidence, timestamp_ms, "timestamp", received_at, processed_at, orphaned_at, orphan_reason, source, time_basis, created_at) FROM stdin;
+16311	9	E28011704000021D53DAB0CB	\N	-63	0	58	\N	\N	1778274787495	2026-05-08 23:13:07.495+02	2026-05-08 23:13:07.804172+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:07.804172+02
+16312	9	E28011704000021D53DAB0CB	\N	-68	0	49	\N	\N	1778274787643	2026-05-08 23:13:07.643+02	2026-05-08 23:13:08.93012+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:08.93012+02
+16317	9	E28011704000021D53DAB0CB	\N	-62	0	48	\N	\N	1778274788245	2026-05-08 23:13:08.245+02	2026-05-08 23:13:09.553014+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:09.553014+02
+16319	9	E28011704000021D53DAB0CB	\N	-64	0	33	\N	\N	1778274788544	2026-05-08 23:13:08.544+02	2026-05-08 23:13:09.624482+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:09.624482+02
+16329	10	E28011704000021D53DAB0CB	\N	-62	0	14	\N	\N	1778274790328	2026-05-08 23:13:10.328+02	2026-05-08 23:13:12.079414+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.079414+02
+16332	10	E28011704000021D53DAB0CB	\N	-57	0	35	\N	\N	1778274790478	2026-05-08 23:13:10.478+02	2026-05-08 23:13:12.089104+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.089104+02
+16337	10	E28011704000021D53DAB0CB	\N	-71	0	39	\N	\N	1778274790928	2026-05-08 23:13:10.928+02	2026-05-08 23:13:12.133287+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.133287+02
+16340	10	E28011704000021D53DAB0CB	\N	-67	0	12	\N	\N	1778274791078	2026-05-08 23:13:11.078+02	2026-05-08 23:13:12.146167+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.146167+02
+16345	10	E28011704000021D53DAB0CB	\N	-70	0	58	\N	\N	1778274791544	2026-05-08 23:13:11.544+02	2026-05-08 23:13:12.208743+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.208743+02
+16348	10	E28011704000021D53DAB0CB	\N	-67	0	46	\N	\N	1778274791683	2026-05-08 23:13:11.683+02	2026-05-08 23:13:12.251001+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.251001+02
+16351	10	E28011704000021D53DAB0CB	\N	-71	0	47	\N	\N	1778274791829	2026-05-08 23:13:11.829+02	2026-05-08 23:13:12.276633+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.276633+02
+16353	10	E28011704000021D53DAB0CB	\N	-70	0	10	\N	\N	1778274792132	2026-05-08 23:13:12.132+02	2026-05-08 23:13:13.333963+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:13.333963+02
+16356	10	E28011704000021D53DAB0CB	\N	-63	0	48	\N	\N	1778274792278	2026-05-08 23:13:12.278+02	2026-05-08 23:13:13.35483+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:13.35483+02
+16359	10	E28011704000021D53DAB0CB	\N	-71	0	36	\N	\N	1778274792432	2026-05-08 23:13:12.432+02	2026-05-08 23:13:13.364552+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:13.364552+02
+16839	10	E28011704000021D53DAB0CB	\N	-68	0	56	\N	\N	1778275096628	2026-05-08 23:18:16.628+02	2026-05-08 23:18:17.25918+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:17.25918+02
+16841	10	E28011704000021D53DAB0CB	\N	-71	0	56	\N	\N	1778275097078	2026-05-08 23:18:17.078+02	2026-05-08 23:18:17.390119+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:17.390119+02
+16844	10	E28011704000021D53DAB0CB	\N	-62	0	41	\N	\N	1778275097241	2026-05-08 23:18:17.241+02	2026-05-08 23:18:18.700686+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.700686+02
+16847	10	E28011704000021D53DAB0CB	\N	-65	0	13	\N	\N	1778275097385	2026-05-08 23:18:17.385+02	2026-05-08 23:18:18.827124+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.827124+02
+16850	10	E28011704000021D53DAB0CB	\N	-58	0	29	\N	\N	1778275097680	2026-05-08 23:18:17.68+02	2026-05-08 23:18:18.839525+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.839525+02
+16584	10	E28011704000021D53DAB0CB	\N	-74	0	53	\N	\N	1778274959528	2026-05-08 23:15:59.528+02	2026-05-08 23:16:00.451745+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:00.451745+02
+16588	10	E28011704000021D53DAB0CB	\N	-70	0	40	\N	\N	1778274960129	2026-05-08 23:16:00.129+02	2026-05-08 23:16:01.207789+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.207789+02
+16590	10	E28011704000021D53DAB0CB	\N	-62	0	54	\N	\N	1778274960428	2026-05-08 23:16:00.428+02	2026-05-08 23:16:01.237819+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.237819+02
+16595	10	E28011704000021D53DAB0CB	\N	-62	0	47	\N	\N	1778274960878	2026-05-08 23:16:00.878+02	2026-05-08 23:16:01.299532+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.299532+02
+16361	10	E28011704000021D53DAB0CB	\N	-74	0	43	\N	\N	1778274818829	2026-05-08 23:13:38.829+02	2026-05-08 23:13:39.343531+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.343531+02
+16365	10	E28011704000021D53DAB0CB	\N	-65	0	19	\N	\N	1778274819278	2026-05-08 23:13:39.278+02	2026-05-08 23:13:39.886476+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.886476+02
+16371	10	E28011704000021D53DAB0CB	\N	-58	0	21	\N	\N	1778274819883	2026-05-08 23:13:39.883+02	2026-05-08 23:13:41.020358+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.020358+02
+16374	10	E28011704000021D53DAB0CB	\N	-55	0	21	\N	\N	1778274820028	2026-05-08 23:13:40.028+02	2026-05-08 23:13:41.053897+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.053897+02
+16377	10	E28011704000021D53DAB0CB	\N	-51	0	7	\N	\N	1778274820178	2026-05-08 23:13:40.178+02	2026-05-08 23:13:41.085695+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.085695+02
+16382	10	E28011704000021D53DAB0CB	\N	-55	0	43	\N	\N	1778274820634	2026-05-08 23:13:40.634+02	2026-05-08 23:13:41.176594+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.176594+02
+16385	10	E28011704000021D53DAB0CB	\N	-52	0	31	\N	\N	1778274820778	2026-05-08 23:13:40.778+02	2026-05-08 23:13:41.18655+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.18655+02
+16388	10	E28011704000021D53DAB0CB	\N	-61	0	14	\N	\N	1778274820928	2026-05-08 23:13:40.928+02	2026-05-08 23:13:41.220344+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.220344+02
+16389	10	E28011704000021D53DAB0CB	\N	-62	0	19	\N	\N	1778274821087	2026-05-08 23:13:41.087+02	2026-05-08 23:13:42.313677+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:42.313677+02
+16392	9	E28011704000021D53DAB0CB	\N	-68	0	8	\N	\N	1778274822293	2026-05-08 23:13:42.293+02	2026-05-08 23:13:42.623841+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:42.623841+02
+16399	9	E28011704000021D53DAB0CB	\N	-69	0	28	\N	\N	1778274822745	2026-05-08 23:13:42.745+02	2026-05-08 23:13:43.49989+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.49989+02
+16404	9	E28011704000021D53DAB0CB	\N	-62	0	13	\N	\N	1778274823194	2026-05-08 23:13:43.194+02	2026-05-08 23:13:43.701585+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.701585+02
+16415	9	E28011704000021D53DAB0CB	\N	-58	0	35	\N	\N	1778274824243	2026-05-08 23:13:44.243+02	2026-05-08 23:13:45.099179+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.099179+02
+16417	9	E28011704000021D53DAB0CB	\N	-61	0	30	\N	\N	1778274824545	2026-05-08 23:13:44.545+02	2026-05-08 23:13:45.129594+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.129594+02
+16411	9	E28011704000021D53DAB0CB	\N	-65	0	7	\N	\N	1778274823804	2026-05-08 23:13:43.804+02	2026-05-08 23:13:44.924575+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:44.924575+02
+16413	9	E28011704000021D53DAB0CB	\N	-65	0	47	\N	\N	1778274824127	2026-05-08 23:13:44.127+02	2026-05-08 23:13:45.015809+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.015809+02
+16420	9	E28011704000021D53DAB0CB	\N	-64	0	33	\N	\N	1778274824878	2026-05-08 23:13:44.878+02	2026-05-08 23:13:45.203906+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.203906+02
+16475	10	E28011704000021D53DAB0CB	\N	-73	0	57	\N	\N	1778274860828	2026-05-08 23:14:20.828+02	2026-05-08 23:14:21.737889+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:21.737889+02
+16477	10	E28011704000021D53DAB0CB	\N	-63	0	38	\N	\N	1778274861129	2026-05-08 23:14:21.129+02	2026-05-08 23:14:21.760269+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:21.760269+02
+16480	10	E28011704000021D53DAB0CB	\N	-70	0	8	\N	\N	1778274861428	2026-05-08 23:14:21.428+02	2026-05-08 23:14:21.775707+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:21.775707+02
+16484	10	E28011704000021D53DAB0CB	\N	-71	0	23	\N	\N	1778274862039	2026-05-08 23:14:22.039+02	2026-05-08 23:14:23.010167+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.010167+02
+16489	10	E28011704000021D53DAB0CB	\N	-65	0	39	\N	\N	1778274862479	2026-05-08 23:14:22.479+02	2026-05-08 23:14:23.091987+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.091987+02
+16494	10	E28011704000021D53DAB0CB	\N	-62	0	48	\N	\N	1778274862940	2026-05-08 23:14:22.94+02	2026-05-08 23:14:23.196966+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.196966+02
+16501	10	E28011704000021D53DAB0CB	\N	-70	0	38	\N	\N	1778274863393	2026-05-08 23:14:23.393+02	2026-05-08 23:14:24.456829+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.456829+02
+16504	10	E28011704000021D53DAB0CB	\N	-67	0	39	\N	\N	1778274863529	2026-05-08 23:14:23.529+02	2026-05-08 23:14:24.470098+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.470098+02
+16509	9	E28011704000021D53DAB0CB	\N	-64	0	14	\N	\N	1778274864449	2026-05-08 23:14:24.449+02	2026-05-08 23:14:25.525965+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.525965+02
+16512	9	E28011704000021D53DAB0CB	\N	-67	0	34	\N	\N	1778274864639	2026-05-08 23:14:24.639+02	2026-05-08 23:14:25.55362+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.55362+02
+16517	9	E28011704000021D53DAB0CB	\N	-65	0	46	\N	\N	1778274865344	2026-05-08 23:14:25.344+02	2026-05-08 23:14:25.673991+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.673991+02
+16518	9	E28011704000021D53DAB0CB	\N	-61	0	58	\N	\N	1778274865493	2026-05-08 23:14:25.493+02	2026-05-08 23:14:26.755852+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.755852+02
+16523	9	E28011704000021D53DAB0CB	\N	-61	0	12	\N	\N	1778274865943	2026-05-08 23:14:25.943+02	2026-05-08 23:14:26.864763+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.864763+02
+16861	10	E28011704000021D53DAB0CB	\N	-60	0	9	\N	\N	1778275120790	2026-05-08 23:18:40.79+02	2026-05-08 23:18:41.553771+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:41.553771+02
+16318	9	E28011704000021D53DAB0CB	\N	-64	0	31	\N	\N	1778274788393	2026-05-08 23:13:08.393+02	2026-05-08 23:13:09.605618+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:09.605618+02
+16308	9	E28011704000021D53DAB0CB	\N	-64	0	10	\N	\N	1778274762906	2026-05-08 23:12:42.906+02	2026-05-08 23:12:44.330607+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:44.330607+02
+16840	10	E28011704000021D53DAB0CB	\N	-64	0	21	\N	\N	1778275096928	2026-05-08 23:18:16.928+02	2026-05-08 23:18:17.380876+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:17.380876+02
+16843	10	E28011704000021D53DAB0CB	\N	-62	0	43	\N	\N	1778275097241	2026-05-08 23:18:17.241+02	2026-05-08 23:18:18.697457+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.697457+02
+16848	10	E28011704000021D53DAB0CB	\N	-65	0	56	\N	\N	1778275097680	2026-05-08 23:18:17.68+02	2026-05-08 23:18:18.835575+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.835575+02
+16851	10	E28011704000021D53DAB0CB	\N	-60	0	28	\N	\N	1778275097828	2026-05-08 23:18:17.828+02	2026-05-08 23:18:18.843571+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.843571+02
+16585	10	E28011704000021D53DAB0CB	\N	-66	0	30	\N	\N	1778274959678	2026-05-08 23:15:59.678+02	2026-05-08 23:16:00.758881+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:00.758881+02
+16587	10	E28011704000021D53DAB0CB	\N	-76	0	31	\N	\N	1778274959828	2026-05-08 23:15:59.828+02	2026-05-08 23:16:01.066168+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.066168+02
+16476	10	E28011704000021D53DAB0CB	\N	-70	0	14	\N	\N	1778274860978	2026-05-08 23:14:20.978+02	2026-05-08 23:14:21.750959+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:21.750959+02
+16320	10	E28011704000021D53DAB0CB	\N	-73	0	54	\N	\N	1778274789284	2026-05-08 23:13:09.284+02	2026-05-08 23:13:09.644665+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:09.644665+02
+16321	10	E28011704000021D53DAB0CB	\N	-66	0	19	\N	\N	1778274789428	2026-05-08 23:13:09.428+02	2026-05-08 23:13:10.773851+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:10.773851+02
+16324	10	E28011704000021D53DAB0CB	\N	-76	0	15	\N	\N	1778274789728	2026-05-08 23:13:09.728+02	2026-05-08 23:13:11.800763+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:11.800763+02
+16325	10	E28011704000021D53DAB0CB	\N	-74	0	38	\N	\N	1778274789878	2026-05-08 23:13:09.878+02	2026-05-08 23:13:12.029116+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.029116+02
+16333	10	E28011704000021D53DAB0CB	\N	-58	0	35	\N	\N	1778274790628	2026-05-08 23:13:10.628+02	2026-05-08 23:13:12.111213+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.111213+02
+16336	10	E28011704000021D53DAB0CB	\N	-66	0	26	\N	\N	1778274790781	2026-05-08 23:13:10.781+02	2026-05-08 23:13:12.123089+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.123089+02
+16341	10	E28011704000021D53DAB0CB	\N	-70	0	22	\N	\N	1778274791229	2026-05-08 23:13:11.229+02	2026-05-08 23:13:12.154948+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.154948+02
+16344	10	E28011704000021D53DAB0CB	\N	-64	0	50	\N	\N	1778274791378	2026-05-08 23:13:11.378+02	2026-05-08 23:13:12.187564+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.187564+02
+16347	10	E28011704000021D53DAB0CB	\N	-67	0	35	\N	\N	1778274791544	2026-05-08 23:13:11.544+02	2026-05-08 23:13:12.21276+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.21276+02
+16352	10	E28011704000021D53DAB0CB	\N	-70	0	23	\N	\N	1778274791978	2026-05-08 23:13:11.978+02	2026-05-08 23:13:12.2843+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.2843+02
+16355	10	E28011704000021D53DAB0CB	\N	-68	0	28	\N	\N	1778274792132	2026-05-08 23:13:12.132+02	2026-05-08 23:13:13.337884+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:13.337884+02
+16360	10	E28011704000021D53DAB0CB	\N	-74	0	56	\N	\N	1778274792578	2026-05-08 23:13:12.578+02	2026-05-08 23:13:13.372782+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:13.372782+02
+16483	10	E28011704000021D53DAB0CB	\N	-70	0	40	\N	\N	1778274861728	2026-05-08 23:14:21.728+02	2026-05-08 23:14:23.001997+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.001997+02
+16488	10	E28011704000021D53DAB0CB	\N	-68	0	38	\N	\N	1778274862342	2026-05-08 23:14:22.342+02	2026-05-08 23:14:23.072909+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.072909+02
+16362	10	E28011704000021D53DAB0CB	\N	-69	0	48	\N	\N	1778274818829	2026-05-08 23:13:38.829+02	2026-05-08 23:13:39.34565+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.34565+02
+16363	10	E28011704000021D53DAB0CB	\N	-72	0	26	\N	\N	1778274818978	2026-05-08 23:13:38.978+02	2026-05-08 23:13:39.873695+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.873695+02
+16368	10	E28011704000021D53DAB0CB	\N	-60	0	31	\N	\N	1778274819589	2026-05-08 23:13:39.589+02	2026-05-08 23:13:39.926504+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.926504+02
+16372	10	E28011704000021D53DAB0CB	\N	-58	0	16	\N	\N	1778274819883	2026-05-08 23:13:39.883+02	2026-05-08 23:13:41.023212+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.023212+02
+16375	10	E28011704000021D53DAB0CB	\N	-55	0	18	\N	\N	1778274820028	2026-05-08 23:13:40.028+02	2026-05-08 23:13:41.056382+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.056382+02
+16380	10	E28011704000021D53DAB0CB	\N	-55	0	51	\N	\N	1778274820478	2026-05-08 23:13:40.478+02	2026-05-08 23:13:41.144726+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.144726+02
+16383	10	E28011704000021D53DAB0CB	\N	-56	0	54	\N	\N	1778274820634	2026-05-08 23:13:40.634+02	2026-05-08 23:13:41.178311+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.178311+02
+16386	10	E28011704000021D53DAB0CB	\N	-58	0	28	\N	\N	1778274820778	2026-05-08 23:13:40.778+02	2026-05-08 23:13:41.188504+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.188504+02
+16390	10	E28011704000021D53DAB0CB	\N	-64	0	28	\N	\N	1778274821087	2026-05-08 23:13:41.087+02	2026-05-08 23:13:42.315983+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:42.315983+02
+16395	10	E28011704000021D53DAB0CB	\N	-67	0	42	\N	\N	1778274821378	2026-05-08 23:13:41.378+02	2026-05-08 23:13:42.654795+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:42.654795+02
+16397	9	E28011704000021D53DAB0CB	\N	-61	0	36	\N	\N	1778274822625	2026-05-08 23:13:42.625+02	2026-05-08 23:13:43.440135+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.440135+02
+16400	9	E28011704000021D53DAB0CB	\N	-68	0	8	\N	\N	1778274822745	2026-05-08 23:13:42.745+02	2026-05-08 23:13:43.502578+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.502578+02
+16402	9	E28011704000021D53DAB0CB	\N	-64	0	31	\N	\N	1778274823078	2026-05-08 23:13:43.078+02	2026-05-08 23:13:43.599903+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.599903+02
+16405	9	E28011704000021D53DAB0CB	\N	-64	0	22	\N	\N	1778274823194	2026-05-08 23:13:43.194+02	2026-05-08 23:13:43.703366+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.703366+02
+16407	9	E28011704000021D53DAB0CB	\N	-57	0	10	\N	\N	1778274823494	2026-05-08 23:13:43.494+02	2026-05-08 23:13:43.796581+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.796581+02
+16428	9	E28011704000021D53DAB0CB	\N	-64	0	30	\N	\N	1778274837745	2026-05-08 23:13:57.745+02	2026-05-08 23:13:59.005741+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.005741+02
+16430	9	E28011704000021D53DAB0CB	\N	-64	0	19	\N	\N	1778274838043	2026-05-08 23:13:58.043+02	2026-05-08 23:13:59.074694+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.074694+02
+16435	9	E28011704000021D53DAB0CB	\N	-61	0	26	\N	\N	1778274838526	2026-05-08 23:13:58.526+02	2026-05-08 23:13:59.157349+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.157349+02
+16440	9	E28011704000021D53DAB0CB	\N	-61	0	27	\N	\N	1778274838794	2026-05-08 23:13:58.794+02	2026-05-08 23:13:59.230859+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.230859+02
+16441	10	E28011704000021D53DAB0CB	\N	-66	0	36	\N	\N	1778274839228	2026-05-08 23:13:59.228+02	2026-05-08 23:14:00.349708+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.349708+02
+16444	10	E28011704000021D53DAB0CB	\N	-70	0	19	\N	\N	1778274839378	2026-05-08 23:13:59.378+02	2026-05-08 23:14:00.494736+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.494736+02
+16446	10	E28011704000021D53DAB0CB	\N	-67	0	20	\N	\N	1778274839678	2026-05-08 23:13:59.678+02	2026-05-08 23:14:00.516278+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.516278+02
+16449	10	E28011704000021D53DAB0CB	\N	-67	0	11	\N	\N	1778274839829	2026-05-08 23:13:59.829+02	2026-05-08 23:14:00.651096+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.651096+02
+16452	10	E28011704000021D53DAB0CB	\N	-62	0	15	\N	\N	1778274839979	2026-05-08 23:13:59.979+02	2026-05-08 23:14:00.77815+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.77815+02
+16457	10	E28011704000021D53DAB0CB	\N	-62	0	45	\N	\N	1778274840435	2026-05-08 23:14:00.435+02	2026-05-08 23:14:00.837951+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.837951+02
+16460	10	E28011704000021D53DAB0CB	\N	-62	0	54	\N	\N	1778274840578	2026-05-08 23:14:00.578+02	2026-05-08 23:14:00.847904+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.847904+02
+16465	10	E28011704000021D53DAB0CB	\N	-59	0	50	\N	\N	1778274840878	2026-05-08 23:14:00.878+02	2026-05-08 23:14:02.386672+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:02.386672+02
+16470	10	E28011704000021D53DAB0CB	\N	-64	0	36	\N	\N	1778274841328	2026-05-08 23:14:01.328+02	2026-05-08 23:14:03.305047+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:03.305047+02
+16473	10	E28011704000021D53DAB0CB	\N	-73	0	33	\N	\N	1778274841485	2026-05-08 23:14:01.485+02	2026-05-08 23:14:03.615399+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:03.615399+02
+16313	9	E28011704000021D53DAB0CB	\N	-66	0	38	\N	\N	1778274787815	2026-05-08 23:13:07.815+02	2026-05-08 23:13:09.462093+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:09.462093+02
+16309	9	E28011704000021D53DAB0CB	\N	-68	0	33	\N	\N	1778274763074	2026-05-08 23:12:43.074+02	2026-05-08 23:12:44.350943+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:44.350943+02
+16842	10	E28011704000021D53DAB0CB	\N	-67	0	16	\N	\N	1778275097078	2026-05-08 23:18:17.078+02	2026-05-08 23:18:17.392252+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:17.392252+02
+16845	10	E28011704000021D53DAB0CB	\N	-64	0	12	\N	\N	1778275097241	2026-05-08 23:18:17.241+02	2026-05-08 23:18:18.702833+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.702833+02
+16853	10	E28011704000021D53DAB0CB	\N	-63	0	48	\N	\N	1778275097979	2026-05-08 23:18:17.979+02	2026-05-08 23:18:18.849229+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.849229+02
+16846	10	E28011704000021D53DAB0CB	\N	-64	0	25	\N	\N	1778275097385	2026-05-08 23:18:17.385+02	2026-05-08 23:18:18.824965+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.824965+02
+16586	10	E28011704000021D53DAB0CB	\N	-74	0	7	\N	\N	1778274959678	2026-05-08 23:15:59.678+02	2026-05-08 23:16:00.761028+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:00.761028+02
+16592	10	E28011704000021D53DAB0CB	\N	-62	0	20	\N	\N	1778274960578	2026-05-08 23:16:00.578+02	2026-05-08 23:16:01.247474+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.247474+02
+16597	10	E28011704000021D53DAB0CB	\N	-64	0	27	\N	\N	1778274961034	2026-05-08 23:16:01.034+02	2026-05-08 23:16:01.309506+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.309506+02
+16602	10	E28011704000021D53DAB0CB	\N	-58	0	29	\N	\N	1778274961328	2026-05-08 23:16:01.328+02	2026-05-08 23:16:02.809448+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:02.809448+02
+16315	9	E28011704000021D53DAB0CB	\N	-64	0	11	\N	\N	1778274788094	2026-05-08 23:13:08.094+02	2026-05-08 23:13:09.534576+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:09.534576+02
+16323	10	E28011704000021D53DAB0CB	\N	-70	0	46	\N	\N	1778274789728	2026-05-08 23:13:09.728+02	2026-05-08 23:13:11.798129+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:11.798129+02
+16327	10	E28011704000021D53DAB0CB	\N	-65	0	45	\N	\N	1778274790033	2026-05-08 23:13:10.033+02	2026-05-08 23:13:12.038347+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.038347+02
+16330	10	E28011704000021D53DAB0CB	\N	-62	0	42	\N	\N	1778274790328	2026-05-08 23:13:10.328+02	2026-05-08 23:13:12.081855+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.081855+02
+16335	10	E28011704000021D53DAB0CB	\N	-67	0	25	\N	\N	1778274790781	2026-05-08 23:13:10.781+02	2026-05-08 23:13:12.121031+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.121031+02
+16338	10	E28011704000021D53DAB0CB	\N	-65	0	50	\N	\N	1778274790928	2026-05-08 23:13:10.928+02	2026-05-08 23:13:12.135228+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.135228+02
+16343	10	E28011704000021D53DAB0CB	\N	-67	0	12	\N	\N	1778274791378	2026-05-08 23:13:11.378+02	2026-05-08 23:13:12.184936+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.184936+02
+16346	10	E28011704000021D53DAB0CB	\N	-70	0	25	\N	\N	1778274791544	2026-05-08 23:13:11.544+02	2026-05-08 23:13:12.210754+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.210754+02
+16349	10	E28011704000021D53DAB0CB	\N	-72	0	54	\N	\N	1778274791683	2026-05-08 23:13:11.683+02	2026-05-08 23:13:12.253094+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.253094+02
+16354	10	E28011704000021D53DAB0CB	\N	-70	0	20	\N	\N	1778274792132	2026-05-08 23:13:12.132+02	2026-05-08 23:13:13.335643+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:13.335643+02
+16357	10	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778274792278	2026-05-08 23:13:12.278+02	2026-05-08 23:13:13.356961+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:13.356961+02
+16605	10	E28011704000021D53DAB0CB	\N	-59	0	30	\N	\N	1778274961485	2026-05-08 23:16:01.485+02	2026-05-08 23:16:03.119327+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.119327+02
+16610	9	E28011704000021D53DAB0CB	\N	-71	0	28	\N	\N	1778274962694	2026-05-08 23:16:02.694+02	2026-05-08 23:16:03.828972+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.828972+02
+16478	10	E28011704000021D53DAB0CB	\N	-64	0	42	\N	\N	1778274861129	2026-05-08 23:14:21.129+02	2026-05-08 23:14:21.762054+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:21.762054+02
+16482	10	E28011704000021D53DAB0CB	\N	-68	0	33	\N	\N	1778274861728	2026-05-08 23:14:21.728+02	2026-05-08 23:14:22.999969+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:22.999969+02
+16485	10	E28011704000021D53DAB0CB	\N	-73	0	11	\N	\N	1778274862039	2026-05-08 23:14:22.039+02	2026-05-08 23:14:23.011995+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.011995+02
+16487	10	E28011704000021D53DAB0CB	\N	-62	0	36	\N	\N	1778274862342	2026-05-08 23:14:22.342+02	2026-05-08 23:14:23.070965+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.070965+02
+16490	10	E28011704000021D53DAB0CB	\N	-65	0	37	\N	\N	1778274862479	2026-05-08 23:14:22.479+02	2026-05-08 23:14:23.094202+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.094202+02
+16492	10	E28011704000021D53DAB0CB	\N	-65	0	49	\N	\N	1778274862779	2026-05-08 23:14:22.779+02	2026-05-08 23:14:23.152302+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.152302+02
+16495	10	E28011704000021D53DAB0CB	\N	-62	0	14	\N	\N	1778274862940	2026-05-08 23:14:22.94+02	2026-05-08 23:14:23.198765+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.198765+02
+16499	10	E28011704000021D53DAB0CB	\N	-71	0	47	\N	\N	1778274863231	2026-05-08 23:14:23.231+02	2026-05-08 23:14:24.442421+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.442421+02
+16502	10	E28011704000021D53DAB0CB	\N	-71	0	43	\N	\N	1778274863393	2026-05-08 23:14:23.393+02	2026-05-08 23:14:24.460091+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.460091+02
+16507	10	E28011704000021D53DAB0CB	\N	-71	0	35	\N	\N	1778274863828	2026-05-08 23:14:23.828+02	2026-05-08 23:14:24.492147+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.492147+02
+16364	10	E28011704000021D53DAB0CB	\N	-70	0	25	\N	\N	1778274819278	2026-05-08 23:13:39.278+02	2026-05-08 23:13:39.883779+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.883779+02
+16367	10	E28011704000021D53DAB0CB	\N	-58	0	7	\N	\N	1778274819429	2026-05-08 23:13:39.429+02	2026-05-08 23:13:39.902021+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.902021+02
+16376	10	E28011704000021D53DAB0CB	\N	-55	0	14	\N	\N	1778274820178	2026-05-08 23:13:40.178+02	2026-05-08 23:13:41.082963+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.082963+02
+16379	10	E28011704000021D53DAB0CB	\N	-58	0	20	\N	\N	1778274820328	2026-05-08 23:13:40.328+02	2026-05-08 23:13:41.113713+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.113713+02
+16387	10	E28011704000021D53DAB0CB	\N	-59	0	27	\N	\N	1778274820928	2026-05-08 23:13:40.928+02	2026-05-08 23:13:41.217999+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.217999+02
+16391	9	E28011704000021D53DAB0CB	\N	-63	0	7	\N	\N	1778274822293	2026-05-08 23:13:42.293+02	2026-05-08 23:13:42.621485+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:42.621485+02
+16394	10	E28011704000021D53DAB0CB	\N	-70	0	35	\N	\N	1778274821228	2026-05-08 23:13:41.228+02	2026-05-08 23:13:42.641527+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:42.641527+02
+16396	9	E28011704000021D53DAB0CB	\N	-64	0	54	\N	\N	1778274822465	2026-05-08 23:13:42.465+02	2026-05-08 23:13:43.030196+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.030196+02
+16401	9	E28011704000021D53DAB0CB	\N	-64	0	7	\N	\N	1778274822902	2026-05-08 23:13:42.902+02	2026-05-08 23:13:43.526027+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.526027+02
+16406	9	E28011704000021D53DAB0CB	\N	-62	0	16	\N	\N	1778274823358	2026-05-08 23:13:43.358+02	2026-05-08 23:13:43.727628+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.727628+02
+16410	9	E28011704000021D53DAB0CB	\N	-65	0	34	\N	\N	1778274823644	2026-05-08 23:13:43.644+02	2026-05-08 23:13:44.875047+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:44.875047+02
+16412	9	E28011704000021D53DAB0CB	\N	-62	0	45	\N	\N	1778274823968	2026-05-08 23:13:43.968+02	2026-05-08 23:13:44.950651+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:44.950651+02
+16419	9	E28011704000021D53DAB0CB	\N	-64	0	54	\N	\N	1778274824699	2026-05-08 23:13:44.699+02	2026-05-08 23:13:45.18503+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.18503+02
+16421	9	E28011704000021D53DAB0CB	\N	-64	0	54	\N	\N	1778274824994	2026-05-08 23:13:44.994+02	2026-05-08 23:13:45.268015+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.268015+02
+16366	10	E28011704000021D53DAB0CB	\N	-68	0	53	\N	\N	1778274819429	2026-05-08 23:13:39.429+02	2026-05-08 23:13:39.900011+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.900011+02
+16423	9	E28011704000021D53DAB0CB	\N	-63	0	41	\N	\N	1778274837293	2026-05-08 23:13:57.293+02	2026-05-08 23:13:57.777217+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:57.777217+02
+16424	9	E28011704000021D53DAB0CB	\N	-68	0	18	\N	\N	1778274837443	2026-05-08 23:13:57.443+02	2026-05-08 23:13:58.187856+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:58.187856+02
+16425	9	E28011704000021D53DAB0CB	\N	-68	0	35	\N	\N	1778274837443	2026-05-08 23:13:57.443+02	2026-05-08 23:13:58.189968+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:58.189968+02
+16427	9	E28011704000021D53DAB0CB	\N	-65	0	21	\N	\N	1778274837745	2026-05-08 23:13:57.745+02	2026-05-08 23:13:59.003878+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.003878+02
+16429	9	E28011704000021D53DAB0CB	\N	-65	0	19	\N	\N	1778274837894	2026-05-08 23:13:57.894+02	2026-05-08 23:13:59.056133+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.056133+02
+16432	9	E28011704000021D53DAB0CB	\N	-62	0	19	\N	\N	1778274838193	2026-05-08 23:13:58.193+02	2026-05-08 23:13:59.125944+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.125944+02
+16247	10	E28011704000021D53DAB0CB	\N	-80	0	54	\N	\N	1778274756441	2026-05-08 23:12:36.441+02	2026-05-08 23:12:36.981778+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:36.981778+02
+16248	10	E28011704000021D53DAB0CB	\N	-67	0	41	\N	\N	1778274756441	2026-05-08 23:12:36.441+02	2026-05-08 23:12:36.984097+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:36.984097+02
+16249	10	E28011704000021D53DAB0CB	\N	-76	0	45	\N	\N	1778274756441	2026-05-08 23:12:36.441+02	2026-05-08 23:12:36.986804+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:36.986804+02
+16250	10	E28011704000021D53DAB0CB	\N	-68	0	21	\N	\N	1778274756878	2026-05-08 23:12:36.878+02	2026-05-08 23:12:37.289222+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:37.289222+02
+16251	10	E28011704000021D53DAB0CB	\N	-70	0	58	\N	\N	1778274756878	2026-05-08 23:12:36.878+02	2026-05-08 23:12:37.294007+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:37.294007+02
+16252	10	E28011704000021D53DAB0CB	\N	-73	0	18	\N	\N	1778274757778	2026-05-08 23:12:37.778+02	2026-05-08 23:12:38.620628+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.620628+02
+16253	10	E28011704000021D53DAB0CB	\N	-67	0	31	\N	\N	1778274757778	2026-05-08 23:12:37.778+02	2026-05-08 23:12:38.622671+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.622671+02
+16254	10	E28011704000021D53DAB0CB	\N	-68	0	7	\N	\N	1778274757929	2026-05-08 23:12:37.929+02	2026-05-08 23:12:38.638132+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.638132+02
+16255	10	E28011704000021D53DAB0CB	\N	-70	0	15	\N	\N	1778274757929	2026-05-08 23:12:37.929+02	2026-05-08 23:12:38.639937+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.639937+02
+16256	10	E28011704000021D53DAB0CB	\N	-70	0	43	\N	\N	1778274758078	2026-05-08 23:12:38.078+02	2026-05-08 23:12:38.673926+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.673926+02
+16257	10	E28011704000021D53DAB0CB	\N	-68	0	8	\N	\N	1778274758243	2026-05-08 23:12:38.243+02	2026-05-08 23:12:38.705975+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.705975+02
+16258	10	E28011704000021D53DAB0CB	\N	-68	0	24	\N	\N	1778274758243	2026-05-08 23:12:38.243+02	2026-05-08 23:12:38.708046+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.708046+02
+16259	10	E28011704000021D53DAB0CB	\N	-70	0	44	\N	\N	1778274758243	2026-05-08 23:12:38.243+02	2026-05-08 23:12:38.710005+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.710005+02
+16260	10	E28011704000021D53DAB0CB	\N	-70	0	50	\N	\N	1778274758389	2026-05-08 23:12:38.389+02	2026-05-08 23:12:38.724699+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.724699+02
+16261	10	E28011704000021D53DAB0CB	\N	-71	0	46	\N	\N	1778274758389	2026-05-08 23:12:38.389+02	2026-05-08 23:12:38.726788+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:38.726788+02
+16262	10	E28011704000021D53DAB0CB	\N	-73	0	50	\N	\N	1778274758528	2026-05-08 23:12:38.528+02	2026-05-08 23:12:39.849602+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:39.849602+02
+16263	10	E28011704000021D53DAB0CB	\N	-68	0	48	\N	\N	1778274758680	2026-05-08 23:12:38.68+02	2026-05-08 23:12:40.15613+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.15613+02
+16264	10	E28011704000021D53DAB0CB	\N	-68	0	59	\N	\N	1778274758828	2026-05-08 23:12:38.828+02	2026-05-08 23:12:40.462593+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.462593+02
+16265	10	E28011704000021D53DAB0CB	\N	-68	0	22	\N	\N	1778274758828	2026-05-08 23:12:38.828+02	2026-05-08 23:12:40.467451+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.467451+02
+16266	10	E28011704000021D53DAB0CB	\N	-70	0	15	\N	\N	1778274758986	2026-05-08 23:12:38.986+02	2026-05-08 23:12:40.590413+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.590413+02
+16267	10	E28011704000021D53DAB0CB	\N	-60	0	23	\N	\N	1778274758986	2026-05-08 23:12:38.986+02	2026-05-08 23:12:40.592201+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.592201+02
+16268	10	E28011704000021D53DAB0CB	\N	-68	0	54	\N	\N	1778274758986	2026-05-08 23:12:38.986+02	2026-05-08 23:12:40.593785+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.593785+02
+16269	10	E28011704000021D53DAB0CB	\N	-61	0	54	\N	\N	1778274759131	2026-05-08 23:12:39.131+02	2026-05-08 23:12:40.598541+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.598541+02
+16270	10	E28011704000021D53DAB0CB	\N	-59	0	34	\N	\N	1778274759131	2026-05-08 23:12:39.131+02	2026-05-08 23:12:40.600225+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.600225+02
+16271	10	E28011704000021D53DAB0CB	\N	-62	0	50	\N	\N	1778274759278	2026-05-08 23:12:39.278+02	2026-05-08 23:12:40.61695+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.61695+02
+16272	10	E28011704000021D53DAB0CB	\N	-58	0	37	\N	\N	1778274759278	2026-05-08 23:12:39.278+02	2026-05-08 23:12:40.618917+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.618917+02
+16273	10	E28011704000021D53DAB0CB	\N	-62	0	23	\N	\N	1778274759434	2026-05-08 23:12:39.434+02	2026-05-08 23:12:40.625036+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.625036+02
+16274	10	E28011704000021D53DAB0CB	\N	-58	0	57	\N	\N	1778274759434	2026-05-08 23:12:39.434+02	2026-05-08 23:12:40.626809+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.626809+02
+16275	10	E28011704000021D53DAB0CB	\N	-64	0	18	\N	\N	1778274759578	2026-05-08 23:12:39.578+02	2026-05-08 23:12:40.634225+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.634225+02
+16276	10	E28011704000021D53DAB0CB	\N	-64	0	19	\N	\N	1778274759739	2026-05-08 23:12:39.739+02	2026-05-08 23:12:40.643151+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.643151+02
+16277	10	E28011704000021D53DAB0CB	\N	-65	0	11	\N	\N	1778274759739	2026-05-08 23:12:39.739+02	2026-05-08 23:12:40.644742+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.644742+02
+16278	10	E28011704000021D53DAB0CB	\N	-68	0	48	\N	\N	1778274759739	2026-05-08 23:12:39.739+02	2026-05-08 23:12:40.646648+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.646648+02
+16279	10	E28011704000021D53DAB0CB	\N	-68	0	28	\N	\N	1778274759880	2026-05-08 23:12:39.88+02	2026-05-08 23:12:40.65912+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.65912+02
+16280	10	E28011704000021D53DAB0CB	\N	-68	0	18	\N	\N	1778274759880	2026-05-08 23:12:39.88+02	2026-05-08 23:12:40.660871+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.660871+02
+16281	10	E28011704000021D53DAB0CB	\N	-66	0	16	\N	\N	1778274760028	2026-05-08 23:12:40.028+02	2026-05-08 23:12:40.667407+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.667407+02
+16282	10	E28011704000021D53DAB0CB	\N	-73	0	59	\N	\N	1778274760028	2026-05-08 23:12:40.028+02	2026-05-08 23:12:40.66958+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.66958+02
+16283	10	E28011704000021D53DAB0CB	\N	-63	0	35	\N	\N	1778274760180	2026-05-08 23:12:40.18+02	2026-05-08 23:12:40.681489+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.681489+02
+16284	10	E28011704000021D53DAB0CB	\N	-64	0	29	\N	\N	1778274760180	2026-05-08 23:12:40.18+02	2026-05-08 23:12:40.683701+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.683701+02
+16285	10	E28011704000021D53DAB0CB	\N	-71	0	58	\N	\N	1778274760328	2026-05-08 23:12:40.328+02	2026-05-08 23:12:40.695861+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:40.695861+02
+16286	9	E28011704000021D53DAB0CB	\N	-67	0	10	\N	\N	1778274760793	2026-05-08 23:12:40.793+02	2026-05-08 23:12:41.794039+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:41.794039+02
+16287	9	E28011704000021D53DAB0CB	\N	-68	0	49	\N	\N	1778274760945	2026-05-08 23:12:40.945+02	2026-05-08 23:12:42.203698+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.203698+02
+16288	9	E28011704000021D53DAB0CB	\N	-65	0	44	\N	\N	1778274760945	2026-05-08 23:12:40.945+02	2026-05-08 23:12:42.205605+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.205605+02
+16289	9	E28011704000021D53DAB0CB	\N	-67	0	15	\N	\N	1778274761117	2026-05-08 23:12:41.117+02	2026-05-08 23:12:42.263245+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.263245+02
+16290	9	E28011704000021D53DAB0CB	\N	-70	0	53	\N	\N	1778274761244	2026-05-08 23:12:41.244+02	2026-05-08 23:12:42.292641+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.292641+02
+16291	9	E28011704000021D53DAB0CB	\N	-62	0	52	\N	\N	1778274761415	2026-05-08 23:12:41.415+02	2026-05-08 23:12:42.361867+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.361867+02
+16292	9	E28011704000021D53DAB0CB	\N	-67	0	56	\N	\N	1778274761579	2026-05-08 23:12:41.579+02	2026-05-08 23:12:42.464357+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.464357+02
+16293	9	E28011704000021D53DAB0CB	\N	-60	0	15	\N	\N	1778274761579	2026-05-08 23:12:41.579+02	2026-05-08 23:12:42.466125+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.466125+02
+16294	9	E28011704000021D53DAB0CB	\N	-68	0	58	\N	\N	1778274761693	2026-05-08 23:12:41.693+02	2026-05-08 23:12:42.490463+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.490463+02
+16295	9	E28011704000021D53DAB0CB	\N	-64	0	39	\N	\N	1778274761865	2026-05-08 23:12:41.865+02	2026-05-08 23:12:42.515666+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.515666+02
+16296	9	E28011704000021D53DAB0CB	\N	-62	0	44	\N	\N	1778274761865	2026-05-08 23:12:41.865+02	2026-05-08 23:12:42.518135+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.518135+02
+16297	9	E28011704000021D53DAB0CB	\N	-62	0	38	\N	\N	1778274761993	2026-05-08 23:12:41.993+02	2026-05-08 23:12:42.570199+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.570199+02
+16298	9	E28011704000021D53DAB0CB	\N	-62	0	29	\N	\N	1778274761993	2026-05-08 23:12:41.993+02	2026-05-08 23:12:42.572115+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.572115+02
+16299	9	E28011704000021D53DAB0CB	\N	-61	0	22	\N	\N	1778274762143	2026-05-08 23:12:42.143+02	2026-05-08 23:12:42.600194+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.600194+02
+16300	9	E28011704000021D53DAB0CB	\N	-61	0	39	\N	\N	1778274762294	2026-05-08 23:12:42.294+02	2026-05-08 23:12:42.670376+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.670376+02
+16301	9	E28011704000021D53DAB0CB	\N	-61	0	56	\N	\N	1778274762294	2026-05-08 23:12:42.294+02	2026-05-08 23:12:42.672525+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.672525+02
+16302	9	E28011704000021D53DAB0CB	\N	-59	0	28	\N	\N	1778274762444	2026-05-08 23:12:42.444+02	2026-05-08 23:12:42.769577+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.769577+02
+16303	9	E28011704000021D53DAB0CB	\N	-61	0	28	\N	\N	1778274762444	2026-05-08 23:12:42.444+02	2026-05-08 23:12:42.777196+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.777196+02
+16304	9	E28011704000021D53DAB0CB	\N	-61	0	48	\N	\N	1778274762610	2026-05-08 23:12:42.61+02	2026-05-08 23:12:42.84192+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:42.84192+02
+16305	9	E28011704000021D53DAB0CB	\N	-64	0	52	\N	\N	1778274762744	2026-05-08 23:12:42.744+02	2026-05-08 23:12:43.945674+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:43.945674+02
+16306	9	E28011704000021D53DAB0CB	\N	-61	0	46	\N	\N	1778274762744	2026-05-08 23:12:42.744+02	2026-05-08 23:12:43.947936+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:43.947936+02
+16307	9	E28011704000021D53DAB0CB	\N	-67	0	53	\N	\N	1778274762906	2026-05-08 23:12:42.906+02	2026-05-08 23:12:44.328755+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:44.328755+02
+16310	9	E28011704000021D53DAB0CB	\N	-67	0	57	\N	\N	1778274763074	2026-05-08 23:12:43.074+02	2026-05-08 23:12:44.353102+02	2026-05-08 23:12:47.94+02	\N	\N	realtime	synced	2026-05-08 23:12:44.353102+02
+16849	10	E28011704000021D53DAB0CB	\N	-58	0	24	\N	\N	1778275097680	2026-05-08 23:18:17.68+02	2026-05-08 23:18:18.837773+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.837773+02
+16852	10	E28011704000021D53DAB0CB	\N	-68	0	58	\N	\N	1778275097828	2026-05-08 23:18:17.828+02	2026-05-08 23:18:18.845636+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:18.845636+02
+16593	10	E28011704000021D53DAB0CB	\N	-65	0	28	\N	\N	1778274960728	2026-05-08 23:16:00.728+02	2026-05-08 23:16:01.28956+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.28956+02
+16596	10	E28011704000021D53DAB0CB	\N	-57	0	31	\N	\N	1778274960878	2026-05-08 23:16:00.878+02	2026-05-08 23:16:01.301752+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.301752+02
+16599	10	E28011704000021D53DAB0CB	\N	-54	0	42	\N	\N	1778274961034	2026-05-08 23:16:01.034+02	2026-05-08 23:16:01.31321+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.31321+02
+16314	9	E28011704000021D53DAB0CB	\N	-69	0	33	\N	\N	1778274787943	2026-05-08 23:13:07.943+02	2026-05-08 23:13:09.516399+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:09.516399+02
+16316	9	E28011704000021D53DAB0CB	\N	-68	0	43	\N	\N	1778274788245	2026-05-08 23:13:08.245+02	2026-05-08 23:13:09.547105+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:09.547105+02
+16322	10	E28011704000021D53DAB0CB	\N	-71	0	53	\N	\N	1778274789578	2026-05-08 23:13:09.578+02	2026-05-08 23:13:11.490586+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:11.490586+02
+16326	10	E28011704000021D53DAB0CB	\N	-67	0	27	\N	\N	1778274789878	2026-05-08 23:13:09.878+02	2026-05-08 23:13:12.031005+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.031005+02
+16328	10	E28011704000021D53DAB0CB	\N	-61	0	47	\N	\N	1778274790328	2026-05-08 23:13:10.328+02	2026-05-08 23:13:12.076128+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.076128+02
+16331	10	E28011704000021D53DAB0CB	\N	-60	0	21	\N	\N	1778274790478	2026-05-08 23:13:10.478+02	2026-05-08 23:13:12.087228+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.087228+02
+16334	10	E28011704000021D53DAB0CB	\N	-65	0	19	\N	\N	1778274790628	2026-05-08 23:13:10.628+02	2026-05-08 23:13:12.113622+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.113622+02
+16339	10	E28011704000021D53DAB0CB	\N	-65	0	50	\N	\N	1778274791078	2026-05-08 23:13:11.078+02	2026-05-08 23:13:12.144314+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.144314+02
+16342	10	E28011704000021D53DAB0CB	\N	-64	0	21	\N	\N	1778274791229	2026-05-08 23:13:11.229+02	2026-05-08 23:13:12.157003+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.157003+02
+16350	10	E28011704000021D53DAB0CB	\N	-68	0	34	\N	\N	1778274791829	2026-05-08 23:13:11.829+02	2026-05-08 23:13:12.274214+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:12.274214+02
+16358	10	E28011704000021D53DAB0CB	\N	-68	0	49	\N	\N	1778274792432	2026-05-08 23:13:12.432+02	2026-05-08 23:13:13.362422+02	2026-05-08 23:13:17.976+02	\N	\N	realtime	synced	2026-05-08 23:13:13.362422+02
+16603	10	E28011704000021D53DAB0CB	\N	-61	0	44	\N	\N	1778274961485	2026-05-08 23:16:01.485+02	2026-05-08 23:16:03.114676+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.114676+02
+16606	10	E28011704000021D53DAB0CB	\N	-62	0	51	\N	\N	1778274961630	2026-05-08 23:16:01.63+02	2026-05-08 23:16:03.421843+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.421843+02
+16481	10	E28011704000021D53DAB0CB	\N	-70	0	20	\N	\N	1778274861578	2026-05-08 23:14:21.578+02	2026-05-08 23:14:22.863796+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:22.863796+02
+16486	10	E28011704000021D53DAB0CB	\N	-71	0	43	\N	\N	1778274862178	2026-05-08 23:14:22.178+02	2026-05-08 23:14:23.042832+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.042832+02
+17659	10	E28011704000021D53DAB0CB	\N	-65	0	24	\N	\N	1778275777928	2026-05-08 23:29:37.928+02	2026-05-08 23:29:38.961801+02	\N	2026-05-08 23:29:46.73+02	insufficient_data	realtime	synced	2026-05-08 23:29:38.961801+02
+17661	10	E28011704000021D53DAB0CB	\N	-65	0	48	\N	\N	1778275786478	2026-05-08 23:29:46.478+02	2026-05-08 23:29:47.442755+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.442755+02
+16369	10	E28011704000021D53DAB0CB	\N	-59	0	48	\N	\N	1778274819589	2026-05-08 23:13:39.589+02	2026-05-08 23:13:39.928221+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:39.928221+02
+16370	10	E28011704000021D53DAB0CB	\N	-62	0	32	\N	\N	1778274819728	2026-05-08 23:13:39.728+02	2026-05-08 23:13:40.9819+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:40.9819+02
+16373	10	E28011704000021D53DAB0CB	\N	-56	0	39	\N	\N	1778274819883	2026-05-08 23:13:39.883+02	2026-05-08 23:13:41.02707+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.02707+02
+16378	10	E28011704000021D53DAB0CB	\N	-50	0	50	\N	\N	1778274820328	2026-05-08 23:13:40.328+02	2026-05-08 23:13:41.109023+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.109023+02
+16381	10	E28011704000021D53DAB0CB	\N	-53	0	36	\N	\N	1778274820478	2026-05-08 23:13:40.478+02	2026-05-08 23:13:41.147159+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.147159+02
+16384	10	E28011704000021D53DAB0CB	\N	-58	0	32	\N	\N	1778274820634	2026-05-08 23:13:40.634+02	2026-05-08 23:13:41.180277+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:41.180277+02
+16393	10	E28011704000021D53DAB0CB	\N	-68	0	24	\N	\N	1778274821228	2026-05-08 23:13:41.228+02	2026-05-08 23:13:42.639788+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:42.639788+02
+16398	9	E28011704000021D53DAB0CB	\N	-67	0	53	\N	\N	1778274822625	2026-05-08 23:13:42.625+02	2026-05-08 23:13:43.442017+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.442017+02
+16403	9	E28011704000021D53DAB0CB	\N	-62	0	25	\N	\N	1778274823078	2026-05-08 23:13:43.078+02	2026-05-08 23:13:43.601816+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.601816+02
+16408	9	E28011704000021D53DAB0CB	\N	-63	0	31	\N	\N	1778274823494	2026-05-08 23:13:43.494+02	2026-05-08 23:13:43.798759+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:43.798759+02
+16409	9	E28011704000021D53DAB0CB	\N	-57	0	57	\N	\N	1778274823644	2026-05-08 23:13:43.644+02	2026-05-08 23:13:44.873223+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:44.873223+02
+16414	9	E28011704000021D53DAB0CB	\N	-65	0	44	\N	\N	1778274824127	2026-05-08 23:13:44.127+02	2026-05-08 23:13:45.019382+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.019382+02
+16416	9	E28011704000021D53DAB0CB	\N	-55	0	13	\N	\N	1778274824393	2026-05-08 23:13:44.393+02	2026-05-08 23:13:45.119886+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.119886+02
+16418	9	E28011704000021D53DAB0CB	\N	-67	0	58	\N	\N	1778274824699	2026-05-08 23:13:44.699+02	2026-05-08 23:13:45.182699+02	2026-05-08 23:13:50.001+02	\N	\N	realtime	synced	2026-05-08 23:13:45.182699+02
+16434	9	E28011704000021D53DAB0CB	\N	-64	0	28	\N	\N	1778274838344	2026-05-08 23:13:58.344+02	2026-05-08 23:13:59.146444+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.146444+02
+16437	10	E28011704000021D53DAB0CB	\N	-71	0	14	\N	\N	1778274838933	2026-05-08 23:13:58.933+02	2026-05-08 23:13:59.188723+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.188723+02
+16439	9	E28011704000021D53DAB0CB	\N	-58	0	20	\N	\N	1778274838794	2026-05-08 23:13:58.794+02	2026-05-08 23:13:59.22887+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.22887+02
+16443	10	E28011704000021D53DAB0CB	\N	-73	0	48	\N	\N	1778274839378	2026-05-08 23:13:59.378+02	2026-05-08 23:14:00.491331+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.491331+02
+16445	10	E28011704000021D53DAB0CB	\N	-71	0	44	\N	\N	1778274839528	2026-05-08 23:13:59.528+02	2026-05-08 23:14:00.50402+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.50402+02
+16448	10	E28011704000021D53DAB0CB	\N	-62	0	43	\N	\N	1778274839829	2026-05-08 23:13:59.829+02	2026-05-08 23:14:00.648767+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.648767+02
+16451	10	E28011704000021D53DAB0CB	\N	-62	0	28	\N	\N	1778274839979	2026-05-08 23:13:59.979+02	2026-05-08 23:14:00.776072+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.776072+02
+16453	10	E28011704000021D53DAB0CB	\N	-68	0	37	\N	\N	1778274840128	2026-05-08 23:14:00.128+02	2026-05-08 23:14:00.787709+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.787709+02
+16454	10	E28011704000021D53DAB0CB	\N	-63	0	51	\N	\N	1778274840128	2026-05-08 23:14:00.128+02	2026-05-08 23:14:00.790071+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.790071+02
+16456	10	E28011704000021D53DAB0CB	\N	-59	0	51	\N	\N	1778274840278	2026-05-08 23:14:00.278+02	2026-05-08 23:14:00.820643+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.820643+02
+16459	10	E28011704000021D53DAB0CB	\N	-64	0	34	\N	\N	1778274840435	2026-05-08 23:14:00.435+02	2026-05-08 23:14:00.844467+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.844467+02
+16462	10	E28011704000021D53DAB0CB	\N	-62	0	46	\N	\N	1778274840728	2026-05-08 23:14:00.728+02	2026-05-08 23:14:01.974203+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:01.974203+02
+16463	10	E28011704000021D53DAB0CB	\N	-61	0	59	\N	\N	1778274840728	2026-05-08 23:14:00.728+02	2026-05-08 23:14:01.977004+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:01.977004+02
+16464	10	E28011704000021D53DAB0CB	\N	-59	0	58	\N	\N	1778274840878	2026-05-08 23:14:00.878+02	2026-05-08 23:14:02.384199+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:02.384199+02
+16466	10	E28011704000021D53DAB0CB	\N	-65	0	29	\N	\N	1778274841028	2026-05-08 23:14:01.028+02	2026-05-08 23:14:02.690915+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:02.690915+02
+16467	10	E28011704000021D53DAB0CB	\N	-69	0	25	\N	\N	1778274841028	2026-05-08 23:14:01.028+02	2026-05-08 23:14:02.692975+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:02.692975+02
+16469	10	E28011704000021D53DAB0CB	\N	-64	0	30	\N	\N	1778274841178	2026-05-08 23:14:01.178+02	2026-05-08 23:14:03.000633+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:03.000633+02
+16472	10	E28011704000021D53DAB0CB	\N	-69	0	11	\N	\N	1778274841485	2026-05-08 23:14:01.485+02	2026-05-08 23:14:03.612523+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:03.612523+02
+16422	9	E28011704000021D53DAB0CB	\N	-66	0	47	\N	\N	1778274837293	2026-05-08 23:13:57.293+02	2026-05-08 23:13:57.775283+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:57.775283+02
+16426	9	E28011704000021D53DAB0CB	\N	-63	0	12	\N	\N	1778274837593	2026-05-08 23:13:57.593+02	2026-05-08 23:13:58.969514+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:58.969514+02
+16431	9	E28011704000021D53DAB0CB	\N	-65	0	58	\N	\N	1778274838043	2026-05-08 23:13:58.043+02	2026-05-08 23:13:59.076444+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.076444+02
+16433	9	E28011704000021D53DAB0CB	\N	-66	0	50	\N	\N	1778274838344	2026-05-08 23:13:58.344+02	2026-05-08 23:13:59.144577+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.144577+02
+16436	9	E28011704000021D53DAB0CB	\N	-62	0	35	\N	\N	1778274838526	2026-05-08 23:13:58.526+02	2026-05-08 23:13:59.16213+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.16213+02
+16438	9	E28011704000021D53DAB0CB	\N	-65	0	26	\N	\N	1778274838643	2026-05-08 23:13:58.643+02	2026-05-08 23:13:59.20408+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:13:59.20408+02
+16442	10	E28011704000021D53DAB0CB	\N	-70	0	21	\N	\N	1778274839228	2026-05-08 23:13:59.228+02	2026-05-08 23:14:00.352135+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.352135+02
+16447	10	E28011704000021D53DAB0CB	\N	-69	0	29	\N	\N	1778274839678	2026-05-08 23:13:59.678+02	2026-05-08 23:14:00.518461+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.518461+02
+16450	10	E28011704000021D53DAB0CB	\N	-64	0	47	\N	\N	1778274839829	2026-05-08 23:13:59.829+02	2026-05-08 23:14:00.653217+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.653217+02
+16455	10	E28011704000021D53DAB0CB	\N	-61	0	43	\N	\N	1778274840278	2026-05-08 23:14:00.278+02	2026-05-08 23:14:00.817596+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.817596+02
+16458	10	E28011704000021D53DAB0CB	\N	-62	0	40	\N	\N	1778274840435	2026-05-08 23:14:00.435+02	2026-05-08 23:14:00.84222+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.84222+02
+16461	10	E28011704000021D53DAB0CB	\N	-65	0	36	\N	\N	1778274840578	2026-05-08 23:14:00.578+02	2026-05-08 23:14:00.850036+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:00.850036+02
+16468	10	E28011704000021D53DAB0CB	\N	-62	0	59	\N	\N	1778274841178	2026-05-08 23:14:01.178+02	2026-05-08 23:14:02.998091+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:02.998091+02
+16471	10	E28011704000021D53DAB0CB	\N	-61	0	52	\N	\N	1778274841328	2026-05-08 23:14:01.328+02	2026-05-08 23:14:03.306784+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:03.306784+02
+16474	10	E28011704000021D53DAB0CB	\N	-77	0	43	\N	\N	1778274841485	2026-05-08 23:14:01.485+02	2026-05-08 23:14:03.618504+02	2026-05-08 23:14:06.015+02	\N	\N	realtime	synced	2026-05-08 23:14:03.618504+02
+16525	9	E28011704000021D53DAB0CB	\N	-58	0	57	\N	\N	1778274866243	2026-05-08 23:14:26.243+02	2026-05-08 23:14:26.935086+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.935086+02
+16527	9	E28011704000021D53DAB0CB	\N	-67	0	58	\N	\N	1778274866543	2026-05-08 23:14:26.543+02	2026-05-08 23:14:26.958474+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.958474+02
+16493	10	E28011704000021D53DAB0CB	\N	-64	0	23	\N	\N	1778274862779	2026-05-08 23:14:22.779+02	2026-05-08 23:14:23.154654+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.154654+02
+16496	10	E28011704000021D53DAB0CB	\N	-62	0	7	\N	\N	1778274862940	2026-05-08 23:14:22.94+02	2026-05-08 23:14:23.200586+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.200586+02
+16497	10	E28011704000021D53DAB0CB	\N	-62	0	19	\N	\N	1778274863078	2026-05-08 23:14:23.078+02	2026-05-08 23:14:24.307196+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.307196+02
+16505	10	E28011704000021D53DAB0CB	\N	-68	0	37	\N	\N	1778274863679	2026-05-08 23:14:23.679+02	2026-05-08 23:14:24.481006+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.481006+02
+16508	10	E28011704000021D53DAB0CB	\N	-72	0	30	\N	\N	1778274863828	2026-05-08 23:14:23.828+02	2026-05-08 23:14:24.493943+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.493943+02
+16513	9	E28011704000021D53DAB0CB	\N	-64	0	23	\N	\N	1778274865074	2026-05-08 23:14:25.074+02	2026-05-08 23:14:25.583196+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.583196+02
+16519	9	E28011704000021D53DAB0CB	\N	-59	0	39	\N	\N	1778274865644	2026-05-08 23:14:25.644+02	2026-05-08 23:14:26.780535+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.780535+02
+16524	9	E28011704000021D53DAB0CB	\N	-70	0	39	\N	\N	1778274866095	2026-05-08 23:14:26.095+02	2026-05-08 23:14:26.921363+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.921363+02
+16526	9	E28011704000021D53DAB0CB	\N	-60	0	19	\N	\N	1778274866417	2026-05-08 23:14:26.417+02	2026-05-08 23:14:26.946115+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.946115+02
+16510	9	E28011704000021D53DAB0CB	\N	-67	0	40	\N	\N	1778274864449	2026-05-08 23:14:24.449+02	2026-05-08 23:14:25.52768+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.52768+02
+16515	9	E28011704000021D53DAB0CB	\N	-61	0	7	\N	\N	1778274865198	2026-05-08 23:14:25.198+02	2026-05-08 23:14:25.611194+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.611194+02
+16521	9	E28011704000021D53DAB0CB	\N	-62	0	55	\N	\N	1778274865795	2026-05-08 23:14:25.795+02	2026-05-08 23:14:26.829623+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.829623+02
+16528	9	E28011704000021D53DAB0CB	\N	-62	0	28	\N	\N	1778274866543	2026-05-08 23:14:26.543+02	2026-05-08 23:14:26.960247+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.960247+02
+16479	10	E28011704000021D53DAB0CB	\N	-79	0	34	\N	\N	1778274861428	2026-05-08 23:14:21.428+02	2026-05-08 23:14:21.773751+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:21.773751+02
+16491	10	E28011704000021D53DAB0CB	\N	-65	0	45	\N	\N	1778274862628	2026-05-08 23:14:22.628+02	2026-05-08 23:14:23.122059+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:23.122059+02
+16498	10	E28011704000021D53DAB0CB	\N	-67	0	7	\N	\N	1778274863078	2026-05-08 23:14:23.078+02	2026-05-08 23:14:24.309224+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.309224+02
+16500	10	E28011704000021D53DAB0CB	\N	-70	0	7	\N	\N	1778274863393	2026-05-08 23:14:23.393+02	2026-05-08 23:14:24.454723+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.454723+02
+16503	10	E28011704000021D53DAB0CB	\N	-73	0	24	\N	\N	1778274863529	2026-05-08 23:14:23.529+02	2026-05-08 23:14:24.467675+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.467675+02
+16506	10	E28011704000021D53DAB0CB	\N	-70	0	26	\N	\N	1778274863679	2026-05-08 23:14:23.679+02	2026-05-08 23:14:24.483094+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:24.483094+02
+16511	9	E28011704000021D53DAB0CB	\N	-64	0	22	\N	\N	1778274864639	2026-05-08 23:14:24.639+02	2026-05-08 23:14:25.551241+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.551241+02
+16514	9	E28011704000021D53DAB0CB	\N	-67	0	59	\N	\N	1778274865074	2026-05-08 23:14:25.074+02	2026-05-08 23:14:25.585661+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.585661+02
+16516	9	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778274865344	2026-05-08 23:14:25.344+02	2026-05-08 23:14:25.672183+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:25.672183+02
+16520	9	E28011704000021D53DAB0CB	\N	-61	0	26	\N	\N	1778274865644	2026-05-08 23:14:25.644+02	2026-05-08 23:14:26.783061+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.783061+02
+16522	9	E28011704000021D53DAB0CB	\N	-64	0	18	\N	\N	1778274865943	2026-05-08 23:14:25.943+02	2026-05-08 23:14:26.860447+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:26.860447+02
+16529	9	E28011704000021D53DAB0CB	\N	-62	0	28	\N	\N	1778274866702	2026-05-08 23:14:26.702+02	2026-05-08 23:14:27.008988+02	2026-05-08 23:14:32.044+02	\N	\N	realtime	synced	2026-05-08 23:14:27.008988+02
+16598	10	E28011704000021D53DAB0CB	\N	-59	0	20	\N	\N	1778274961034	2026-05-08 23:16:01.034+02	2026-05-08 23:16:01.311517+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.311517+02
+16600	10	E28011704000021D53DAB0CB	\N	-60	0	28	\N	\N	1778274961178	2026-05-08 23:16:01.178+02	2026-05-08 23:16:02.39749+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:02.39749+02
+16608	10	E28011704000021D53DAB0CB	\N	-67	0	59	\N	\N	1778274961778	2026-05-08 23:16:01.778+02	2026-05-08 23:16:03.728878+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.728878+02
+16611	9	E28011704000021D53DAB0CB	\N	-68	0	8	\N	\N	1778274962694	2026-05-08 23:16:02.694+02	2026-05-08 23:16:03.833887+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.833887+02
+16613	9	E28011704000021D53DAB0CB	\N	-67	0	8	\N	\N	1778274962998	2026-05-08 23:16:02.998+02	2026-05-08 23:16:03.87311+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.87311+02
+16618	9	E28011704000021D53DAB0CB	\N	-70	0	11	\N	\N	1778274963443	2026-05-08 23:16:03.443+02	2026-05-08 23:16:04.003654+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:04.003654+02
+16589	10	E28011704000021D53DAB0CB	\N	-67	0	31	\N	\N	1778274960278	2026-05-08 23:16:00.278+02	2026-05-08 23:16:01.229337+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.229337+02
+16594	10	E28011704000021D53DAB0CB	\N	-63	0	56	\N	\N	1778274960728	2026-05-08 23:16:00.728+02	2026-05-08 23:16:01.291382+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.291382+02
+16601	10	E28011704000021D53DAB0CB	\N	-59	0	21	\N	\N	1778274961328	2026-05-08 23:16:01.328+02	2026-05-08 23:16:02.807714+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:02.807714+02
+16604	10	E28011704000021D53DAB0CB	\N	-58	0	30	\N	\N	1778274961485	2026-05-08 23:16:01.485+02	2026-05-08 23:16:03.116611+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.116611+02
+16607	10	E28011704000021D53DAB0CB	\N	-62	0	30	\N	\N	1778274961630	2026-05-08 23:16:01.63+02	2026-05-08 23:16:03.435747+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.435747+02
+16612	9	E28011704000021D53DAB0CB	\N	-67	0	37	\N	\N	1778274962845	2026-05-08 23:16:02.845+02	2026-05-08 23:16:03.854648+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.854648+02
+16617	9	E28011704000021D53DAB0CB	\N	-69	0	16	\N	\N	1778274963294	2026-05-08 23:16:03.294+02	2026-05-08 23:16:03.953184+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.953184+02
+16535	9	E28011704000021D53DAB0CB	\N	-72	0	30	\N	\N	1778274880218	2026-05-08 23:14:40.218+02	2026-05-08 23:14:41.193499+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.193499+02
+16537	9	E28011704000021D53DAB0CB	\N	-67	0	22	\N	\N	1778274880494	2026-05-08 23:14:40.494+02	2026-05-08 23:14:41.756482+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.756482+02
+16542	9	E28011704000021D53DAB0CB	\N	-69	0	10	\N	\N	1778274880944	2026-05-08 23:14:40.944+02	2026-05-08 23:14:41.842844+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.842844+02
+16544	9	E28011704000021D53DAB0CB	\N	-72	0	30	\N	\N	1778274881244	2026-05-08 23:14:41.244+02	2026-05-08 23:14:41.903789+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.903789+02
+16550	10	E28011704000021D53DAB0CB	\N	-73	0	43	\N	\N	1778274881978	2026-05-08 23:14:41.978+02	2026-05-08 23:14:43.20934+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.20934+02
+16552	10	E28011704000021D53DAB0CB	\N	-68	0	16	\N	\N	1778274882278	2026-05-08 23:14:42.278+02	2026-05-08 23:14:43.231812+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.231812+02
+16555	10	E28011704000021D53DAB0CB	\N	-74	0	32	\N	\N	1778274882428	2026-05-08 23:14:42.428+02	2026-05-08 23:14:43.247143+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.247143+02
+16561	10	E28011704000021D53DAB0CB	\N	-63	0	25	\N	\N	1778274882887	2026-05-08 23:14:42.887+02	2026-05-08 23:14:43.303081+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.303081+02
+16564	10	E28011704000021D53DAB0CB	\N	-67	0	32	\N	\N	1778274883032	2026-05-08 23:14:43.032+02	2026-05-08 23:14:43.312851+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.312851+02
+16565	10	E28011704000021D53DAB0CB	\N	-67	0	8	\N	\N	1778274883178	2026-05-08 23:14:43.178+02	2026-05-08 23:14:44.47051+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:44.47051+02
+16571	10	E28011704000021D53DAB0CB	\N	-68	0	56	\N	\N	1778274883628	2026-05-08 23:14:43.628+02	2026-05-08 23:14:45.699066+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:45.699066+02
+16574	10	E28011704000021D53DAB0CB	\N	-74	0	8	\N	\N	1778274883778	2026-05-08 23:14:43.778+02	2026-05-08 23:14:46.008804+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.008804+02
+16531	9	E28011704000021D53DAB0CB	\N	-72	0	56	\N	\N	1778274879767	2026-05-08 23:14:39.767+02	2026-05-08 23:14:40.532144+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:40.532144+02
+16533	9	E28011704000021D53DAB0CB	\N	-68	0	31	\N	\N	1778274880045	2026-05-08 23:14:40.045+02	2026-05-08 23:14:40.712622+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:40.712622+02
+16538	9	E28011704000021D53DAB0CB	\N	-67	0	50	\N	\N	1778274880494	2026-05-08 23:14:40.494+02	2026-05-08 23:14:41.758216+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.758216+02
+16540	9	E28011704000021D53DAB0CB	\N	-64	0	27	\N	\N	1778274880807	2026-05-08 23:14:40.807+02	2026-05-08 23:14:41.825156+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.825156+02
+16545	9	E28011704000021D53DAB0CB	\N	-77	0	41	\N	\N	1778274881244	2026-05-08 23:14:41.244+02	2026-05-08 23:14:41.90602+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.90602+02
+16546	10	E28011704000021D53DAB0CB	\N	-74	0	42	\N	\N	1778274881528	2026-05-08 23:14:41.528+02	2026-05-08 23:14:42.116842+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:42.116842+02
+16548	10	E28011704000021D53DAB0CB	\N	-74	0	55	\N	\N	1778274881828	2026-05-08 23:14:41.828+02	2026-05-08 23:14:42.182841+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:42.182841+02
+16553	10	E28011704000021D53DAB0CB	\N	-70	0	34	\N	\N	1778274882278	2026-05-08 23:14:42.278+02	2026-05-08 23:14:43.233798+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.233798+02
+16559	10	E28011704000021D53DAB0CB	\N	-64	0	8	\N	\N	1778274882738	2026-05-08 23:14:42.738+02	2026-05-08 23:14:43.294248+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.294248+02
+16562	10	E28011704000021D53DAB0CB	\N	-68	0	36	\N	\N	1778274882887	2026-05-08 23:14:42.887+02	2026-05-08 23:14:43.304793+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.304793+02
+16566	10	E28011704000021D53DAB0CB	\N	-68	0	59	\N	\N	1778274883178	2026-05-08 23:14:43.178+02	2026-05-08 23:14:44.472388+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:44.472388+02
+16569	10	E28011704000021D53DAB0CB	\N	-68	0	27	\N	\N	1778274883478	2026-05-08 23:14:43.478+02	2026-05-08 23:14:45.392097+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:45.392097+02
+16572	10	E28011704000021D53DAB0CB	\N	-67	0	30	\N	\N	1778274883628	2026-05-08 23:14:43.628+02	2026-05-08 23:14:45.701839+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:45.701839+02
+16575	10	E28011704000021D53DAB0CB	\N	-76	0	42	\N	\N	1778274883928	2026-05-08 23:14:43.928+02	2026-05-08 23:14:46.314108+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.314108+02
+16534	9	E28011704000021D53DAB0CB	\N	-71	0	10	\N	\N	1778274880045	2026-05-08 23:14:40.045+02	2026-05-08 23:14:40.716168+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:40.716168+02
+16536	9	E28011704000021D53DAB0CB	\N	-68	0	29	\N	\N	1778274880344	2026-05-08 23:14:40.344+02	2026-05-08 23:14:41.705429+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.705429+02
+16543	9	E28011704000021D53DAB0CB	\N	-65	0	47	\N	\N	1778274881095	2026-05-08 23:14:41.095+02	2026-05-08 23:14:41.849851+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.849851+02
+16549	10	E28011704000021D53DAB0CB	\N	-71	0	45	\N	\N	1778274881828	2026-05-08 23:14:41.828+02	2026-05-08 23:14:42.184736+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:42.184736+02
+16551	10	E28011704000021D53DAB0CB	\N	-74	0	7	\N	\N	1778274882131	2026-05-08 23:14:42.131+02	2026-05-08 23:14:43.22261+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.22261+02
+16556	10	E28011704000021D53DAB0CB	\N	-66	0	36	\N	\N	1778274882590	2026-05-08 23:14:42.59+02	2026-05-08 23:14:43.2836+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.2836+02
+16558	10	E28011704000021D53DAB0CB	\N	-66	0	36	\N	\N	1778274882590	2026-05-08 23:14:42.59+02	2026-05-08 23:14:43.289189+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.289189+02
+16560	10	E28011704000021D53DAB0CB	\N	-64	0	8	\N	\N	1778274882738	2026-05-08 23:14:42.738+02	2026-05-08 23:14:43.295953+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.295953+02
+16567	10	E28011704000021D53DAB0CB	\N	-67	0	45	\N	\N	1778274883328	2026-05-08 23:14:43.328+02	2026-05-08 23:14:45.085799+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:45.085799+02
+16570	10	E28011704000021D53DAB0CB	\N	-68	0	52	\N	\N	1778274883478	2026-05-08 23:14:43.478+02	2026-05-08 23:14:45.393935+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:45.393935+02
+16576	10	E28011704000021D53DAB0CB	\N	-74	0	40	\N	\N	1778274883928	2026-05-08 23:14:43.928+02	2026-05-08 23:14:46.316223+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.316223+02
+16579	10	E28011704000021D53DAB0CB	\N	-74	0	32	\N	\N	1778274884088	2026-05-08 23:14:44.088+02	2026-05-08 23:14:46.625652+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.625652+02
+16580	10	E28011704000021D53DAB0CB	\N	-72	0	56	\N	\N	1778274884228	2026-05-08 23:14:44.228+02	2026-05-08 23:14:46.927842+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.927842+02
+16530	9	E28011704000021D53DAB0CB	\N	-76	0	50	\N	\N	1778274879443	2026-05-08 23:14:39.443+02	2026-05-08 23:14:40.476959+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:40.476959+02
+16532	9	E28011704000021D53DAB0CB	\N	-71	0	15	\N	\N	1778274879893	2026-05-08 23:14:39.893+02	2026-05-08 23:14:40.639113+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:40.639113+02
+16539	9	E28011704000021D53DAB0CB	\N	-71	0	51	\N	\N	1778274880645	2026-05-08 23:14:40.645+02	2026-05-08 23:14:41.772535+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.772535+02
+16541	9	E28011704000021D53DAB0CB	\N	-69	0	43	\N	\N	1778274880944	2026-05-08 23:14:40.944+02	2026-05-08 23:14:41.838658+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:41.838658+02
+16547	10	E28011704000021D53DAB0CB	\N	-73	0	19	\N	\N	1778274881693	2026-05-08 23:14:41.693+02	2026-05-08 23:14:42.15077+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:42.15077+02
+16554	10	E28011704000021D53DAB0CB	\N	-73	0	28	\N	\N	1778274882428	2026-05-08 23:14:42.428+02	2026-05-08 23:14:43.244657+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.244657+02
+16557	10	E28011704000021D53DAB0CB	\N	-65	0	29	\N	\N	1778274882590	2026-05-08 23:14:42.59+02	2026-05-08 23:14:43.286209+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.286209+02
+16563	10	E28011704000021D53DAB0CB	\N	-68	0	9	\N	\N	1778274883032	2026-05-08 23:14:43.032+02	2026-05-08 23:14:43.310927+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:43.310927+02
+16568	10	E28011704000021D53DAB0CB	\N	-67	0	20	\N	\N	1778274883328	2026-05-08 23:14:43.328+02	2026-05-08 23:14:45.088271+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:45.088271+02
+16573	10	E28011704000021D53DAB0CB	\N	-70	0	27	\N	\N	1778274883778	2026-05-08 23:14:43.778+02	2026-05-08 23:14:46.006814+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.006814+02
+16577	10	E28011704000021D53DAB0CB	\N	-70	0	22	\N	\N	1778274884088	2026-05-08 23:14:44.088+02	2026-05-08 23:14:46.621506+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.621506+02
+16578	10	E28011704000021D53DAB0CB	\N	-74	0	44	\N	\N	1778274884088	2026-05-08 23:14:44.088+02	2026-05-08 23:14:46.623697+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.623697+02
+16581	10	E28011704000021D53DAB0CB	\N	-69	0	25	\N	\N	1778274884228	2026-05-08 23:14:44.228+02	2026-05-08 23:14:46.929798+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:46.929798+02
+16583	10	E28011704000021D53DAB0CB	\N	-77	0	23	\N	\N	1778274884378	2026-05-08 23:14:44.378+02	2026-05-08 23:14:47.54208+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:47.54208+02
+16619	9	E28011704000021D53DAB0CB	\N	-70	0	16	\N	\N	1778274963611	2026-05-08 23:16:03.611+02	2026-05-08 23:16:04.016396+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:04.016396+02
+16615	9	E28011704000021D53DAB0CB	\N	-66	0	58	\N	\N	1778274963163	2026-05-08 23:16:03.163+02	2026-05-08 23:16:03.920572+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.920572+02
+16620	9	E28011704000021D53DAB0CB	\N	-64	0	47	\N	\N	1778274963611	2026-05-08 23:16:03.611+02	2026-05-08 23:16:04.018944+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:04.018944+02
+16591	10	E28011704000021D53DAB0CB	\N	-67	0	29	\N	\N	1778274960428	2026-05-08 23:16:00.428+02	2026-05-08 23:16:01.241389+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:01.241389+02
+16582	10	E28011704000021D53DAB0CB	\N	-77	0	23	\N	\N	1778274884378	2026-05-08 23:14:44.378+02	2026-05-08 23:14:47.235494+02	2026-05-08 23:14:50.062+02	\N	\N	realtime	synced	2026-05-08 23:14:47.235494+02
+16609	10	E28011704000021D53DAB0CB	\N	-65	0	19	\N	\N	1778274961778	2026-05-08 23:16:01.778+02	2026-05-08 23:16:03.730944+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.730944+02
+16614	9	E28011704000021D53DAB0CB	\N	-70	0	47	\N	\N	1778274962998	2026-05-08 23:16:02.998+02	2026-05-08 23:16:03.875021+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.875021+02
+16616	9	E28011704000021D53DAB0CB	\N	-68	0	10	\N	\N	1778274963294	2026-05-08 23:16:03.294+02	2026-05-08 23:16:03.951162+02	2026-05-08 23:16:08.137+02	\N	\N	realtime	synced	2026-05-08 23:16:03.951162+02
+16864	9	E28011704000021D53DAB0CB	\N	-65	0	34	\N	\N	1778275123371	2026-05-08 23:18:43.371+02	2026-05-08 23:18:44.397559+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.397559+02
+16869	9	E28011704000021D53DAB0CB	\N	-62	0	39	\N	\N	1778275123950	2026-05-08 23:18:43.95+02	2026-05-08 23:18:44.5268+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.5268+02
+16871	9	E28011704000021D53DAB0CB	\N	-58	0	45	\N	\N	1778275124244	2026-05-08 23:18:44.244+02	2026-05-08 23:18:44.617361+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.617361+02
+16855	10	E28011704000021D53DAB0CB	\N	-68	0	35	\N	\N	1778275120178	2026-05-08 23:18:40.178+02	2026-05-08 23:18:40.463063+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:40.463063+02
+16858	10	E28011704000021D53DAB0CB	\N	-64	0	25	\N	\N	1778275120478	2026-05-08 23:18:40.478+02	2026-05-08 23:18:41.532613+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:41.532613+02
+16863	9	E28011704000021D53DAB0CB	\N	-68	0	46	\N	\N	1778275123371	2026-05-08 23:18:43.371+02	2026-05-08 23:18:44.395653+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.395653+02
+16866	9	E28011704000021D53DAB0CB	\N	-65	0	47	\N	\N	1778275123493	2026-05-08 23:18:43.493+02	2026-05-08 23:18:44.430803+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.430803+02
+16868	9	E28011704000021D53DAB0CB	\N	-63	0	30	\N	\N	1778275123950	2026-05-08 23:18:43.95+02	2026-05-08 23:18:44.524623+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.524623+02
+16622	9	E28011704000021D53DAB0CB	\N	-62	0	35	\N	\N	1778274978758	2026-05-08 23:16:18.758+02	2026-05-08 23:16:19.40004+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:19.40004+02
+16624	9	E28011704000021D53DAB0CB	\N	-61	0	21	\N	\N	1778274979045	2026-05-08 23:16:19.045+02	2026-05-08 23:16:19.466592+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:19.466592+02
+16630	10	E28011704000021D53DAB0CB	\N	-73	0	9	\N	\N	1778274980078	2026-05-08 23:16:20.078+02	2026-05-08 23:16:20.471634+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:20.471634+02
+16637	10	E28011704000021D53DAB0CB	\N	-67	0	26	\N	\N	1778274980686	2026-05-08 23:16:20.686+02	2026-05-08 23:16:21.78604+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.78604+02
+16640	10	E28011704000021D53DAB0CB	\N	-60	0	8	\N	\N	1778274980830	2026-05-08 23:16:20.83+02	2026-05-08 23:16:21.81858+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.81858+02
+16642	10	E28011704000021D53DAB0CB	\N	-63	0	48	\N	\N	1778274981128	2026-05-08 23:16:21.128+02	2026-05-08 23:16:21.881653+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.881653+02
+16645	10	E28011704000021D53DAB0CB	\N	-58	0	21	\N	\N	1778274981278	2026-05-08 23:16:21.278+02	2026-05-08 23:16:21.913805+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.913805+02
+16648	10	E28011704000021D53DAB0CB	\N	-57	0	12	\N	\N	1778274981431	2026-05-08 23:16:21.431+02	2026-05-08 23:16:21.926974+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.926974+02
+16649	10	E28011704000021D53DAB0CB	\N	-65	0	33	\N	\N	1778274981578	2026-05-08 23:16:21.578+02	2026-05-08 23:16:21.954245+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.954245+02
+16652	10	E28011704000021D53DAB0CB	\N	-60	0	52	\N	\N	1778274981728	2026-05-08 23:16:21.728+02	2026-05-08 23:16:22.996524+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:22.996524+02
+16621	9	E28011704000021D53DAB0CB	\N	-69	0	20	\N	\N	1778274978758	2026-05-08 23:16:18.758+02	2026-05-08 23:16:19.396264+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:19.396264+02
+16626	9	E28011704000021D53DAB0CB	\N	-61	0	7	\N	\N	1778274979214	2026-05-08 23:16:19.214+02	2026-05-08 23:16:19.54088+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:19.54088+02
+16632	10	E28011704000021D53DAB0CB	\N	-75	0	13	\N	\N	1778274980228	2026-05-08 23:16:20.228+02	2026-05-08 23:16:20.567877+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:20.567877+02
+16634	10	E28011704000021D53DAB0CB	\N	-71	0	10	\N	\N	1778274980394	2026-05-08 23:16:20.394+02	2026-05-08 23:16:21.649796+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.649796+02
+16639	10	E28011704000021D53DAB0CB	\N	-69	0	30	\N	\N	1778274980830	2026-05-08 23:16:20.83+02	2026-05-08 23:16:21.816487+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.816487+02
+16644	10	E28011704000021D53DAB0CB	\N	-59	0	47	\N	\N	1778274981278	2026-05-08 23:16:21.278+02	2026-05-08 23:16:21.911829+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.911829+02
+16647	10	E28011704000021D53DAB0CB	\N	-62	0	56	\N	\N	1778274981431	2026-05-08 23:16:21.431+02	2026-05-08 23:16:21.925431+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.925431+02
+16650	10	E28011704000021D53DAB0CB	\N	-66	0	48	\N	\N	1778274981578	2026-05-08 23:16:21.578+02	2026-05-08 23:16:21.956225+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.956225+02
+16623	9	E28011704000021D53DAB0CB	\N	-61	0	22	\N	\N	1778274978926	2026-05-08 23:16:18.926+02	2026-05-08 23:16:19.437224+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:19.437224+02
+16625	9	E28011704000021D53DAB0CB	\N	-61	0	52	\N	\N	1778274979214	2026-05-08 23:16:19.214+02	2026-05-08 23:16:19.538751+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:19.538751+02
+16628	9	E28011704000021D53DAB0CB	\N	-65	0	8	\N	\N	1778274979345	2026-05-08 23:16:19.345+02	2026-05-08 23:16:19.633904+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:19.633904+02
+16629	10	E28011704000021D53DAB0CB	\N	-72	0	56	\N	\N	1778274979778	2026-05-08 23:16:19.778+02	2026-05-08 23:16:20.421549+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:20.421549+02
+16631	10	E28011704000021D53DAB0CB	\N	-69	0	29	\N	\N	1778274980228	2026-05-08 23:16:20.228+02	2026-05-08 23:16:20.565829+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:20.565829+02
+16636	10	E28011704000021D53DAB0CB	\N	-63	0	34	\N	\N	1778274980543	2026-05-08 23:16:20.543+02	2026-05-08 23:16:21.778235+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.778235+02
+16641	10	E28011704000021D53DAB0CB	\N	-60	0	28	\N	\N	1778274980978	2026-05-08 23:16:20.978+02	2026-05-08 23:16:21.843863+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.843863+02
+16646	10	E28011704000021D53DAB0CB	\N	-61	0	51	\N	\N	1778274981431	2026-05-08 23:16:21.431+02	2026-05-08 23:16:21.9235+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.9235+02
+16627	9	E28011704000021D53DAB0CB	\N	-61	0	45	\N	\N	1778274979345	2026-05-08 23:16:19.345+02	2026-05-08 23:16:19.631754+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:19.631754+02
+16633	9	E28011704000021D53DAB0CB	\N	-68	0	52	\N	\N	1778274979503	2026-05-08 23:16:19.503+02	2026-05-08 23:16:20.66681+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:20.66681+02
+16635	10	E28011704000021D53DAB0CB	\N	-68	0	54	\N	\N	1778274980543	2026-05-08 23:16:20.543+02	2026-05-08 23:16:21.77498+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.77498+02
+16638	10	E28011704000021D53DAB0CB	\N	-68	0	7	\N	\N	1778274980686	2026-05-08 23:16:20.686+02	2026-05-08 23:16:21.788102+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.788102+02
+16643	10	E28011704000021D53DAB0CB	\N	-62	0	37	\N	\N	1778274981128	2026-05-08 23:16:21.128+02	2026-05-08 23:16:21.883925+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:21.883925+02
+16651	10	E28011704000021D53DAB0CB	\N	-64	0	42	\N	\N	1778274981728	2026-05-08 23:16:21.728+02	2026-05-08 23:16:22.994131+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:22.994131+02
+16653	10	E28011704000021D53DAB0CB	\N	-68	0	45	\N	\N	1778274981886	2026-05-08 23:16:21.886+02	2026-05-08 23:16:23.006586+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:23.006586+02
+16654	10	E28011704000021D53DAB0CB	\N	-64	0	53	\N	\N	1778274981886	2026-05-08 23:16:21.886+02	2026-05-08 23:16:23.008742+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:23.008742+02
+16655	10	E28011704000021D53DAB0CB	\N	-70	0	45	\N	\N	1778274982028	2026-05-08 23:16:22.028+02	2026-05-08 23:16:23.014482+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:23.014482+02
+16656	10	E28011704000021D53DAB0CB	\N	-73	0	58	\N	\N	1778274982028	2026-05-08 23:16:22.028+02	2026-05-08 23:16:23.01689+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:23.01689+02
+16657	10	E28011704000021D53DAB0CB	\N	-73	0	21	\N	\N	1778274982178	2026-05-08 23:16:22.178+02	2026-05-08 23:16:23.021813+02	2026-05-08 23:16:28.16+02	\N	\N	realtime	synced	2026-05-08 23:16:23.021813+02
+16658	10	E28011704000021D53DAB0CB	\N	-79	0	51	\N	\N	1778274998528	2026-05-08 23:16:38.528+02	2026-05-08 23:16:39.46635+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.46635+02
+16659	10	E28011704000021D53DAB0CB	\N	-76	0	8	\N	\N	1778274998528	2026-05-08 23:16:38.528+02	2026-05-08 23:16:39.468213+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.468213+02
+16660	10	E28011704000021D53DAB0CB	\N	-73	0	53	\N	\N	1778274998841	2026-05-08 23:16:38.841+02	2026-05-08 23:16:39.62396+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.62396+02
+16661	10	E28011704000021D53DAB0CB	\N	-70	0	29	\N	\N	1778274998841	2026-05-08 23:16:38.841+02	2026-05-08 23:16:39.625951+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.625951+02
+16662	10	E28011704000021D53DAB0CB	\N	-73	0	10	\N	\N	1778274998841	2026-05-08 23:16:38.841+02	2026-05-08 23:16:39.62766+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.62766+02
+16663	10	E28011704000021D53DAB0CB	\N	-77	0	45	\N	\N	1778274998980	2026-05-08 23:16:38.98+02	2026-05-08 23:16:39.632194+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.632194+02
+16872	9	E28011704000021D53DAB0CB	\N	-64	0	27	\N	\N	1778275124244	2026-05-08 23:18:44.244+02	2026-05-08 23:18:44.621146+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.621146+02
+16875	9	E28011704000021D53DAB0CB	\N	-64	0	57	\N	\N	1778275124545	2026-05-08 23:18:44.545+02	2026-05-08 23:18:45.832757+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:45.832757+02
+16876	9	E28011704000021D53DAB0CB	\N	-67	0	16	\N	\N	1778275124694	2026-05-08 23:18:44.694+02	2026-05-08 23:18:46.341246+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:46.341246+02
+16664	10	E28011704000021D53DAB0CB	\N	-70	0	45	\N	\N	1778274998980	2026-05-08 23:16:38.98+02	2026-05-08 23:16:39.634028+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.634028+02
+16673	10	E28011704000021D53DAB0CB	\N	-74	0	49	\N	\N	1778274999728	2026-05-08 23:16:39.728+02	2026-05-08 23:16:41.156064+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.156064+02
+16678	10	E28011704000021D53DAB0CB	\N	-70	0	49	\N	\N	1778275000328	2026-05-08 23:16:40.328+02	2026-05-08 23:16:41.198038+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.198038+02
+16681	10	E28011704000021D53DAB0CB	\N	-68	0	56	\N	\N	1778275000478	2026-05-08 23:16:40.478+02	2026-05-08 23:16:41.330037+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.330037+02
+16686	10	E28011704000021D53DAB0CB	\N	-68	0	29	\N	\N	1778275000928	2026-05-08 23:16:40.928+02	2026-05-08 23:16:41.510908+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.510908+02
+16689	10	E28011704000021D53DAB0CB	\N	-76	0	20	\N	\N	1778275001078	2026-05-08 23:16:41.078+02	2026-05-08 23:16:41.526625+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.526625+02
+16698	10	E28011704000021D53DAB0CB	\N	-62	0	31	\N	\N	1778275033934	2026-05-08 23:17:13.934+02	2026-05-08 23:17:14.616548+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.616548+02
+16701	10	E28011704000021D53DAB0CB	\N	-58	0	30	\N	\N	1778275034079	2026-05-08 23:17:14.079+02	2026-05-08 23:17:14.65167+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.65167+02
+16707	10	E28011704000021D53DAB0CB	\N	-51	0	24	\N	\N	1778275034533	2026-05-08 23:17:14.533+02	2026-05-08 23:17:15.745591+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:15.745591+02
+16714	10	E28011704000021D53DAB0CB	\N	-62	0	45	\N	\N	1778275035141	2026-05-08 23:17:15.141+02	2026-05-08 23:17:16.214216+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.214216+02
+16717	10	E28011704000021D53DAB0CB	\N	-62	0	25	\N	\N	1778275035278	2026-05-08 23:17:15.278+02	2026-05-08 23:17:16.222479+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.222479+02
+16723	10	E28011704000021D53DAB0CB	\N	-65	0	23	\N	\N	1778275035591	2026-05-08 23:17:15.591+02	2026-05-08 23:17:16.360507+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.360507+02
+16726	9	E28011704000021D53DAB0CB	\N	-62	0	7	\N	\N	1778275036044	2026-05-08 23:17:16.044+02	2026-05-08 23:17:16.640211+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.640211+02
+16728	9	E28011704000021D53DAB0CB	\N	-61	0	24	\N	\N	1778275036351	2026-05-08 23:17:16.351+02	2026-05-08 23:17:16.717856+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.717856+02
+16731	9	E28011704000021D53DAB0CB	\N	-68	0	54	\N	\N	1778275036495	2026-05-08 23:17:16.495+02	2026-05-08 23:17:16.792733+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.792733+02
+16878	9	E28011704000021D53DAB0CB	\N	-71	0	32	\N	\N	1778275140144	2026-05-08 23:19:00.144+02	2026-05-08 23:19:00.632189+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:00.632189+02
+16880	9	E28011704000021D53DAB0CB	\N	-64	0	50	\N	\N	1778275140444	2026-05-08 23:19:00.444+02	2026-05-08 23:19:00.675237+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:00.675237+02
+16882	9	E28011704000021D53DAB0CB	\N	-61	0	55	\N	\N	1778275140596	2026-05-08 23:19:00.596+02	2026-05-08 23:19:01.803559+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:01.803559+02
+16885	9	E28011704000021D53DAB0CB	\N	-54	0	56	\N	\N	1778275140905	2026-05-08 23:19:00.905+02	2026-05-08 23:19:01.85702+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:01.85702+02
+16892	9	E28011704000021D53DAB0CB	\N	-59	0	56	\N	\N	1778275141645	2026-05-08 23:19:01.645+02	2026-05-08 23:19:02.047864+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:02.047864+02
+16898	10	E28011704000021D53DAB0CB	\N	-67	0	57	\N	\N	1778275142979	2026-05-08 23:19:02.979+02	2026-05-08 23:19:03.632986+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.632986+02
+16901	10	E28011704000021D53DAB0CB	\N	-65	0	34	\N	\N	1778275143136	2026-05-08 23:19:03.136+02	2026-05-08 23:19:03.660919+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.660919+02
+16903	9	E28011704000021D53DAB0CB	\N	-65	0	39	\N	\N	1778275142243	2026-05-08 23:19:02.243+02	2026-05-08 23:19:03.702639+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.702639+02
+16905	9	E28011704000021D53DAB0CB	\N	-67	0	54	\N	\N	1778275142412	2026-05-08 23:19:02.412+02	2026-05-08 23:19:03.720254+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.720254+02
+16908	9	E28011704000021D53DAB0CB	\N	-69	0	22	\N	\N	1778275142577	2026-05-08 23:19:02.577+02	2026-05-08 23:19:03.73297+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.73297+02
+16912	10	E28011704000021D53DAB0CB	\N	-62	0	30	\N	\N	1778275143578	2026-05-08 23:19:03.578+02	2026-05-08 23:19:04.762963+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.762963+02
+16917	10	E28011704000021D53DAB0CB	\N	-55	0	19	\N	\N	1778275144040	2026-05-08 23:19:04.04+02	2026-05-08 23:19:04.799182+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.799182+02
+16920	10	E28011704000021D53DAB0CB	\N	-68	0	16	\N	\N	1778275144179	2026-05-08 23:19:04.179+02	2026-05-08 23:19:04.807733+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.807733+02
+16941	10	E28011704000021D53DAB0CB	\N	-61	0	29	\N	\N	1778275167278	2026-05-08 23:19:27.278+02	2026-05-08 23:19:27.873385+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.873385+02
+16944	10	E28011704000021D53DAB0CB	\N	-62	0	30	\N	\N	1778275167443	2026-05-08 23:19:27.443+02	2026-05-08 23:19:27.884931+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.884931+02
+16948	9	E28011704000021D53DAB0CB	\N	-62	0	16	\N	\N	1778275168209	2026-05-08 23:19:28.209+02	2026-05-08 23:19:29.042561+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:29.042561+02
+16953	9	E28011704000021D53DAB0CB	\N	-61	0	50	\N	\N	1778275168643	2026-05-08 23:19:28.643+02	2026-05-08 23:19:29.534733+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:29.534733+02
+16960	10	E28011704000021D53DAB0CB	\N	-66	0	58	\N	\N	1778275184684	2026-05-08 23:19:44.684+02	2026-05-08 23:19:45.528829+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.528829+02
+16965	10	E28011704000021D53DAB0CB	\N	-64	0	13	\N	\N	1778275185128	2026-05-08 23:19:45.128+02	2026-05-08 23:19:45.586462+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.586462+02
+16974	10	E28011704000021D53DAB0CB	\N	-61	0	31	\N	\N	1778275185878	2026-05-08 23:19:45.878+02	2026-05-08 23:19:46.691519+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.691519+02
+16977	10	E28011704000021D53DAB0CB	\N	-73	0	25	\N	\N	1778275186028	2026-05-08 23:19:46.028+02	2026-05-08 23:19:46.702753+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.702753+02
+16980	10	E28011704000021D53DAB0CB	\N	-67	0	16	\N	\N	1778275205383	2026-05-08 23:20:05.383+02	2026-05-08 23:20:06.342162+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:06.342162+02
+16982	10	E28011704000021D53DAB0CB	\N	-67	0	45	\N	\N	1778275205678	2026-05-08 23:20:05.678+02	2026-05-08 23:20:06.358406+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:06.358406+02
+16989	9	E28011704000021D53DAB0CB	\N	-57	0	57	\N	\N	1778275206893	2026-05-08 23:20:06.893+02	2026-05-08 23:20:08.159687+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:08.159687+02
+16991	9	E28011704000021D53DAB0CB	\N	-68	0	18	\N	\N	1778275207197	2026-05-08 23:20:07.197+02	2026-05-08 23:20:08.194035+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:08.194035+02
+17013	10	E28011704000021D53DAB0CB	\N	-70	0	12	\N	\N	1778275240478	2026-05-08 23:20:40.478+02	2026-05-08 23:20:41.465994+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:41.465994+02
+17018	10	E28011704000021D53DAB0CB	\N	-70	0	32	\N	\N	1778275241232	2026-05-08 23:20:41.232+02	2026-05-08 23:20:41.517953+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:41.517953+02
+17022	10	E28011704000021D53DAB0CB	\N	-68	0	30	\N	\N	1778275241528	2026-05-08 23:20:41.528+02	2026-05-08 23:20:42.97587+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:42.97587+02
+17025	10	E28011704000021D53DAB0CB	\N	-73	0	34	\N	\N	1778275241678	2026-05-08 23:20:41.678+02	2026-05-08 23:20:43.286686+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:43.286686+02
+17050	9	E28011704000021D53DAB0CB	\N	-69	0	21	\N	\N	1778275260476	2026-05-08 23:21:00.476+02	2026-05-08 23:21:00.952275+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:00.952275+02
+17053	10	E28011704000021D53DAB0CB	\N	-74	0	52	\N	\N	1778275262078	2026-05-08 23:21:02.078+02	2026-05-08 23:21:03.251269+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:03.251269+02
+17055	10	E28011704000021D53DAB0CB	\N	-70	0	59	\N	\N	1778275262386	2026-05-08 23:21:02.386+02	2026-05-08 23:21:03.865583+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:03.865583+02
+17058	10	E28011704000021D53DAB0CB	\N	-63	0	16	\N	\N	1778275262532	2026-05-08 23:21:02.532+02	2026-05-08 23:21:04.174913+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:04.174913+02
+17059	10	E28011704000021D53DAB0CB	\N	-68	0	49	\N	\N	1778275262679	2026-05-08 23:21:02.679+02	2026-05-08 23:21:04.480248+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:04.480248+02
+16873	9	E28011704000021D53DAB0CB	\N	-65	0	7	\N	\N	1778275124394	2026-05-08 23:18:44.394+02	2026-05-08 23:18:44.64595+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.64595+02
+16874	9	E28011704000021D53DAB0CB	\N	-67	0	54	\N	\N	1778275124545	2026-05-08 23:18:44.545+02	2026-05-08 23:18:45.829784+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:45.829784+02
+16877	9	E28011704000021D53DAB0CB	\N	-68	0	10	\N	\N	1778275124851	2026-05-08 23:18:44.851+02	2026-05-08 23:18:46.648795+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:46.648795+02
+17331	10	E28011704000021D53DAB0CB	\N	-60	0	51	\N	\N	1778275458878	2026-05-08 23:24:18.878+02	2026-05-08 23:24:19.416621+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.416621+02
+17335	9	E28011704000021D53DAB0CB	\N	-67	0	28	\N	\N	1778275459972	2026-05-08 23:24:19.972+02	2026-05-08 23:24:20.990963+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:20.990963+02
+16665	10	E28011704000021D53DAB0CB	\N	-68	0	33	\N	\N	1778274999129	2026-05-08 23:16:39.129+02	2026-05-08 23:16:39.642138+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.642138+02
+16669	10	E28011704000021D53DAB0CB	\N	-70	0	20	\N	\N	1778274999443	2026-05-08 23:16:39.443+02	2026-05-08 23:16:41.008634+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.008634+02
+16672	10	E28011704000021D53DAB0CB	\N	-74	0	50	\N	\N	1778274999581	2026-05-08 23:16:39.581+02	2026-05-08 23:16:41.138639+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.138639+02
+16677	10	E28011704000021D53DAB0CB	\N	-70	0	26	\N	\N	1778275000029	2026-05-08 23:16:40.029+02	2026-05-08 23:16:41.189004+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.189004+02
+16682	10	E28011704000021D53DAB0CB	\N	-73	0	43	\N	\N	1778275000628	2026-05-08 23:16:40.628+02	2026-05-08 23:16:41.458265+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.458265+02
+16685	10	E28011704000021D53DAB0CB	\N	-71	0	16	\N	\N	1778275000778	2026-05-08 23:16:40.778+02	2026-05-08 23:16:41.495187+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.495187+02
+16690	10	E28011704000021D53DAB0CB	\N	-74	0	45	\N	\N	1778275001228	2026-05-08 23:16:41.228+02	2026-05-08 23:16:41.635513+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.635513+02
+16693	10	E28011704000021D53DAB0CB	\N	-68	0	53	\N	\N	1778275001382	2026-05-08 23:16:41.382+02	2026-05-08 23:16:41.740287+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.740287+02
+17337	9	E28011704000021D53DAB0CB	\N	-65	0	49	\N	\N	1778275460243	2026-05-08 23:24:20.243+02	2026-05-08 23:24:21.061234+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:21.061234+02
+17641	10	E28011704000021D53DAB0CB	\N	-67	0	56	\N	\N	1778275764128	2026-05-08 23:29:24.128+02	2026-05-08 23:29:26.144062+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.144062+02
+17063	10	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778275281278	2026-05-08 23:21:21.278+02	2026-05-08 23:21:22.605106+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:22.605106+02
+17658	10	E28011704000021D53DAB0CB	\N	-60	0	9	\N	\N	1778275777779	2026-05-08 23:29:37.779+02	2026-05-08 23:29:38.841313+02	\N	2026-05-08 23:29:46.73+02	insufficient_data	realtime	synced	2026-05-08 23:29:38.841313+02
+16884	9	E28011704000021D53DAB0CB	\N	-61	0	44	\N	\N	1778275140905	2026-05-08 23:19:00.905+02	2026-05-08 23:19:01.854799+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:01.854799+02
+16697	10	E28011704000021D53DAB0CB	\N	-67	0	29	\N	\N	1778275033178	2026-05-08 23:17:13.178+02	2026-05-08 23:17:14.500576+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.500576+02
+16702	10	E28011704000021D53DAB0CB	\N	-54	0	37	\N	\N	1778275034228	2026-05-08 23:17:14.228+02	2026-05-08 23:17:14.67354+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.67354+02
+16705	10	E28011704000021D53DAB0CB	\N	-58	0	59	\N	\N	1778275034383	2026-05-08 23:17:14.383+02	2026-05-08 23:17:14.687096+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.687096+02
+16711	10	E28011704000021D53DAB0CB	\N	-54	0	36	\N	\N	1778275034828	2026-05-08 23:17:14.828+02	2026-05-08 23:17:16.194934+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.194934+02
+16719	10	E28011704000021D53DAB0CB	\N	-64	0	40	\N	\N	1778275035429	2026-05-08 23:17:15.429+02	2026-05-08 23:17:16.236033+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.236033+02
+16721	10	E28011704000021D53DAB0CB	\N	-64	0	22	\N	\N	1778275035591	2026-05-08 23:17:15.591+02	2026-05-08 23:17:16.357572+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.357572+02
+16727	9	E28011704000021D53DAB0CB	\N	-58	0	26	\N	\N	1778275036193	2026-05-08 23:17:16.193+02	2026-05-08 23:17:16.692263+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.692263+02
+16732	9	E28011704000021D53DAB0CB	\N	-64	0	53	\N	\N	1778275036672	2026-05-08 23:17:16.672+02	2026-05-08 23:17:16.894878+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.894878+02
+16887	9	E28011704000021D53DAB0CB	\N	-53	0	16	\N	\N	1778275141043	2026-05-08 23:19:01.043+02	2026-05-08 23:19:01.925099+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:01.925099+02
+16889	9	E28011704000021D53DAB0CB	\N	-54	0	53	\N	\N	1778275141349	2026-05-08 23:19:01.349+02	2026-05-08 23:19:01.976494+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:01.976494+02
+16894	9	E28011704000021D53DAB0CB	\N	-65	0	26	\N	\N	1778275141808	2026-05-08 23:19:01.808+02	2026-05-08 23:19:02.109201+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:02.109201+02
+16881	9	E28011704000021D53DAB0CB	\N	-64	0	14	\N	\N	1778275140444	2026-05-08 23:19:00.444+02	2026-05-08 23:19:00.676988+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:00.676988+02
+16883	9	E28011704000021D53DAB0CB	\N	-61	0	52	\N	\N	1778275140596	2026-05-08 23:19:00.596+02	2026-05-08 23:19:01.805448+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:01.805448+02
+16888	9	E28011704000021D53DAB0CB	\N	-54	0	23	\N	\N	1778275141194	2026-05-08 23:19:01.194+02	2026-05-08 23:19:01.950977+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:01.950977+02
+16890	9	E28011704000021D53DAB0CB	\N	-55	0	13	\N	\N	1778275141522	2026-05-08 23:19:01.522+02	2026-05-08 23:19:02.035328+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:02.035328+02
+16896	9	E28011704000021D53DAB0CB	\N	-60	0	12	\N	\N	1778275142094	2026-05-08 23:19:02.094+02	2026-05-08 23:19:03.544904+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.544904+02
+16906	10	E28011704000021D53DAB0CB	\N	-58	0	51	\N	\N	1778275143441	2026-05-08 23:19:03.441+02	2026-05-08 23:19:03.72117+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.72117+02
+16915	10	E28011704000021D53DAB0CB	\N	-50	0	31	\N	\N	1778275143878	2026-05-08 23:19:03.878+02	2026-05-08 23:19:04.790194+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.790194+02
+16918	10	E28011704000021D53DAB0CB	\N	-63	0	11	\N	\N	1778275144040	2026-05-08 23:19:04.04+02	2026-05-08 23:19:04.801408+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.801408+02
+16923	10	E28011704000021D53DAB0CB	\N	-67	0	29	\N	\N	1778275144478	2026-05-08 23:19:04.478+02	2026-05-08 23:19:04.831723+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.831723+02
+17662	10	E28011704000021D53DAB0CB	\N	-68	0	36	\N	\N	1778275786628	2026-05-08 23:29:46.628+02	2026-05-08 23:29:47.575257+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.575257+02
+16993	9	E28011704000021D53DAB0CB	\N	-74	0	55	\N	\N	1778275220393	2026-05-08 23:20:20.393+02	2026-05-08 23:20:20.756626+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:20.756626+02
+16996	10	E28011704000021D53DAB0CB	\N	-66	0	42	\N	\N	1778275220678	2026-05-08 23:20:20.678+02	2026-05-08 23:20:21.553938+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.553938+02
+16998	10	E28011704000021D53DAB0CB	\N	-71	0	41	\N	\N	1778275221128	2026-05-08 23:20:21.128+02	2026-05-08 23:20:21.57353+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.57353+02
+17001	10	E28011704000021D53DAB0CB	\N	-64	0	56	\N	\N	1778275221278	2026-05-08 23:20:21.278+02	2026-05-08 23:20:21.607213+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.607213+02
+17003	9	E28011704000021D53DAB0CB	\N	-68	0	29	\N	\N	1778275220866	2026-05-08 23:20:20.866+02	2026-05-08 23:20:21.93824+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.93824+02
+17009	10	E28011704000021D53DAB0CB	\N	-61	0	44	\N	\N	1778275221578	2026-05-08 23:20:21.578+02	2026-05-08 23:20:23.007591+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:23.007591+02
+17012	10	E28011704000021D53DAB0CB	\N	-66	0	33	\N	\N	1778275221728	2026-05-08 23:20:21.728+02	2026-05-08 23:20:23.319075+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:23.319075+02
+17015	10	E28011704000021D53DAB0CB	\N	-70	0	37	\N	\N	1778275240928	2026-05-08 23:20:40.928+02	2026-05-08 23:20:41.486778+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:41.486778+02
+17024	10	E28011704000021D53DAB0CB	\N	-69	0	12	\N	\N	1778275241678	2026-05-08 23:20:41.678+02	2026-05-08 23:20:43.284525+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:43.284525+02
+17026	9	E28011704000021D53DAB0CB	\N	-67	0	59	\N	\N	1778275243193	2026-05-08 23:20:43.193+02	2026-05-08 23:20:43.590561+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:43.590561+02
+17029	9	E28011704000021D53DAB0CB	\N	-67	0	29	\N	\N	1778275243344	2026-05-08 23:20:43.344+02	2026-05-08 23:20:43.635845+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:43.635845+02
+17033	9	E28011704000021D53DAB0CB	\N	-62	0	7	\N	\N	1778275243496	2026-05-08 23:20:43.496+02	2026-05-08 23:20:44.71979+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.71979+02
+17035	9	E28011704000021D53DAB0CB	\N	-56	0	16	\N	\N	1778275243793	2026-05-08 23:20:43.793+02	2026-05-08 23:20:44.814774+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.814774+02
+17038	9	E28011704000021D53DAB0CB	\N	-58	0	32	\N	\N	1778275243944	2026-05-08 23:20:43.944+02	2026-05-08 23:20:44.883631+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.883631+02
+17040	9	E28011704000021D53DAB0CB	\N	-58	0	9	\N	\N	1778275244244	2026-05-08 23:20:44.244+02	2026-05-08 23:20:44.964816+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.964816+02
+17045	9	E28011704000021D53DAB0CB	\N	-67	0	34	\N	\N	1778275244693	2026-05-08 23:20:44.693+02	2026-05-08 23:20:45.740921+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:45.740921+02
+16857	10	E28011704000021D53DAB0CB	\N	-71	0	35	\N	\N	1778275120478	2026-05-08 23:18:40.478+02	2026-05-08 23:18:41.530651+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:41.530651+02
+16860	10	E28011704000021D53DAB0CB	\N	-67	0	51	\N	\N	1778275120631	2026-05-08 23:18:40.631+02	2026-05-08 23:18:41.548111+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:41.548111+02
+16865	9	E28011704000021D53DAB0CB	\N	-65	0	51	\N	\N	1778275123493	2026-05-08 23:18:43.493+02	2026-05-08 23:18:44.426717+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.426717+02
+16854	10	E28011704000021D53DAB0CB	\N	-67	0	17	\N	\N	1778275120028	2026-05-08 23:18:40.028+02	2026-05-08 23:18:40.452318+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:40.452318+02
+16856	10	E28011704000021D53DAB0CB	\N	-64	0	32	\N	\N	1778275120478	2026-05-08 23:18:40.478+02	2026-05-08 23:18:41.528473+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:41.528473+02
+16859	10	E28011704000021D53DAB0CB	\N	-62	0	41	\N	\N	1778275120631	2026-05-08 23:18:40.631+02	2026-05-08 23:18:41.54355+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:41.54355+02
+16862	10	E28011704000021D53DAB0CB	\N	-61	0	28	\N	\N	1778275120790	2026-05-08 23:18:40.79+02	2026-05-08 23:18:41.555906+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:41.555906+02
+16867	9	E28011704000021D53DAB0CB	\N	-58	0	25	\N	\N	1778275123643	2026-05-08 23:18:43.643+02	2026-05-08 23:18:44.458275+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.458275+02
+16870	9	E28011704000021D53DAB0CB	\N	-58	0	21	\N	\N	1778275124118	2026-05-08 23:18:44.118+02	2026-05-08 23:18:44.602802+02	2026-05-08 23:18:50.263+02	\N	\N	realtime	synced	2026-05-08 23:18:44.602802+02
+16666	10	E28011704000021D53DAB0CB	\N	-67	0	47	\N	\N	1778274999129	2026-05-08 23:16:39.129+02	2026-05-08 23:16:39.643856+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.643856+02
+16670	10	E28011704000021D53DAB0CB	\N	-67	0	30	\N	\N	1778274999443	2026-05-08 23:16:39.443+02	2026-05-08 23:16:41.010483+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.010483+02
+16675	10	E28011704000021D53DAB0CB	\N	-74	0	38	\N	\N	1778274999878	2026-05-08 23:16:39.878+02	2026-05-08 23:16:41.170178+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.170178+02
+16680	10	E28011704000021D53DAB0CB	\N	-71	0	30	\N	\N	1778275000478	2026-05-08 23:16:40.478+02	2026-05-08 23:16:41.32809+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.32809+02
+16683	10	E28011704000021D53DAB0CB	\N	-70	0	35	\N	\N	1778275000628	2026-05-08 23:16:40.628+02	2026-05-08 23:16:41.459938+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.459938+02
+16688	10	E28011704000021D53DAB0CB	\N	-70	0	50	\N	\N	1778275001078	2026-05-08 23:16:41.078+02	2026-05-08 23:16:41.524574+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.524574+02
+16691	10	E28011704000021D53DAB0CB	\N	-76	0	46	\N	\N	1778275001228	2026-05-08 23:16:41.228+02	2026-05-08 23:16:41.638054+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.638054+02
+16694	10	E28011704000021D53DAB0CB	\N	-70	0	36	\N	\N	1778275001382	2026-05-08 23:16:41.382+02	2026-05-08 23:16:41.74224+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.74224+02
+16695	10	E28011704000021D53DAB0CB	\N	-73	0	48	\N	\N	1778275001528	2026-05-08 23:16:41.528+02	2026-05-08 23:16:42.846025+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:42.846025+02
+17336	9	E28011704000021D53DAB0CB	\N	-68	0	11	\N	\N	1778275460093	2026-05-08 23:24:20.093+02	2026-05-08 23:24:21.009675+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:21.009675+02
+17338	9	E28011704000021D53DAB0CB	\N	-64	0	12	\N	\N	1778275460393	2026-05-08 23:24:20.393+02	2026-05-08 23:24:21.084456+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:21.084456+02
+16700	10	E28011704000021D53DAB0CB	\N	-56	0	44	\N	\N	1778275034079	2026-05-08 23:17:14.079+02	2026-05-08 23:17:14.646354+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.646354+02
+16703	10	E28011704000021D53DAB0CB	\N	-56	0	12	\N	\N	1778275034228	2026-05-08 23:17:14.228+02	2026-05-08 23:17:14.675484+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.675484+02
+16706	10	E28011704000021D53DAB0CB	\N	-55	0	24	\N	\N	1778275034533	2026-05-08 23:17:14.533+02	2026-05-08 23:17:15.7436+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:15.7436+02
+16709	10	E28011704000021D53DAB0CB	\N	-53	0	44	\N	\N	1778275034679	2026-05-08 23:17:14.679+02	2026-05-08 23:17:15.886508+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:15.886508+02
+16712	10	E28011704000021D53DAB0CB	\N	-55	0	49	\N	\N	1778275034979	2026-05-08 23:17:14.979+02	2026-05-08 23:17:16.203772+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.203772+02
+16715	10	E28011704000021D53DAB0CB	\N	-60	0	9	\N	\N	1778275035141	2026-05-08 23:17:15.141+02	2026-05-08 23:17:16.216898+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.216898+02
+16722	9	E28011704000021D53DAB0CB	\N	-62	0	26	\N	\N	1778275035911	2026-05-08 23:17:15.911+02	2026-05-08 23:17:16.359417+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.359417+02
+16725	9	E28011704000021D53DAB0CB	\N	-61	0	34	\N	\N	1778275036044	2026-05-08 23:17:16.044+02	2026-05-08 23:17:16.638421+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.638421+02
+16730	9	E28011704000021D53DAB0CB	\N	-67	0	53	\N	\N	1778275036495	2026-05-08 23:17:16.495+02	2026-05-08 23:17:16.790867+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.790867+02
+16733	9	E28011704000021D53DAB0CB	\N	-62	0	36	\N	\N	1778275036672	2026-05-08 23:17:16.672+02	2026-05-08 23:17:16.897616+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.897616+02
+16879	9	E28011704000021D53DAB0CB	\N	-67	0	50	\N	\N	1778275140293	2026-05-08 23:19:00.293+02	2026-05-08 23:19:00.659164+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:00.659164+02
+16886	9	E28011704000021D53DAB0CB	\N	-58	0	53	\N	\N	1778275141043	2026-05-08 23:19:01.043+02	2026-05-08 23:19:01.922718+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:01.922718+02
+16891	9	E28011704000021D53DAB0CB	\N	-54	0	25	\N	\N	1778275141522	2026-05-08 23:19:01.522+02	2026-05-08 23:19:02.037373+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:02.037373+02
+16893	9	E28011704000021D53DAB0CB	\N	-61	0	36	\N	\N	1778275141808	2026-05-08 23:19:01.808+02	2026-05-08 23:19:02.10735+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:02.10735+02
+16899	10	E28011704000021D53DAB0CB	\N	-62	0	26	\N	\N	1778275143136	2026-05-08 23:19:03.136+02	2026-05-08 23:19:03.657103+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.657103+02
+16902	10	E28011704000021D53DAB0CB	\N	-64	0	49	\N	\N	1778275143278	2026-05-08 23:19:03.278+02	2026-05-08 23:19:03.686703+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.686703+02
+16904	10	E28011704000021D53DAB0CB	\N	-59	0	22	\N	\N	1778275143441	2026-05-08 23:19:03.441+02	2026-05-08 23:19:03.718984+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.718984+02
+16910	9	E28011704000021D53DAB0CB	\N	-68	0	49	\N	\N	1778275142693	2026-05-08 23:19:02.693+02	2026-05-08 23:19:03.790839+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.790839+02
+16911	10	E28011704000021D53DAB0CB	\N	-58	0	56	\N	\N	1778275143578	2026-05-08 23:19:03.578+02	2026-05-08 23:19:04.761053+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.761053+02
+16914	10	E28011704000021D53DAB0CB	\N	-59	0	27	\N	\N	1778275143731	2026-05-08 23:19:03.731+02	2026-05-08 23:19:04.773541+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.773541+02
+16922	10	E28011704000021D53DAB0CB	\N	-61	0	42	\N	\N	1778275144328	2026-05-08 23:19:04.328+02	2026-05-08 23:19:04.820173+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.820173+02
+16994	9	E28011704000021D53DAB0CB	\N	-65	0	36	\N	\N	1778275220543	2026-05-08 23:20:20.543+02	2026-05-08 23:20:20.821077+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:20.821077+02
+16997	10	E28011704000021D53DAB0CB	\N	-73	0	48	\N	\N	1778275220978	2026-05-08 23:20:20.978+02	2026-05-08 23:20:21.56324+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.56324+02
+17002	9	E28011704000021D53DAB0CB	\N	-64	0	29	\N	\N	1778275220693	2026-05-08 23:20:20.693+02	2026-05-08 23:20:21.8818+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.8818+02
+17008	10	E28011704000021D53DAB0CB	\N	-60	0	46	\N	\N	1778275221428	2026-05-08 23:20:21.428+02	2026-05-08 23:20:22.703253+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:22.703253+02
+17017	10	E28011704000021D53DAB0CB	\N	-64	0	18	\N	\N	1778275241078	2026-05-08 23:20:41.078+02	2026-05-08 23:20:41.505977+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:41.505977+02
+17021	10	E28011704000021D53DAB0CB	\N	-71	0	14	\N	\N	1778275241378	2026-05-08 23:20:41.378+02	2026-05-08 23:20:42.670803+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:42.670803+02
+17028	10	E28011704000021D53DAB0CB	\N	-70	0	33	\N	\N	1778275241828	2026-05-08 23:20:41.828+02	2026-05-08 23:20:43.604193+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:43.604193+02
+17034	9	E28011704000021D53DAB0CB	\N	-57	0	51	\N	\N	1778275243648	2026-05-08 23:20:43.648+02	2026-05-08 23:20:44.784027+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.784027+02
+17039	9	E28011704000021D53DAB0CB	\N	-62	0	53	\N	\N	1778275244094	2026-05-08 23:20:44.094+02	2026-05-08 23:20:44.917027+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.917027+02
+17044	9	E28011704000021D53DAB0CB	\N	-62	0	56	\N	\N	1778275244568	2026-05-08 23:20:44.568+02	2026-05-08 23:20:45.090576+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:45.090576+02
+17046	9	E28011704000021D53DAB0CB	\N	-63	0	45	\N	\N	1778275244873	2026-05-08 23:20:44.873+02	2026-05-08 23:20:46.150787+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:46.150787+02
+17049	9	E28011704000021D53DAB0CB	\N	-74	0	57	\N	\N	1778275260476	2026-05-08 23:21:00.476+02	2026-05-08 23:21:00.949583+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:00.949583+02
+17052	10	E28011704000021D53DAB0CB	\N	-73	0	26	\N	\N	1778275261929	2026-05-08 23:21:01.929+02	2026-05-08 23:21:02.841934+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:02.841934+02
+17054	10	E28011704000021D53DAB0CB	\N	-70	0	23	\N	\N	1778275262244	2026-05-08 23:21:02.244+02	2026-05-08 23:21:03.558061+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:03.558061+02
+17314	10	E28011704000021D53DAB0CB	\N	-68	0	45	\N	\N	1778275457378	2026-05-08 23:24:17.378+02	2026-05-08 23:24:18.222581+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:18.222581+02
+17316	10	E28011704000021D53DAB0CB	\N	-62	0	30	\N	\N	1778275457684	2026-05-08 23:24:17.684+02	2026-05-08 23:24:18.257475+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:18.257475+02
+17323	10	E28011704000021D53DAB0CB	\N	-61	0	28	\N	\N	1778275458278	2026-05-08 23:24:18.278+02	2026-05-08 23:24:19.362799+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.362799+02
+16667	10	E28011704000021D53DAB0CB	\N	-67	0	50	\N	\N	1778274999278	2026-05-08 23:16:39.278+02	2026-05-08 23:16:39.650053+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:39.650053+02
+16668	10	E28011704000021D53DAB0CB	\N	-68	0	50	\N	\N	1778274999443	2026-05-08 23:16:39.443+02	2026-05-08 23:16:41.006343+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.006343+02
+16671	10	E28011704000021D53DAB0CB	\N	-70	0	8	\N	\N	1778274999581	2026-05-08 23:16:39.581+02	2026-05-08 23:16:41.135412+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.135412+02
+16674	10	E28011704000021D53DAB0CB	\N	-73	0	9	\N	\N	1778274999728	2026-05-08 23:16:39.728+02	2026-05-08 23:16:41.157995+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.157995+02
+16676	10	E28011704000021D53DAB0CB	\N	-71	0	33	\N	\N	1778275000029	2026-05-08 23:16:40.029+02	2026-05-08 23:16:41.187055+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.187055+02
+16679	10	E28011704000021D53DAB0CB	\N	-70	0	54	\N	\N	1778275000328	2026-05-08 23:16:40.328+02	2026-05-08 23:16:41.20163+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.20163+02
+16684	10	E28011704000021D53DAB0CB	\N	-66	0	55	\N	\N	1778275000778	2026-05-08 23:16:40.778+02	2026-05-08 23:16:41.492757+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.492757+02
+16687	10	E28011704000021D53DAB0CB	\N	-70	0	9	\N	\N	1778275000928	2026-05-08 23:16:40.928+02	2026-05-08 23:16:41.512809+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.512809+02
+16692	10	E28011704000021D53DAB0CB	\N	-71	0	31	\N	\N	1778275001382	2026-05-08 23:16:41.382+02	2026-05-08 23:16:41.73844+02	\N	2026-05-08 23:16:50.172+02	insufficient_data	realtime	synced	2026-05-08 23:16:41.73844+02
+16895	9	E28011704000021D53DAB0CB	\N	-61	0	12	\N	\N	1778275141945	2026-05-08 23:19:01.945+02	2026-05-08 23:19:03.237359+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.237359+02
+16897	10	E28011704000021D53DAB0CB	\N	-60	0	8	\N	\N	1778275142979	2026-05-08 23:19:02.979+02	2026-05-08 23:19:03.630596+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.630596+02
+16900	10	E28011704000021D53DAB0CB	\N	-67	0	32	\N	\N	1778275143136	2026-05-08 23:19:03.136+02	2026-05-08 23:19:03.659029+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.659029+02
+16907	9	E28011704000021D53DAB0CB	\N	-63	0	10	\N	\N	1778275142412	2026-05-08 23:19:02.412+02	2026-05-08 23:19:03.722325+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.722325+02
+16909	9	E28011704000021D53DAB0CB	\N	-65	0	14	\N	\N	1778275142693	2026-05-08 23:19:02.693+02	2026-05-08 23:19:03.788651+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:03.788651+02
+16913	10	E28011704000021D53DAB0CB	\N	-55	0	25	\N	\N	1778275143731	2026-05-08 23:19:03.731+02	2026-05-08 23:19:04.771621+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.771621+02
+16916	10	E28011704000021D53DAB0CB	\N	-55	0	57	\N	\N	1778275143878	2026-05-08 23:19:03.878+02	2026-05-08 23:19:04.79208+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.79208+02
+16919	10	E28011704000021D53DAB0CB	\N	-64	0	58	\N	\N	1778275144040	2026-05-08 23:19:04.04+02	2026-05-08 23:19:04.803509+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.803509+02
+16921	10	E28011704000021D53DAB0CB	\N	-56	0	17	\N	\N	1778275144328	2026-05-08 23:19:04.328+02	2026-05-08 23:19:04.817373+02	2026-05-08 23:19:10.281+02	\N	\N	realtime	synced	2026-05-08 23:19:04.817373+02
+16995	9	E28011704000021D53DAB0CB	\N	-67	0	29	\N	\N	1778275220543	2026-05-08 23:20:20.543+02	2026-05-08 23:20:20.823036+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:20.823036+02
+17000	10	E28011704000021D53DAB0CB	\N	-68	0	18	\N	\N	1778275221278	2026-05-08 23:20:21.278+02	2026-05-08 23:20:21.60545+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.60545+02
+17005	9	E28011704000021D53DAB0CB	\N	-57	0	38	\N	\N	1778275220994	2026-05-08 23:20:20.994+02	2026-05-08 23:20:21.961064+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.961064+02
+17011	10	E28011704000021D53DAB0CB	\N	-62	0	27	\N	\N	1778275221728	2026-05-08 23:20:21.728+02	2026-05-08 23:20:23.315488+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:23.315488+02
+16999	10	E28011704000021D53DAB0CB	\N	-68	0	49	\N	\N	1778275221128	2026-05-08 23:20:21.128+02	2026-05-08 23:20:21.575378+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.575378+02
+17004	9	E28011704000021D53DAB0CB	\N	-58	0	12	\N	\N	1778275220866	2026-05-08 23:20:20.866+02	2026-05-08 23:20:21.939976+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.939976+02
+17006	9	E28011704000021D53DAB0CB	\N	-58	0	40	\N	\N	1778275221143	2026-05-08 23:20:21.143+02	2026-05-08 23:20:21.973513+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:21.973513+02
+17007	10	E28011704000021D53DAB0CB	\N	-64	0	9	\N	\N	1778275221428	2026-05-08 23:20:21.428+02	2026-05-08 23:20:22.700931+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:22.700931+02
+16696	10	E28011704000021D53DAB0CB	\N	-65	0	8	\N	\N	1778275033178	2026-05-08 23:17:13.178+02	2026-05-08 23:17:14.498503+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.498503+02
+16699	10	E28011704000021D53DAB0CB	\N	-61	0	10	\N	\N	1778275033934	2026-05-08 23:17:13.934+02	2026-05-08 23:17:14.618985+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.618985+02
+16704	10	E28011704000021D53DAB0CB	\N	-61	0	34	\N	\N	1778275034383	2026-05-08 23:17:14.383+02	2026-05-08 23:17:14.684107+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:14.684107+02
+16708	10	E28011704000021D53DAB0CB	\N	-53	0	21	\N	\N	1778275034679	2026-05-08 23:17:14.679+02	2026-05-08 23:17:15.883988+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:15.883988+02
+16710	10	E28011704000021D53DAB0CB	\N	-59	0	21	\N	\N	1778275034828	2026-05-08 23:17:14.828+02	2026-05-08 23:17:16.193029+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.193029+02
+16713	10	E28011704000021D53DAB0CB	\N	-62	0	37	\N	\N	1778275034979	2026-05-08 23:17:14.979+02	2026-05-08 23:17:16.205824+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.205824+02
+16716	10	E28011704000021D53DAB0CB	\N	-62	0	48	\N	\N	1778275035141	2026-05-08 23:17:15.141+02	2026-05-08 23:17:16.219382+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.219382+02
+16718	10	E28011704000021D53DAB0CB	\N	-66	0	17	\N	\N	1778275035429	2026-05-08 23:17:15.429+02	2026-05-08 23:17:16.233883+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.233883+02
+16720	9	E28011704000021D53DAB0CB	\N	-63	0	38	\N	\N	1778275035911	2026-05-08 23:17:15.911+02	2026-05-08 23:17:16.357564+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.357564+02
+16724	10	E28011704000021D53DAB0CB	\N	-70	0	49	\N	\N	1778275035591	2026-05-08 23:17:15.591+02	2026-05-08 23:17:16.36221+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.36221+02
+16729	9	E28011704000021D53DAB0CB	\N	-55	0	7	\N	\N	1778275036351	2026-05-08 23:17:16.351+02	2026-05-08 23:17:16.720032+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:16.720032+02
+16734	9	E28011704000021D53DAB0CB	\N	-60	0	27	\N	\N	1778275036795	2026-05-08 23:17:16.795+02	2026-05-08 23:17:17.969706+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:17.969706+02
+16735	9	E28011704000021D53DAB0CB	\N	-64	0	49	\N	\N	1778275036943	2026-05-08 23:17:16.943+02	2026-05-08 23:17:18.01161+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.01161+02
+16736	9	E28011704000021D53DAB0CB	\N	-56	0	42	\N	\N	1778275036943	2026-05-08 23:17:16.943+02	2026-05-08 23:17:18.013699+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.013699+02
+16737	9	E28011704000021D53DAB0CB	\N	-64	0	18	\N	\N	1778275037117	2026-05-08 23:17:17.117+02	2026-05-08 23:17:18.037882+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.037882+02
+16750	9	E28011704000021D53DAB0CB	\N	-68	0	42	\N	\N	1778275053009	2026-05-08 23:17:33.009+02	2026-05-08 23:17:33.946278+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:33.946278+02
+16751	9	E28011704000021D53DAB0CB	\N	-68	0	42	\N	\N	1778275053143	2026-05-08 23:17:33.143+02	2026-05-08 23:17:34.008087+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.008087+02
+16752	9	E28011704000021D53DAB0CB	\N	-70	0	37	\N	\N	1778275053293	2026-05-08 23:17:33.293+02	2026-05-08 23:17:34.661301+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.661301+02
+16753	9	E28011704000021D53DAB0CB	\N	-71	0	42	\N	\N	1778275053293	2026-05-08 23:17:33.293+02	2026-05-08 23:17:34.668856+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.668856+02
+16754	9	E28011704000021D53DAB0CB	\N	-65	0	33	\N	\N	1778275053455	2026-05-08 23:17:33.455+02	2026-05-08 23:17:34.687858+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.687858+02
+16755	9	E28011704000021D53DAB0CB	\N	-64	0	23	\N	\N	1778275053616	2026-05-08 23:17:33.616+02	2026-05-08 23:17:34.705989+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.705989+02
+16756	9	E28011704000021D53DAB0CB	\N	-65	0	50	\N	\N	1778275053745	2026-05-08 23:17:33.745+02	2026-05-08 23:17:34.717804+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.717804+02
+16757	9	E28011704000021D53DAB0CB	\N	-68	0	40	\N	\N	1778275053745	2026-05-08 23:17:33.745+02	2026-05-08 23:17:34.720083+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.720083+02
+16759	9	E28011704000021D53DAB0CB	\N	-77	0	8	\N	\N	1778275054061	2026-05-08 23:17:34.061+02	2026-05-08 23:17:34.80042+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.80042+02
+16761	10	E28011704000021D53DAB0CB	\N	-70	0	36	\N	\N	1778275054935	2026-05-08 23:17:34.935+02	2026-05-08 23:17:36.19718+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:36.19718+02
+16762	10	E28011704000021D53DAB0CB	\N	-68	0	40	\N	\N	1778275054935	2026-05-08 23:17:34.935+02	2026-05-08 23:17:36.198998+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:36.198998+02
+16765	10	E28011704000021D53DAB0CB	\N	-68	0	30	\N	\N	1778275055081	2026-05-08 23:17:35.081+02	2026-05-08 23:17:36.506554+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:36.506554+02
+16738	9	E28011704000021D53DAB0CB	\N	-57	0	26	\N	\N	1778275037243	2026-05-08 23:17:17.243+02	2026-05-08 23:17:18.100712+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.100712+02
+16739	9	E28011704000021D53DAB0CB	\N	-57	0	39	\N	\N	1778275037243	2026-05-08 23:17:17.243+02	2026-05-08 23:17:18.102996+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.102996+02
+16740	9	E28011704000021D53DAB0CB	\N	-61	0	31	\N	\N	1778275037395	2026-05-08 23:17:17.395+02	2026-05-08 23:17:18.12422+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.12422+02
+16741	9	E28011704000021D53DAB0CB	\N	-61	0	38	\N	\N	1778275037543	2026-05-08 23:17:17.543+02	2026-05-08 23:17:18.138849+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.138849+02
+16742	9	E28011704000021D53DAB0CB	\N	-60	0	22	\N	\N	1778275037543	2026-05-08 23:17:17.543+02	2026-05-08 23:17:18.140924+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.140924+02
+16743	9	E28011704000021D53DAB0CB	\N	-65	0	11	\N	\N	1778275037703	2026-05-08 23:17:17.703+02	2026-05-08 23:17:18.19584+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.19584+02
+16744	9	E28011704000021D53DAB0CB	\N	-61	0	43	\N	\N	1778275037844	2026-05-08 23:17:17.844+02	2026-05-08 23:17:18.263834+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.263834+02
+16745	9	E28011704000021D53DAB0CB	\N	-67	0	43	\N	\N	1778275037844	2026-05-08 23:17:17.844+02	2026-05-08 23:17:18.266231+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:18.266231+02
+16746	9	E28011704000021D53DAB0CB	\N	-65	0	53	\N	\N	1778275038146	2026-05-08 23:17:18.146+02	2026-05-08 23:17:19.403133+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:19.403133+02
+16747	9	E28011704000021D53DAB0CB	\N	-65	0	29	\N	\N	1778275038146	2026-05-08 23:17:18.146+02	2026-05-08 23:17:19.404897+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:19.404897+02
+16748	9	E28011704000021D53DAB0CB	\N	-62	0	31	\N	\N	1778275038294	2026-05-08 23:17:18.294+02	2026-05-08 23:17:19.445979+02	2026-05-08 23:17:24.21+02	\N	\N	realtime	synced	2026-05-08 23:17:19.445979+02
+16831	9	E28011704000021D53DAB0CB	\N	-64	0	10	\N	\N	1778275095161	2026-05-08 23:18:15.161+02	2026-05-08 23:18:16.13334+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:16.13334+02
+16832	9	E28011704000021D53DAB0CB	\N	-64	0	21	\N	\N	1778275095330	2026-05-08 23:18:15.33+02	2026-05-08 23:18:16.542894+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:16.542894+02
+16837	9	E28011704000021D53DAB0CB	\N	-67	0	50	\N	\N	1778275095743	2026-05-08 23:18:15.743+02	2026-05-08 23:18:17.035483+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:17.035483+02
+17065	10	E28011704000021D53DAB0CB	\N	-64	0	22	\N	\N	1778275281578	2026-05-08 23:21:21.578+02	2026-05-08 23:21:23.220455+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.220455+02
+17068	10	E28011704000021D53DAB0CB	\N	-52	0	22	\N	\N	1778275281728	2026-05-08 23:21:21.728+02	2026-05-08 23:21:23.530604+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.530604+02
+17070	9	E28011704000021D53DAB0CB	\N	-58	0	46	\N	\N	1778275283253	2026-05-08 23:21:23.253+02	2026-05-08 23:21:23.667301+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.667301+02
+16749	9	E28011704000021D53DAB0CB	\N	-68	0	43	\N	\N	1778275053009	2026-05-08 23:17:33.009+02	2026-05-08 23:17:33.944349+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:33.944349+02
+16758	9	E28011704000021D53DAB0CB	\N	-70	0	32	\N	\N	1778275053894	2026-05-08 23:17:33.894+02	2026-05-08 23:17:34.781301+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:34.781301+02
+16760	10	E28011704000021D53DAB0CB	\N	-70	0	58	\N	\N	1778275054628	2026-05-08 23:17:34.628+02	2026-05-08 23:17:35.070419+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:35.070419+02
+16763	10	E28011704000021D53DAB0CB	\N	-67	0	52	\N	\N	1778275054935	2026-05-08 23:17:34.935+02	2026-05-08 23:17:36.200656+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:36.200656+02
+16764	10	E28011704000021D53DAB0CB	\N	-68	0	51	\N	\N	1778275055081	2026-05-08 23:17:35.081+02	2026-05-08 23:17:36.504179+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:36.504179+02
+16768	10	E28011704000021D53DAB0CB	\N	-60	0	14	\N	\N	1778275055378	2026-05-08 23:17:35.378+02	2026-05-08 23:17:37.122158+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.122158+02
+17064	10	E28011704000021D53DAB0CB	\N	-71	0	37	\N	\N	1778275281428	2026-05-08 23:21:21.428+02	2026-05-08 23:21:22.911987+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:22.911987+02
+16924	10	E28011704000021D53DAB0CB	\N	-63	0	24	\N	\N	1778275165778	2026-05-08 23:19:25.778+02	2026-05-08 23:19:26.589402+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:26.589402+02
+16929	10	E28011704000021D53DAB0CB	\N	-61	0	29	\N	\N	1778275166378	2026-05-08 23:19:26.378+02	2026-05-08 23:19:26.757234+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:26.757234+02
+16932	10	E28011704000021D53DAB0CB	\N	-53	0	14	\N	\N	1778275166528	2026-05-08 23:19:26.528+02	2026-05-08 23:19:27.816401+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.816401+02
+16937	10	E28011704000021D53DAB0CB	\N	-61	0	8	\N	\N	1778275166978	2026-05-08 23:19:26.978+02	2026-05-08 23:19:27.850753+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.850753+02
+16940	10	E28011704000021D53DAB0CB	\N	-63	0	47	\N	\N	1778275167128	2026-05-08 23:19:27.128+02	2026-05-08 23:19:27.866991+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.866991+02
+16952	9	E28011704000021D53DAB0CB	\N	-62	0	19	\N	\N	1778275168494	2026-05-08 23:19:28.494+02	2026-05-08 23:19:29.478314+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:29.478314+02
+16954	9	E28011704000021D53DAB0CB	\N	-62	0	33	\N	\N	1778275168801	2026-05-08 23:19:28.801+02	2026-05-08 23:19:29.545038+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:29.545038+02
+16777	10	E28011704000021D53DAB0CB	\N	-67	0	11	\N	\N	1778275076828	2026-05-08 23:17:56.828+02	2026-05-08 23:17:57.598707+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:57.598707+02
+16779	10	E28011704000021D53DAB0CB	\N	-65	0	39	\N	\N	1778275077128	2026-05-08 23:17:57.128+02	2026-05-08 23:17:57.660899+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:57.660899+02
+16785	10	E28011704000021D53DAB0CB	\N	-51	0	37	\N	\N	1778275078028	2026-05-08 23:17:58.028+02	2026-05-08 23:17:59.224557+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.224557+02
+16788	10	E28011704000021D53DAB0CB	\N	-52	0	10	\N	\N	1778275078178	2026-05-08 23:17:58.178+02	2026-05-08 23:17:59.251254+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.251254+02
+16791	10	E28011704000021D53DAB0CB	\N	-50	0	39	\N	\N	1778275078338	2026-05-08 23:17:58.338+02	2026-05-08 23:17:59.285886+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.285886+02
+16796	10	E28011704000021D53DAB0CB	\N	-61	0	21	\N	\N	1778275078795	2026-05-08 23:17:58.795+02	2026-05-08 23:17:59.350036+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.350036+02
+16799	10	E28011704000021D53DAB0CB	\N	-60	0	43	\N	\N	1778275078929	2026-05-08 23:17:58.929+02	2026-05-08 23:17:59.372235+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.372235+02
+16805	10	E28011704000021D53DAB0CB	\N	-65	0	8	\N	\N	1778275079228	2026-05-08 23:17:59.228+02	2026-05-08 23:18:00.46773+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:00.46773+02
+16808	9	E28011704000021D53DAB0CB	\N	-59	0	8	\N	\N	1778275079867	2026-05-08 23:17:59.867+02	2026-05-08 23:18:01.023326+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.023326+02
+16811	9	E28011704000021D53DAB0CB	\N	-56	0	31	\N	\N	1778275079993	2026-05-08 23:17:59.993+02	2026-05-08 23:18:01.050191+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.050191+02
+16813	9	E28011704000021D53DAB0CB	\N	-55	0	23	\N	\N	1778275080312	2026-05-08 23:18:00.312+02	2026-05-08 23:18:01.151065+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.151065+02
+16818	9	E28011704000021D53DAB0CB	\N	-55	0	57	\N	\N	1778275080743	2026-05-08 23:18:00.743+02	2026-05-08 23:18:01.26004+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.26004+02
+16824	9	E28011704000021D53DAB0CB	\N	-65	0	35	\N	\N	1778275081356	2026-05-08 23:18:01.356+02	2026-05-08 23:18:02.573124+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.573124+02
+16826	9	E28011704000021D53DAB0CB	\N	-63	0	14	\N	\N	1778275081643	2026-05-08 23:18:01.643+02	2026-05-08 23:18:02.593487+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.593487+02
+16957	9	E28011704000021D53DAB0CB	\N	-67	0	38	\N	\N	1778275184393	2026-05-08 23:19:44.393+02	2026-05-08 23:19:45.222355+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.222355+02
+16962	10	E28011704000021D53DAB0CB	\N	-65	0	19	\N	\N	1778275184834	2026-05-08 23:19:44.834+02	2026-05-08 23:19:45.542211+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.542211+02
+16964	10	E28011704000021D53DAB0CB	\N	-64	0	17	\N	\N	1778275185128	2026-05-08 23:19:45.128+02	2026-05-08 23:19:45.584127+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.584127+02
+16967	10	E28011704000021D53DAB0CB	\N	-64	0	17	\N	\N	1778275185278	2026-05-08 23:19:45.278+02	2026-05-08 23:19:45.596368+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.596368+02
+16968	10	E28011704000021D53DAB0CB	\N	-63	0	37	\N	\N	1778275185428	2026-05-08 23:19:45.428+02	2026-05-08 23:19:46.65569+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.65569+02
+16971	10	E28011704000021D53DAB0CB	\N	-58	0	56	\N	\N	1778275185591	2026-05-08 23:19:45.591+02	2026-05-08 23:19:46.67468+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.67468+02
+16976	10	E28011704000021D53DAB0CB	\N	-62	0	59	\N	\N	1778275186028	2026-05-08 23:19:46.028+02	2026-05-08 23:19:46.700685+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.700685+02
+16981	10	E28011704000021D53DAB0CB	\N	-67	0	28	\N	\N	1778275205529	2026-05-08 23:20:05.529+02	2026-05-08 23:20:06.349882+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:06.349882+02
+16983	10	E28011704000021D53DAB0CB	\N	-73	0	28	\N	\N	1778275205828	2026-05-08 23:20:05.828+02	2026-05-08 23:20:06.372334+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:06.372334+02
+16988	9	E28011704000021D53DAB0CB	\N	-58	0	10	\N	\N	1778275206762	2026-05-08 23:20:06.762+02	2026-05-08 23:20:07.075981+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:07.075981+02
+16990	9	E28011704000021D53DAB0CB	\N	-55	0	32	\N	\N	1778275207043	2026-05-08 23:20:07.043+02	2026-05-08 23:20:08.177754+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:08.177754+02
+16992	9	E28011704000021D53DAB0CB	\N	-61	0	58	\N	\N	1778275207360	2026-05-08 23:20:07.36+02	2026-05-08 23:20:08.209802+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:08.209802+02
+16766	10	E28011704000021D53DAB0CB	\N	-67	0	28	\N	\N	1778275055229	2026-05-08 23:17:35.229+02	2026-05-08 23:17:36.81124+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:36.81124+02
+16767	10	E28011704000021D53DAB0CB	\N	-57	0	10	\N	\N	1778275055378	2026-05-08 23:17:35.378+02	2026-05-08 23:17:37.118552+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.118552+02
+16769	10	E28011704000021D53DAB0CB	\N	-63	0	19	\N	\N	1778275055528	2026-05-08 23:17:35.528+02	2026-05-08 23:17:37.425476+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.425476+02
+16770	10	E28011704000021D53DAB0CB	\N	-71	0	53	\N	\N	1778275055528	2026-05-08 23:17:35.528+02	2026-05-08 23:17:37.427201+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.427201+02
+16771	10	E28011704000021D53DAB0CB	\N	-67	0	25	\N	\N	1778275055682	2026-05-08 23:17:35.682+02	2026-05-08 23:17:37.73298+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.73298+02
+16772	10	E28011704000021D53DAB0CB	\N	-73	0	38	\N	\N	1778275055682	2026-05-08 23:17:35.682+02	2026-05-08 23:17:37.734951+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.734951+02
+16773	10	E28011704000021D53DAB0CB	\N	-76	0	54	\N	\N	1778275055682	2026-05-08 23:17:35.682+02	2026-05-08 23:17:37.736758+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.736758+02
+16774	10	E28011704000021D53DAB0CB	\N	-76	0	32	\N	\N	1778275055828	2026-05-08 23:17:35.828+02	2026-05-08 23:17:37.956769+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.956769+02
+16775	10	E28011704000021D53DAB0CB	\N	-74	0	42	\N	\N	1778275055978	2026-05-08 23:17:35.978+02	2026-05-08 23:17:37.962617+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.962617+02
+16776	10	E28011704000021D53DAB0CB	\N	-74	0	42	\N	\N	1778275055978	2026-05-08 23:17:35.978+02	2026-05-08 23:17:37.971067+02	2026-05-08 23:17:40.224+02	\N	\N	realtime	synced	2026-05-08 23:17:37.971067+02
+16834	9	E28011704000021D53DAB0CB	\N	-67	0	25	\N	\N	1778275095443	2026-05-08 23:18:15.443+02	2026-05-08 23:18:16.849939+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:16.849939+02
+16836	9	E28011704000021D53DAB0CB	\N	-65	0	47	\N	\N	1778275095743	2026-05-08 23:18:15.743+02	2026-05-08 23:18:17.031278+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:17.031278+02
+17066	10	E28011704000021D53DAB0CB	\N	-56	0	39	\N	\N	1778275281728	2026-05-08 23:21:21.728+02	2026-05-08 23:21:23.526363+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.526363+02
+17069	9	E28011704000021D53DAB0CB	\N	-74	0	21	\N	\N	1778275282943	2026-05-08 23:21:22.943+02	2026-05-08 23:21:23.643768+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.643768+02
+17071	9	E28011704000021D53DAB0CB	\N	-73	0	24	\N	\N	1778275283394	2026-05-08 23:21:23.394+02	2026-05-08 23:21:23.679538+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.679538+02
+17074	10	E28011704000021D53DAB0CB	\N	-57	0	43	\N	\N	1778275282035	2026-05-08 23:21:22.035+02	2026-05-08 23:21:23.754025+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.754025+02
+17067	10	E28011704000021D53DAB0CB	\N	-58	0	17	\N	\N	1778275281728	2026-05-08 23:21:21.728+02	2026-05-08 23:21:23.528554+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.528554+02
+17077	10	E28011704000021D53DAB0CB	\N	-59	0	38	\N	\N	1778275282328	2026-05-08 23:21:22.328+02	2026-05-08 23:21:23.767537+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.767537+02
+17085	10	E28011704000021D53DAB0CB	\N	-63	0	27	\N	\N	1778275282778	2026-05-08 23:21:22.778+02	2026-05-08 23:21:23.811372+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.811372+02
+17072	10	E28011704000021D53DAB0CB	\N	-54	0	42	\N	\N	1778275282035	2026-05-08 23:21:22.035+02	2026-05-08 23:21:23.749257+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.749257+02
+16925	10	E28011704000021D53DAB0CB	\N	-63	0	16	\N	\N	1778275165931	2026-05-08 23:19:25.931+02	2026-05-08 23:19:26.713628+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:26.713628+02
+16928	10	E28011704000021D53DAB0CB	\N	-68	0	39	\N	\N	1778275166078	2026-05-08 23:19:26.078+02	2026-05-08 23:19:26.725018+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:26.725018+02
+16933	10	E28011704000021D53DAB0CB	\N	-59	0	34	\N	\N	1778275166678	2026-05-08 23:19:26.678+02	2026-05-08 23:19:27.826859+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.826859+02
+16778	10	E28011704000021D53DAB0CB	\N	-64	0	55	\N	\N	1778275076978	2026-05-08 23:17:56.978+02	2026-05-08 23:17:57.651764+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:57.651764+02
+16781	10	E28011704000021D53DAB0CB	\N	-65	0	29	\N	\N	1778275077278	2026-05-08 23:17:57.278+02	2026-05-08 23:17:57.672812+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:57.672812+02
+16784	10	E28011704000021D53DAB0CB	\N	-56	0	31	\N	\N	1778275077578	2026-05-08 23:17:57.578+02	2026-05-08 23:17:58.828973+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:58.828973+02
+16787	10	E28011704000021D53DAB0CB	\N	-52	0	43	\N	\N	1778275078178	2026-05-08 23:17:58.178+02	2026-05-08 23:17:59.249226+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.249226+02
+16789	10	E28011704000021D53DAB0CB	\N	-49	0	32	\N	\N	1778275078338	2026-05-08 23:17:58.338+02	2026-05-08 23:17:59.281349+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.281349+02
+16790	10	E28011704000021D53DAB0CB	\N	-53	0	26	\N	\N	1778275078338	2026-05-08 23:17:58.338+02	2026-05-08 23:17:59.283318+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.283318+02
+16792	10	E28011704000021D53DAB0CB	\N	-53	0	56	\N	\N	1778275078478	2026-05-08 23:17:58.478+02	2026-05-08 23:17:59.297191+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.297191+02
+16793	10	E28011704000021D53DAB0CB	\N	-56	0	36	\N	\N	1778275078478	2026-05-08 23:17:58.478+02	2026-05-08 23:17:59.299038+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.299038+02
+16795	10	E28011704000021D53DAB0CB	\N	-62	0	23	\N	\N	1778275078628	2026-05-08 23:17:58.628+02	2026-05-08 23:17:59.341622+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.341622+02
+16798	10	E28011704000021D53DAB0CB	\N	-67	0	51	\N	\N	1778275078929	2026-05-08 23:17:58.929+02	2026-05-08 23:17:59.367095+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.367095+02
+16800	10	E28011704000021D53DAB0CB	\N	-57	0	50	\N	\N	1778275079083	2026-05-08 23:17:59.083+02	2026-05-08 23:17:59.397385+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.397385+02
+16801	10	E28011704000021D53DAB0CB	\N	-61	0	13	\N	\N	1778275079083	2026-05-08 23:17:59.083+02	2026-05-08 23:17:59.399194+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.399194+02
+16803	9	E28011704000021D53DAB0CB	\N	-68	0	27	\N	\N	1778275079268	2026-05-08 23:17:59.268+02	2026-05-08 23:17:59.821712+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.821712+02
+16804	10	E28011704000021D53DAB0CB	\N	-68	0	58	\N	\N	1778275079228	2026-05-08 23:17:59.228+02	2026-05-08 23:18:00.465814+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:00.465814+02
+16806	10	E28011704000021D53DAB0CB	\N	-64	0	56	\N	\N	1778275079378	2026-05-08 23:17:59.378+02	2026-05-08 23:18:00.478507+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:00.478507+02
+16809	9	E28011704000021D53DAB0CB	\N	-57	0	22	\N	\N	1778275079867	2026-05-08 23:17:59.867+02	2026-05-08 23:18:01.025079+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.025079+02
+16810	9	E28011704000021D53DAB0CB	\N	-62	0	37	\N	\N	1778275079993	2026-05-08 23:17:59.993+02	2026-05-08 23:18:01.048098+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.048098+02
+16814	9	E28011704000021D53DAB0CB	\N	-58	0	14	\N	\N	1778275080312	2026-05-08 23:18:00.312+02	2026-05-08 23:18:01.15398+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.15398+02
+16815	9	E28011704000021D53DAB0CB	\N	-55	0	37	\N	\N	1778275080445	2026-05-08 23:18:00.445+02	2026-05-08 23:18:01.181724+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.181724+02
+16816	9	E28011704000021D53DAB0CB	\N	-58	0	58	\N	\N	1778275080618	2026-05-08 23:18:00.618+02	2026-05-08 23:18:01.229624+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.229624+02
+16820	9	E28011704000021D53DAB0CB	\N	-57	0	46	\N	\N	1778275080899	2026-05-08 23:18:00.899+02	2026-05-08 23:18:01.331188+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.331188+02
+16780	10	E28011704000021D53DAB0CB	\N	-62	0	11	\N	\N	1778275077128	2026-05-08 23:17:57.128+02	2026-05-08 23:17:57.662982+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:57.662982+02
+16782	10	E28011704000021D53DAB0CB	\N	-66	0	42	\N	\N	1778275077428	2026-05-08 23:17:57.428+02	2026-05-08 23:17:57.720883+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:57.720883+02
+16783	10	E28011704000021D53DAB0CB	\N	-62	0	30	\N	\N	1778275077578	2026-05-08 23:17:57.578+02	2026-05-08 23:17:58.827077+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:58.827077+02
+16786	10	E28011704000021D53DAB0CB	\N	-48	0	13	\N	\N	1778275078028	2026-05-08 23:17:58.028+02	2026-05-08 23:17:59.226814+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.226814+02
+16794	10	E28011704000021D53DAB0CB	\N	-58	0	49	\N	\N	1778275078628	2026-05-08 23:17:58.628+02	2026-05-08 23:17:59.339041+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.339041+02
+16797	10	E28011704000021D53DAB0CB	\N	-70	0	26	\N	\N	1778275078795	2026-05-08 23:17:58.795+02	2026-05-08 23:17:59.352214+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.352214+02
+16802	9	E28011704000021D53DAB0CB	\N	-65	0	18	\N	\N	1778275079105	2026-05-08 23:17:59.105+02	2026-05-08 23:17:59.646586+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:17:59.646586+02
+16807	9	E28011704000021D53DAB0CB	\N	-64	0	42	\N	\N	1778275079693	2026-05-08 23:17:59.693+02	2026-05-08 23:18:00.958787+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:00.958787+02
+16812	9	E28011704000021D53DAB0CB	\N	-62	0	54	\N	\N	1778275080147	2026-05-08 23:18:00.147+02	2026-05-08 23:18:01.11494+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.11494+02
+16817	9	E28011704000021D53DAB0CB	\N	-59	0	52	\N	\N	1778275080618	2026-05-08 23:18:00.618+02	2026-05-08 23:18:01.231349+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.231349+02
+16819	9	E28011704000021D53DAB0CB	\N	-63	0	34	\N	\N	1778275080899	2026-05-08 23:18:00.899+02	2026-05-08 23:18:01.329496+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:01.329496+02
+16823	9	E28011704000021D53DAB0CB	\N	-63	0	43	\N	\N	1778275081197	2026-05-08 23:18:01.197+02	2026-05-08 23:18:02.416165+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.416165+02
+16825	9	E28011704000021D53DAB0CB	\N	-62	0	17	\N	\N	1778275081518	2026-05-08 23:18:01.518+02	2026-05-08 23:18:02.582273+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.582273+02
+16936	10	E28011704000021D53DAB0CB	\N	-58	0	28	\N	\N	1778275166829	2026-05-08 23:19:26.829+02	2026-05-08 23:19:27.839437+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.839437+02
+16833	9	E28011704000021D53DAB0CB	\N	-67	0	36	\N	\N	1778275095330	2026-05-08 23:18:15.33+02	2026-05-08 23:18:16.545048+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:16.545048+02
+16835	9	E28011704000021D53DAB0CB	\N	-64	0	52	\N	\N	1778275095595	2026-05-08 23:18:15.595+02	2026-05-08 23:18:17.009746+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:17.009746+02
+17073	10	E28011704000021D53DAB0CB	\N	-55	0	8	\N	\N	1778275282035	2026-05-08 23:21:22.035+02	2026-05-08 23:21:23.751983+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.751983+02
+17076	10	E28011704000021D53DAB0CB	\N	-59	0	39	\N	\N	1778275282178	2026-05-08 23:21:22.178+02	2026-05-08 23:21:23.759019+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.759019+02
+16821	9	E28011704000021D53DAB0CB	\N	-58	0	18	\N	\N	1778275081044	2026-05-08 23:18:01.044+02	2026-05-08 23:18:02.001692+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.001692+02
+16822	9	E28011704000021D53DAB0CB	\N	-61	0	13	\N	\N	1778275081197	2026-05-08 23:18:01.197+02	2026-05-08 23:18:02.413353+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.413353+02
+16827	9	E28011704000021D53DAB0CB	\N	-62	0	32	\N	\N	1778275081643	2026-05-08 23:18:01.643+02	2026-05-08 23:18:02.59535+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.59535+02
+16829	9	E28011704000021D53DAB0CB	\N	-63	0	46	\N	\N	1778275081943	2026-05-08 23:18:01.943+02	2026-05-08 23:18:02.657424+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.657424+02
+17081	10	E28011704000021D53DAB0CB	\N	-57	0	57	\N	\N	1778275282631	2026-05-08 23:21:22.631+02	2026-05-08 23:21:23.79099+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.79099+02
+17086	10	E28011704000021D53DAB0CB	\N	-70	0	8	\N	\N	1778275282929	2026-05-08 23:21:22.929+02	2026-05-08 23:21:23.815705+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.815705+02
+17087	9	E28011704000021D53DAB0CB	\N	-70	0	11	\N	\N	1778275283862	2026-05-08 23:21:23.862+02	2026-05-08 23:21:24.766168+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:24.766168+02
+17075	10	E28011704000021D53DAB0CB	\N	-58	0	20	\N	\N	1778275282178	2026-05-08 23:21:22.178+02	2026-05-08 23:21:23.757162+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.757162+02
+17078	10	E28011704000021D53DAB0CB	\N	-65	0	35	\N	\N	1778275282328	2026-05-08 23:21:22.328+02	2026-05-08 23:21:23.769694+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.769694+02
+17080	10	E28011704000021D53DAB0CB	\N	-68	0	15	\N	\N	1778275282631	2026-05-08 23:21:22.631+02	2026-05-08 23:21:23.788967+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.788967+02
+17083	10	E28011704000021D53DAB0CB	\N	-65	0	29	\N	\N	1778275282778	2026-05-08 23:21:22.778+02	2026-05-08 23:21:23.798757+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.798757+02
+17088	9	E28011704000021D53DAB0CB	\N	-70	0	35	\N	\N	1778275283862	2026-05-08 23:21:23.862+02	2026-05-08 23:21:24.76803+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:24.76803+02
+16926	10	E28011704000021D53DAB0CB	\N	-62	0	29	\N	\N	1778275165931	2026-05-08 23:19:25.931+02	2026-05-08 23:19:26.715979+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:26.715979+02
+16931	10	E28011704000021D53DAB0CB	\N	-63	0	39	\N	\N	1778275166528	2026-05-08 23:19:26.528+02	2026-05-08 23:19:27.814168+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.814168+02
+16934	10	E28011704000021D53DAB0CB	\N	-58	0	53	\N	\N	1778275166678	2026-05-08 23:19:26.678+02	2026-05-08 23:19:27.82892+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.82892+02
+16939	10	E28011704000021D53DAB0CB	\N	-61	0	17	\N	\N	1778275167128	2026-05-08 23:19:27.128+02	2026-05-08 23:19:27.864912+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.864912+02
+16942	10	E28011704000021D53DAB0CB	\N	-62	0	12	\N	\N	1778275167278	2026-05-08 23:19:27.278+02	2026-05-08 23:19:27.875227+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.875227+02
+16945	10	E28011704000021D53DAB0CB	\N	-68	0	8	\N	\N	1778275167443	2026-05-08 23:19:27.443+02	2026-05-08 23:19:27.887743+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.887743+02
+16949	9	E28011704000021D53DAB0CB	\N	-62	0	37	\N	\N	1778275168209	2026-05-08 23:19:28.209+02	2026-05-08 23:19:29.044427+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:29.044427+02
+16951	9	E28011704000021D53DAB0CB	\N	-56	0	10	\N	\N	1778275168494	2026-05-08 23:19:28.494+02	2026-05-08 23:19:29.476208+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:29.476208+02
+17095	9	E28011704000021D53DAB0CB	\N	-68	0	11	\N	\N	1778275284594	2026-05-08 23:21:24.594+02	2026-05-08 23:21:25.01972+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:25.01972+02
+17079	10	E28011704000021D53DAB0CB	\N	-62	0	11	\N	\N	1778275282478	2026-05-08 23:21:22.478+02	2026-05-08 23:21:23.783359+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.783359+02
+17082	10	E28011704000021D53DAB0CB	\N	-64	0	43	\N	\N	1778275282631	2026-05-08 23:21:22.631+02	2026-05-08 23:21:23.792707+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.792707+02
+17084	10	E28011704000021D53DAB0CB	\N	-71	0	24	\N	\N	1778275282929	2026-05-08 23:21:22.929+02	2026-05-08 23:21:23.807842+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:23.807842+02
+16959	9	E28011704000021D53DAB0CB	\N	-62	0	7	\N	\N	1778275184709	2026-05-08 23:19:44.709+02	2026-05-08 23:19:45.258909+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.258909+02
+16966	10	E28011704000021D53DAB0CB	\N	-67	0	21	\N	\N	1778275185278	2026-05-08 23:19:45.278+02	2026-05-08 23:19:45.594616+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.594616+02
+16970	10	E28011704000021D53DAB0CB	\N	-62	0	20	\N	\N	1778275185591	2026-05-08 23:19:45.591+02	2026-05-08 23:19:46.672864+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.672864+02
+16973	10	E28011704000021D53DAB0CB	\N	-58	0	26	\N	\N	1778275185730	2026-05-08 23:19:45.73+02	2026-05-08 23:19:46.681383+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.681383+02
+17091	9	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778275284146	2026-05-08 23:21:24.146+02	2026-05-08 23:21:24.836652+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:24.836652+02
+17093	9	E28011704000021D53DAB0CB	\N	-70	0	35	\N	\N	1778275284445	2026-05-08 23:21:24.445+02	2026-05-08 23:21:24.993039+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:24.993039+02
+16985	9	E28011704000021D53DAB0CB	\N	-68	0	35	\N	\N	1778275206445	2026-05-08 23:20:06.445+02	2026-05-08 23:20:06.931205+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:06.931205+02
+16987	9	E28011704000021D53DAB0CB	\N	-61	0	7	\N	\N	1778275206762	2026-05-08 23:20:06.762+02	2026-05-08 23:20:07.074049+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:07.074049+02
+17010	10	E28011704000021D53DAB0CB	\N	-59	0	51	\N	\N	1778275221578	2026-05-08 23:20:21.578+02	2026-05-08 23:20:23.009269+02	2026-05-08 23:20:26.325+02	\N	\N	realtime	synced	2026-05-08 23:20:23.009269+02
+17098	9	E28011704000021D53DAB0CB	\N	-67	0	34	\N	\N	1778275284894	2026-05-08 23:21:24.894+02	2026-05-08 23:21:26.189476+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:26.189476+02
+17099	9	E28011704000021D53DAB0CB	\N	-65	0	54	\N	\N	1778275285044	2026-05-08 23:21:25.044+02	2026-05-08 23:21:26.586047+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:26.586047+02
+17101	9	E28011704000021D53DAB0CB	\N	-63	0	46	\N	\N	1778275285355	2026-05-08 23:21:25.355+02	2026-05-08 23:21:26.639968+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:26.639968+02
+17089	9	E28011704000021D53DAB0CB	\N	-68	0	53	\N	\N	1778275284026	2026-05-08 23:21:24.026+02	2026-05-08 23:21:24.807907+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:24.807907+02
+17094	9	E28011704000021D53DAB0CB	\N	-60	0	7	\N	\N	1778275284445	2026-05-08 23:21:24.445+02	2026-05-08 23:21:24.995205+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:24.995205+02
+17096	9	E28011704000021D53DAB0CB	\N	-58	0	17	\N	\N	1778275284770	2026-05-08 23:21:24.77+02	2026-05-08 23:21:25.078226+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:25.078226+02
+17102	9	E28011704000021D53DAB0CB	\N	-71	0	30	\N	\N	1778275285355	2026-05-08 23:21:25.355+02	2026-05-08 23:21:26.641995+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:26.641995+02
+17014	10	E28011704000021D53DAB0CB	\N	-73	0	38	\N	\N	1778275240478	2026-05-08 23:20:40.478+02	2026-05-08 23:20:41.467991+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:41.467991+02
+17016	10	E28011704000021D53DAB0CB	\N	-74	0	20	\N	\N	1778275241078	2026-05-08 23:20:41.078+02	2026-05-08 23:20:41.504061+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:41.504061+02
+17019	10	E28011704000021D53DAB0CB	\N	-65	0	56	\N	\N	1778275241232	2026-05-08 23:20:41.232+02	2026-05-08 23:20:41.520543+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:41.520543+02
+17020	10	E28011704000021D53DAB0CB	\N	-64	0	44	\N	\N	1778275241378	2026-05-08 23:20:41.378+02	2026-05-08 23:20:42.668844+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:42.668844+02
+17023	10	E28011704000021D53DAB0CB	\N	-68	0	40	\N	\N	1778275241528	2026-05-08 23:20:41.528+02	2026-05-08 23:20:42.977578+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:42.977578+02
+17031	10	E28011704000021D53DAB0CB	\N	-70	0	41	\N	\N	1778275241979	2026-05-08 23:20:41.979+02	2026-05-08 23:20:43.897483+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:43.897483+02
+17032	9	E28011704000021D53DAB0CB	\N	-64	0	15	\N	\N	1778275243496	2026-05-08 23:20:43.496+02	2026-05-08 23:20:44.717526+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.717526+02
+17037	9	E28011704000021D53DAB0CB	\N	-55	0	47	\N	\N	1778275243944	2026-05-08 23:20:43.944+02	2026-05-08 23:20:44.881557+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.881557+02
+17042	9	E28011704000021D53DAB0CB	\N	-62	0	42	\N	\N	1778275244406	2026-05-08 23:20:44.406+02	2026-05-08 23:20:44.995983+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.995983+02
+17047	9	E28011704000021D53DAB0CB	\N	-65	0	37	\N	\N	1778275244873	2026-05-08 23:20:44.873+02	2026-05-08 23:20:46.167826+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:46.167826+02
+17048	9	E28011704000021D53DAB0CB	\N	-76	0	9	\N	\N	1778275260311	2026-05-08 23:21:00.311+02	2026-05-08 23:21:00.896216+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:00.896216+02
+17056	10	E28011704000021D53DAB0CB	\N	-67	0	35	\N	\N	1778275262386	2026-05-08 23:21:02.386+02	2026-05-08 23:21:03.868016+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:03.868016+02
+17060	10	E28011704000021D53DAB0CB	\N	-63	0	54	\N	\N	1778275262679	2026-05-08 23:21:02.679+02	2026-05-08 23:21:04.484215+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:04.484215+02
+17062	10	E28011704000021D53DAB0CB	\N	-66	0	10	\N	\N	1778275262828	2026-05-08 23:21:02.828+02	2026-05-08 23:21:05.310535+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:05.310535+02
+16838	9	E28011704000021D53DAB0CB	\N	-67	0	47	\N	\N	1778275095907	2026-05-08 23:18:15.907+02	2026-05-08 23:18:17.052257+02	2026-05-08 23:18:22.249+02	\N	\N	realtime	synced	2026-05-08 23:18:17.052257+02
+17090	9	E28011704000021D53DAB0CB	\N	-67	0	7	\N	\N	1778275284026	2026-05-08 23:21:24.026+02	2026-05-08 23:21:24.812583+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:24.812583+02
+16828	9	E28011704000021D53DAB0CB	\N	-59	0	36	\N	\N	1778275081794	2026-05-08 23:18:01.794+02	2026-05-08 23:18:02.609683+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.609683+02
+16830	9	E28011704000021D53DAB0CB	\N	-67	0	16	\N	\N	1778275082108	2026-05-08 23:18:02.108+02	2026-05-08 23:18:02.675529+02	2026-05-08 23:18:06.238+02	\N	\N	realtime	synced	2026-05-08 23:18:02.675529+02
+17092	9	E28011704000021D53DAB0CB	\N	-70	0	55	\N	\N	1778275284293	2026-05-08 23:21:24.293+02	2026-05-08 23:21:24.901611+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:24.901611+02
+17097	9	E28011704000021D53DAB0CB	\N	-61	0	56	\N	\N	1778275284770	2026-05-08 23:21:24.77+02	2026-05-08 23:21:25.080346+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:25.080346+02
+17100	9	E28011704000021D53DAB0CB	\N	-67	0	51	\N	\N	1778275285198	2026-05-08 23:21:25.198+02	2026-05-08 23:21:26.622106+02	2026-05-08 23:21:30.362+02	\N	\N	realtime	synced	2026-05-08 23:21:26.622106+02
+17326	10	E28011704000021D53DAB0CB	\N	-59	0	49	\N	\N	1778275458428	2026-05-08 23:24:18.428+02	2026-05-08 23:24:19.373086+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.373086+02
+17315	10	E28011704000021D53DAB0CB	\N	-65	0	24	\N	\N	1778275457546	2026-05-08 23:24:17.546+02	2026-05-08 23:24:18.24545+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:18.24545+02
+17320	10	E28011704000021D53DAB0CB	\N	-65	0	49	\N	\N	1778275457978	2026-05-08 23:24:17.978+02	2026-05-08 23:24:18.306699+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:18.306699+02
+17322	10	E28011704000021D53DAB0CB	\N	-65	0	47	\N	\N	1778275458129	2026-05-08 23:24:18.129+02	2026-05-08 23:24:19.351237+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.351237+02
+17327	10	E28011704000021D53DAB0CB	\N	-62	0	49	\N	\N	1778275458578	2026-05-08 23:24:18.578+02	2026-05-08 23:24:19.389131+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.389131+02
+17330	10	E28011704000021D53DAB0CB	\N	-57	0	40	\N	\N	1778275458728	2026-05-08 23:24:18.728+02	2026-05-08 23:24:19.40634+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.40634+02
+16927	10	E28011704000021D53DAB0CB	\N	-64	0	7	\N	\N	1778275166078	2026-05-08 23:19:26.078+02	2026-05-08 23:19:26.723043+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:26.723043+02
+16930	10	E28011704000021D53DAB0CB	\N	-61	0	23	\N	\N	1778275166378	2026-05-08 23:19:26.378+02	2026-05-08 23:19:26.759018+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:26.759018+02
+16935	10	E28011704000021D53DAB0CB	\N	-58	0	43	\N	\N	1778275166829	2026-05-08 23:19:26.829+02	2026-05-08 23:19:27.837337+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.837337+02
+16938	10	E28011704000021D53DAB0CB	\N	-59	0	55	\N	\N	1778275166978	2026-05-08 23:19:26.978+02	2026-05-08 23:19:27.852811+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.852811+02
+16943	10	E28011704000021D53DAB0CB	\N	-60	0	29	\N	\N	1778275167443	2026-05-08 23:19:27.443+02	2026-05-08 23:19:27.88296+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.88296+02
+16946	10	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778275167578	2026-05-08 23:19:27.578+02	2026-05-08 23:19:27.893045+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:27.893045+02
+16947	9	E28011704000021D53DAB0CB	\N	-57	0	32	\N	\N	1778275168044	2026-05-08 23:19:28.044+02	2026-05-08 23:19:28.530267+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:28.530267+02
+16950	9	E28011704000021D53DAB0CB	\N	-59	0	57	\N	\N	1778275168376	2026-05-08 23:19:28.376+02	2026-05-08 23:19:29.350669+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:29.350669+02
+16955	9	E28011704000021D53DAB0CB	\N	-56	0	53	\N	\N	1778275168801	2026-05-08 23:19:28.801+02	2026-05-08 23:19:29.547496+02	2026-05-08 23:19:34.297+02	\N	\N	realtime	synced	2026-05-08 23:19:29.547496+02
+17317	10	E28011704000021D53DAB0CB	\N	-59	0	10	\N	\N	1778275457684	2026-05-08 23:24:17.684+02	2026-05-08 23:24:18.259245+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:18.259245+02
+17319	10	E28011704000021D53DAB0CB	\N	-59	0	55	\N	\N	1778275457978	2026-05-08 23:24:17.978+02	2026-05-08 23:24:18.305037+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:18.305037+02
+17321	10	E28011704000021D53DAB0CB	\N	-57	0	31	\N	\N	1778275458129	2026-05-08 23:24:18.129+02	2026-05-08 23:24:19.348942+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.348942+02
+17318	10	E28011704000021D53DAB0CB	\N	-61	0	36	\N	\N	1778275457828	2026-05-08 23:24:17.828+02	2026-05-08 23:24:18.289479+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:18.289479+02
+17324	10	E28011704000021D53DAB0CB	\N	-62	0	41	\N	\N	1778275458278	2026-05-08 23:24:18.278+02	2026-05-08 23:24:19.366383+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.366383+02
+17329	10	E28011704000021D53DAB0CB	\N	-62	0	53	\N	\N	1778275458728	2026-05-08 23:24:18.728+02	2026-05-08 23:24:19.404583+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.404583+02
+17332	10	E28011704000021D53DAB0CB	\N	-65	0	29	\N	\N	1778275458878	2026-05-08 23:24:18.878+02	2026-05-08 23:24:19.419203+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.419203+02
+16956	9	E28011704000021D53DAB0CB	\N	-59	0	37	\N	\N	1778275184244	2026-05-08 23:19:44.244+02	2026-05-08 23:19:44.915816+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:44.915816+02
+16958	9	E28011704000021D53DAB0CB	\N	-65	0	49	\N	\N	1778275184709	2026-05-08 23:19:44.709+02	2026-05-08 23:19:45.256727+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.256727+02
+16961	10	E28011704000021D53DAB0CB	\N	-74	0	53	\N	\N	1778275184684	2026-05-08 23:19:44.684+02	2026-05-08 23:19:45.530988+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.530988+02
+16963	10	E28011704000021D53DAB0CB	\N	-70	0	44	\N	\N	1778275184978	2026-05-08 23:19:44.978+02	2026-05-08 23:19:45.572539+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:45.572539+02
+16969	10	E28011704000021D53DAB0CB	\N	-65	0	55	\N	\N	1778275185591	2026-05-08 23:19:45.591+02	2026-05-08 23:19:46.669153+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.669153+02
+16972	10	E28011704000021D53DAB0CB	\N	-59	0	21	\N	\N	1778275185730	2026-05-08 23:19:45.73+02	2026-05-08 23:19:46.679093+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.679093+02
+16975	10	E28011704000021D53DAB0CB	\N	-61	0	9	\N	\N	1778275185878	2026-05-08 23:19:45.878+02	2026-05-08 23:19:46.693125+02	2026-05-08 23:19:50.302+02	\N	\N	realtime	synced	2026-05-08 23:19:46.693125+02
+17340	9	E28011704000021D53DAB0CB	\N	-64	0	39	\N	\N	1778275460543	2026-05-08 23:24:20.543+02	2026-05-08 23:24:21.10145+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:21.10145+02
+17342	9	E28011704000021D53DAB0CB	\N	-67	0	17	\N	\N	1778275460847	2026-05-08 23:24:20.847+02	2026-05-08 23:24:21.171471+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:21.171471+02
+17325	10	E28011704000021D53DAB0CB	\N	-65	0	22	\N	\N	1778275458428	2026-05-08 23:24:18.428+02	2026-05-08 23:24:19.371467+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.371467+02
+17328	10	E28011704000021D53DAB0CB	\N	-59	0	37	\N	\N	1778275458578	2026-05-08 23:24:18.578+02	2026-05-08 23:24:19.390833+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.390833+02
+16978	10	E28011704000021D53DAB0CB	\N	-68	0	43	\N	\N	1778275205228	2026-05-08 23:20:05.228+02	2026-05-08 23:20:06.214598+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:06.214598+02
+16979	10	E28011704000021D53DAB0CB	\N	-74	0	47	\N	\N	1778275205383	2026-05-08 23:20:05.383+02	2026-05-08 23:20:06.340376+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:06.340376+02
+16984	10	E28011704000021D53DAB0CB	\N	-73	0	11	\N	\N	1778275205828	2026-05-08 23:20:05.828+02	2026-05-08 23:20:06.374274+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:06.374274+02
+16986	9	E28011704000021D53DAB0CB	\N	-61	0	38	\N	\N	1778275206597	2026-05-08 23:20:06.597+02	2026-05-08 23:20:07.002817+02	2026-05-08 23:20:12.315+02	\N	\N	realtime	synced	2026-05-08 23:20:07.002817+02
+17333	10	E28011704000021D53DAB0CB	\N	-67	0	29	\N	\N	1778275459030	2026-05-08 23:24:19.03+02	2026-05-08 23:24:19.431012+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:19.431012+02
+17334	9	E28011704000021D53DAB0CB	\N	-63	0	40	\N	\N	1778275459972	2026-05-08 23:24:19.972+02	2026-05-08 23:24:20.987566+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:20.987566+02
+17339	9	E28011704000021D53DAB0CB	\N	-64	0	34	\N	\N	1778275460393	2026-05-08 23:24:20.393+02	2026-05-08 23:24:21.087195+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:21.087195+02
+17341	9	E28011704000021D53DAB0CB	\N	-65	0	52	\N	\N	1778275460693	2026-05-08 23:24:20.693+02	2026-05-08 23:24:21.153721+02	2026-05-08 23:24:26.46+02	\N	\N	realtime	synced	2026-05-08 23:24:21.153721+02
+17027	10	E28011704000021D53DAB0CB	\N	-66	0	7	\N	\N	1778275241828	2026-05-08 23:20:41.828+02	2026-05-08 23:20:43.590583+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:43.590583+02
+17030	9	E28011704000021D53DAB0CB	\N	-62	0	24	\N	\N	1778275243344	2026-05-08 23:20:43.344+02	2026-05-08 23:20:43.641331+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:43.641331+02
+17036	9	E28011704000021D53DAB0CB	\N	-57	0	23	\N	\N	1778275243793	2026-05-08 23:20:43.793+02	2026-05-08 23:20:44.819642+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.819642+02
+17041	9	E28011704000021D53DAB0CB	\N	-61	0	23	\N	\N	1778275244244	2026-05-08 23:20:44.244+02	2026-05-08 23:20:44.966797+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:44.966797+02
+17043	9	E28011704000021D53DAB0CB	\N	-58	0	25	\N	\N	1778275244568	2026-05-08 23:20:44.568+02	2026-05-08 23:20:45.088615+02	2026-05-08 23:20:50.338+02	\N	\N	realtime	synced	2026-05-08 23:20:45.088615+02
+17051	9	E28011704000021D53DAB0CB	\N	-74	0	49	\N	\N	1778275260593	2026-05-08 23:21:00.593+02	2026-05-08 23:21:00.96216+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:00.96216+02
+17057	10	E28011704000021D53DAB0CB	\N	-62	0	46	\N	\N	1778275262532	2026-05-08 23:21:02.532+02	2026-05-08 23:21:04.173061+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:04.173061+02
+17061	10	E28011704000021D53DAB0CB	\N	-66	0	10	\N	\N	1778275262828	2026-05-08 23:21:02.828+02	2026-05-08 23:21:05.094498+02	2026-05-08 23:21:08.346+02	\N	\N	realtime	synced	2026-05-08 23:21:05.094498+02
+17103	9	E28011704000021D53DAB0CB	\N	-74	0	14	\N	\N	1778275296301	2026-05-08 23:21:36.301+02	2026-05-08 23:21:37.043455+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.043455+02
+17110	9	E28011704000021D53DAB0CB	\N	-67	0	20	\N	\N	1778275297062	2026-05-08 23:21:37.062+02	2026-05-08 23:21:37.821931+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.821931+02
+17115	9	E28011704000021D53DAB0CB	\N	-61	0	23	\N	\N	1778275297495	2026-05-08 23:21:37.495+02	2026-05-08 23:21:37.933858+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.933858+02
+17117	10	E28011704000021D53DAB0CB	\N	-70	0	47	\N	\N	1778275297329	2026-05-08 23:21:37.329+02	2026-05-08 23:21:37.982696+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.982696+02
+17119	10	E28011704000021D53DAB0CB	\N	-68	0	9	\N	\N	1778275297628	2026-05-08 23:21:37.628+02	2026-05-08 23:21:38.00372+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:38.00372+02
+17105	9	E28011704000021D53DAB0CB	\N	-64	0	38	\N	\N	1778275296463	2026-05-08 23:21:36.463+02	2026-05-08 23:21:37.089324+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.089324+02
+17107	9	E28011704000021D53DAB0CB	\N	-63	0	34	\N	\N	1778275296743	2026-05-08 23:21:36.743+02	2026-05-08 23:21:37.195587+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.195587+02
+17112	9	E28011704000021D53DAB0CB	\N	-59	0	45	\N	\N	1778275297222	2026-05-08 23:21:37.222+02	2026-05-08 23:21:37.881139+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.881139+02
+17114	9	E28011704000021D53DAB0CB	\N	-59	0	27	\N	\N	1778275297495	2026-05-08 23:21:37.495+02	2026-05-08 23:21:37.932085+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.932085+02
+17106	9	E28011704000021D53DAB0CB	\N	-62	0	18	\N	\N	1778275296626	2026-05-08 23:21:36.626+02	2026-05-08 23:21:37.119232+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.119232+02
+17108	9	E28011704000021D53DAB0CB	\N	-61	0	57	\N	\N	1778275296894	2026-05-08 23:21:36.894+02	2026-05-08 23:21:37.760662+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.760662+02
+17113	9	E28011704000021D53DAB0CB	\N	-59	0	52	\N	\N	1778275297343	2026-05-08 23:21:37.343+02	2026-05-08 23:21:37.905674+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.905674+02
+17120	10	E28011704000021D53DAB0CB	\N	-71	0	39	\N	\N	1778275297628	2026-05-08 23:21:37.628+02	2026-05-08 23:21:38.005553+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:38.005553+02
+17104	9	E28011704000021D53DAB0CB	\N	-70	0	36	\N	\N	1778275296463	2026-05-08 23:21:36.463+02	2026-05-08 23:21:37.087169+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.087169+02
+17109	9	E28011704000021D53DAB0CB	\N	-60	0	18	\N	\N	1778275296894	2026-05-08 23:21:36.894+02	2026-05-08 23:21:37.763852+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.763852+02
+17111	9	E28011704000021D53DAB0CB	\N	-62	0	21	\N	\N	1778275297222	2026-05-08 23:21:37.222+02	2026-05-08 23:21:37.878869+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.878869+02
+17116	9	E28011704000021D53DAB0CB	\N	-59	0	25	\N	\N	1778275297665	2026-05-08 23:21:37.665+02	2026-05-08 23:21:37.942245+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.942245+02
+17118	10	E28011704000021D53DAB0CB	\N	-74	0	34	\N	\N	1778275297478	2026-05-08 23:21:37.478+02	2026-05-08 23:21:37.996509+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:37.996509+02
+17121	10	E28011704000021D53DAB0CB	\N	-70	0	19	\N	\N	1778275297778	2026-05-08 23:21:37.778+02	2026-05-08 23:21:39.09161+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:39.09161+02
+17122	9	E28011704000021D53DAB0CB	\N	-64	0	18	\N	\N	1778275297795	2026-05-08 23:21:37.795+02	2026-05-08 23:21:39.09188+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:39.09188+02
+17123	10	E28011704000021D53DAB0CB	\N	-73	0	40	\N	\N	1778275297778	2026-05-08 23:21:37.778+02	2026-05-08 23:21:39.093474+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:39.093474+02
+17124	9	E28011704000021D53DAB0CB	\N	-67	0	23	\N	\N	1778275297795	2026-05-08 23:21:37.795+02	2026-05-08 23:21:39.094349+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:39.094349+02
+17125	10	E28011704000021D53DAB0CB	\N	-68	0	31	\N	\N	1778275297928	2026-05-08 23:21:37.928+02	2026-05-08 23:21:39.488833+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:39.488833+02
+17126	10	E28011704000021D53DAB0CB	\N	-74	0	39	\N	\N	1778275297928	2026-05-08 23:21:37.928+02	2026-05-08 23:21:39.491083+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:39.491083+02
+17127	10	E28011704000021D53DAB0CB	\N	-71	0	53	\N	\N	1778275298078	2026-05-08 23:21:38.078+02	2026-05-08 23:21:39.808689+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:39.808689+02
+17128	10	E28011704000021D53DAB0CB	\N	-60	0	43	\N	\N	1778275298078	2026-05-08 23:21:38.078+02	2026-05-08 23:21:39.810773+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:39.810773+02
+17129	10	E28011704000021D53DAB0CB	\N	-61	0	31	\N	\N	1778275298228	2026-05-08 23:21:38.228+02	2026-05-08 23:21:40.116054+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:40.116054+02
+17130	10	E28011704000021D53DAB0CB	\N	-58	0	7	\N	\N	1778275298228	2026-05-08 23:21:38.228+02	2026-05-08 23:21:40.118214+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:40.118214+02
+17131	10	E28011704000021D53DAB0CB	\N	-65	0	23	\N	\N	1778275298378	2026-05-08 23:21:38.378+02	2026-05-08 23:21:40.423158+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:40.423158+02
+17132	10	E28011704000021D53DAB0CB	\N	-61	0	52	\N	\N	1778275298378	2026-05-08 23:21:38.378+02	2026-05-08 23:21:40.42528+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:40.42528+02
+17133	10	E28011704000021D53DAB0CB	\N	-59	0	22	\N	\N	1778275298528	2026-05-08 23:21:38.528+02	2026-05-08 23:21:40.729981+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:40.729981+02
+17134	10	E28011704000021D53DAB0CB	\N	-61	0	45	\N	\N	1778275298528	2026-05-08 23:21:38.528+02	2026-05-08 23:21:40.732717+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:40.732717+02
+17135	10	E28011704000021D53DAB0CB	\N	-61	0	55	\N	\N	1778275298678	2026-05-08 23:21:38.678+02	2026-05-08 23:21:41.036848+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:41.036848+02
+17136	10	E28011704000021D53DAB0CB	\N	-62	0	38	\N	\N	1778275298678	2026-05-08 23:21:38.678+02	2026-05-08 23:21:41.038755+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:41.038755+02
+17137	10	E28011704000021D53DAB0CB	\N	-60	0	31	\N	\N	1778275298835	2026-05-08 23:21:38.835+02	2026-05-08 23:21:41.344537+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:41.344537+02
+17138	10	E28011704000021D53DAB0CB	\N	-65	0	53	\N	\N	1778275298835	2026-05-08 23:21:38.835+02	2026-05-08 23:21:41.346524+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:41.346524+02
+17139	10	E28011704000021D53DAB0CB	\N	-69	0	44	\N	\N	1778275298835	2026-05-08 23:21:38.835+02	2026-05-08 23:21:41.349163+02	2026-05-08 23:21:44.366+02	\N	\N	realtime	synced	2026-05-08 23:21:41.349163+02
+17656	9	E28011704000021D53DAB0CB	\N	-73	0	59	\N	\N	1778275766546	2026-05-08 23:29:26.546+02	2026-05-08 23:29:27.717083+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:27.717083+02
+17140	10	E28011704000021D53DAB0CB	\N	-70	0	31	\N	\N	1778275342482	2026-05-08 23:22:22.482+02	2026-05-08 23:22:23.431341+02	\N	2026-05-08 23:22:32.389+02	insufficient_data	realtime	synced	2026-05-08 23:22:23.431341+02
+17141	10	E28011704000021D53DAB0CB	\N	-71	0	30	\N	\N	1778275342482	2026-05-08 23:22:22.482+02	2026-05-08 23:22:23.433535+02	\N	2026-05-08 23:22:32.389+02	insufficient_data	realtime	synced	2026-05-08 23:22:23.433535+02
+17142	10	E28011704000021D53DAB0CB	\N	-71	0	35	\N	\N	1778275342482	2026-05-08 23:22:22.482+02	2026-05-08 23:22:23.435795+02	\N	2026-05-08 23:22:32.389+02	insufficient_data	realtime	synced	2026-05-08 23:22:23.435795+02
+17143	10	E28011704000021D53DAB0CB	\N	-66	0	9	\N	\N	1778275342628	2026-05-08 23:22:22.628+02	2026-05-08 23:22:23.450936+02	\N	2026-05-08 23:22:32.389+02	insufficient_data	realtime	synced	2026-05-08 23:22:23.450936+02
+17144	10	E28011704000021D53DAB0CB	\N	-76	0	33	\N	\N	1778275342778	2026-05-08 23:22:22.778+02	2026-05-08 23:22:23.455482+02	\N	2026-05-08 23:22:32.389+02	insufficient_data	realtime	synced	2026-05-08 23:22:23.455482+02
+17145	10	E28011704000021D53DAB0CB	\N	-77	0	34	\N	\N	1778275342928	2026-05-08 23:22:22.928+02	2026-05-08 23:22:23.465884+02	\N	2026-05-08 23:22:32.389+02	insufficient_data	realtime	synced	2026-05-08 23:22:23.465884+02
+17146	10	E28011704000021D53DAB0CB	\N	-73	0	53	\N	\N	1778275342928	2026-05-08 23:22:22.928+02	2026-05-08 23:22:23.468071+02	\N	2026-05-08 23:22:32.389+02	insufficient_data	realtime	synced	2026-05-08 23:22:23.468071+02
+17147	10	E28011704000021D53DAB0CB	\N	-77	0	12	\N	\N	1778275343078	2026-05-08 23:22:23.078+02	2026-05-08 23:22:23.474132+02	\N	2026-05-08 23:22:32.389+02	insufficient_data	realtime	synced	2026-05-08 23:22:23.474132+02
+17351	9	E28011704000021D53DAB0CB	\N	-67	0	40	\N	\N	1778275473143	2026-05-08 23:24:33.143+02	2026-05-08 23:24:34.044725+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:34.044725+02
+17353	9	E28011704000021D53DAB0CB	\N	-72	0	53	\N	\N	1778275473465	2026-05-08 23:24:33.465+02	2026-05-08 23:24:34.091508+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:34.091508+02
+17354	10	E28011704000021D53DAB0CB	\N	-82	0	29	\N	\N	1778275475228	2026-05-08 23:24:35.228+02	2026-05-08 23:24:35.937601+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:35.937601+02
+17378	10	E28011704000021D53DAB0CB	\N	-67	0	20	\N	\N	1778275506128	2026-05-08 23:25:06.128+02	2026-05-08 23:25:07.476931+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:07.476931+02
+17624	10	E28011704000021D53DAB0CB	\N	-68	0	10	\N	\N	1778275762778	2026-05-08 23:29:22.778+02	2026-05-08 23:29:23.479596+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:23.479596+02
+17629	10	E28011704000021D53DAB0CB	\N	-73	0	45	\N	\N	1778275763228	2026-05-08 23:29:23.228+02	2026-05-08 23:29:23.514797+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:23.514797+02
+17633	10	E28011704000021D53DAB0CB	\N	-62	0	51	\N	\N	1778275763528	2026-05-08 23:29:23.528+02	2026-05-08 23:29:24.916009+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:24.916009+02
+17638	10	E28011704000021D53DAB0CB	\N	-64	0	40	\N	\N	1778275763978	2026-05-08 23:29:23.978+02	2026-05-08 23:29:25.834451+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:25.834451+02
+17625	10	E28011704000021D53DAB0CB	\N	-61	0	35	\N	\N	1778275762928	2026-05-08 23:29:22.928+02	2026-05-08 23:29:23.491754+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:23.491754+02
+17628	10	E28011704000021D53DAB0CB	\N	-67	0	25	\N	\N	1778275763085	2026-05-08 23:29:23.085+02	2026-05-08 23:29:23.505562+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:23.505562+02
+17346	9	E28011704000021D53DAB0CB	\N	-70	0	18	\N	\N	1778275472573	2026-05-08 23:24:32.573+02	2026-05-08 23:24:32.845472+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:32.845472+02
+17348	9	E28011704000021D53DAB0CB	\N	-73	0	11	\N	\N	1778275472844	2026-05-08 23:24:32.844+02	2026-05-08 23:24:34.020721+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:34.020721+02
+17356	10	E28011704000021D53DAB0CB	\N	-71	0	45	\N	\N	1778275475378	2026-05-08 23:24:35.378+02	2026-05-08 23:24:35.959232+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:35.959232+02
+17161	10	E28011704000021D53DAB0CB	\N	-61	0	10	\N	\N	1778275383878	2026-05-08 23:23:03.878+02	2026-05-08 23:23:05.0269+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.0269+02
+17169	10	E28011704000021D53DAB0CB	\N	-61	0	44	\N	\N	1778275384479	2026-05-08 23:23:04.479+02	2026-05-08 23:23:05.072803+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.072803+02
+17172	10	E28011704000021D53DAB0CB	\N	-62	0	44	\N	\N	1778275384632	2026-05-08 23:23:04.632+02	2026-05-08 23:23:05.084634+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.084634+02
+17174	9	E28011704000021D53DAB0CB	\N	-71	0	26	\N	\N	1778275384975	2026-05-08 23:23:04.975+02	2026-05-08 23:23:05.825527+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.825527+02
+17179	9	E28011704000021D53DAB0CB	\N	-64	0	27	\N	\N	1778275385395	2026-05-08 23:23:05.395+02	2026-05-08 23:23:05.920036+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.920036+02
+17185	9	E28011704000021D53DAB0CB	\N	-66	0	9	\N	\N	1778275386295	2026-05-08 23:23:06.295+02	2026-05-08 23:23:07.123613+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.123613+02
+17190	9	E28011704000021D53DAB0CB	\N	-65	0	32	\N	\N	1778275386759	2026-05-08 23:23:06.759+02	2026-05-08 23:23:07.218032+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.218032+02
+17194	9	E28011704000021D53DAB0CB	\N	-62	0	9	\N	\N	1778275387225	2026-05-08 23:23:07.225+02	2026-05-08 23:23:08.603737+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:08.603737+02
+17199	9	E28011704000021D53DAB0CB	\N	-65	0	22	\N	\N	1778275387671	2026-05-08 23:23:07.671+02	2026-05-08 23:23:08.888121+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:08.888121+02
+17201	9	E28011704000021D53DAB0CB	\N	-67	0	22	\N	\N	1778275387943	2026-05-08 23:23:07.943+02	2026-05-08 23:23:09.028742+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:09.028742+02
+17363	10	E28011704000021D53DAB0CB	\N	-74	0	30	\N	\N	1778275476128	2026-05-08 23:24:36.128+02	2026-05-08 23:24:37.678589+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:37.678589+02
+17366	10	E28011704000021D53DAB0CB	\N	-66	0	32	\N	\N	1778275476289	2026-05-08 23:24:36.289+02	2026-05-08 23:24:37.99062+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:37.99062+02
+17345	9	E28011704000021D53DAB0CB	\N	-77	0	31	\N	\N	1778275472401	2026-05-08 23:24:32.401+02	2026-05-08 23:24:32.820045+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:32.820045+02
+17347	9	E28011704000021D53DAB0CB	\N	-73	0	44	\N	\N	1778275472695	2026-05-08 23:24:32.695+02	2026-05-08 23:24:33.992575+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:33.992575+02
+17355	10	E28011704000021D53DAB0CB	\N	-70	0	57	\N	\N	1778275475228	2026-05-08 23:24:35.228+02	2026-05-08 23:24:35.940586+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:35.940586+02
+17362	10	E28011704000021D53DAB0CB	\N	-73	0	54	\N	\N	1778275475979	2026-05-08 23:24:35.979+02	2026-05-08 23:24:37.373111+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:37.373111+02
+17371	10	E28011704000021D53DAB0CB	\N	-74	0	57	\N	\N	1778275476728	2026-05-08 23:24:36.728+02	2026-05-08 23:24:38.616921+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.616921+02
+17344	9	E28011704000021D53DAB0CB	\N	-74	0	30	\N	\N	1778275472401	2026-05-08 23:24:32.401+02	2026-05-08 23:24:32.817538+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:32.817538+02
+17349	9	E28011704000021D53DAB0CB	\N	-73	0	11	\N	\N	1778275472844	2026-05-08 23:24:32.844+02	2026-05-08 23:24:34.022736+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:34.022736+02
+17343	9	E28011704000021D53DAB0CB	\N	-70	0	26	\N	\N	1778275471944	2026-05-08 23:24:31.944+02	2026-05-08 23:24:32.78941+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:32.78941+02
+17204	10	E28011704000021D53DAB0CB	\N	-79	0	44	\N	\N	1778275402028	2026-05-08 23:23:22.028+02	2026-05-08 23:23:22.51709+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:22.51709+02
+17206	9	E28011704000021D53DAB0CB	\N	-71	0	30	\N	\N	1778275401899	2026-05-08 23:23:21.899+02	2026-05-08 23:23:23.028272+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.028272+02
+17209	9	E28011704000021D53DAB0CB	\N	-58	0	23	\N	\N	1778275402065	2026-05-08 23:23:22.065+02	2026-05-08 23:23:23.065227+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.065227+02
+17211	9	E28011704000021D53DAB0CB	\N	-59	0	44	\N	\N	1778275402352	2026-05-08 23:23:22.352+02	2026-05-08 23:23:23.134798+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.134798+02
+17213	9	E28011704000021D53DAB0CB	\N	-59	0	21	\N	\N	1778275402675	2026-05-08 23:23:22.675+02	2026-05-08 23:23:23.211454+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.211454+02
+17218	10	E28011704000021D53DAB0CB	\N	-67	0	31	\N	\N	1778275403686	2026-05-08 23:23:23.686+02	2026-05-08 23:23:24.057107+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:24.057107+02
+17222	10	E28011704000021D53DAB0CB	\N	-65	0	22	\N	\N	1778275403828	2026-05-08 23:23:23.828+02	2026-05-08 23:23:24.174911+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:24.174911+02
+17223	10	E28011704000021D53DAB0CB	\N	-62	0	34	\N	\N	1778275403978	2026-05-08 23:23:23.978+02	2026-05-08 23:23:25.281833+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.281833+02
+17231	10	E28011704000021D53DAB0CB	\N	-58	0	52	\N	\N	1778275404578	2026-05-08 23:23:24.578+02	2026-05-08 23:23:25.43569+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.43569+02
+17234	10	E28011704000021D53DAB0CB	\N	-62	0	36	\N	\N	1778275404734	2026-05-08 23:23:24.734+02	2026-05-08 23:23:25.443228+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.443228+02
+17350	9	E28011704000021D53DAB0CB	\N	-71	0	50	\N	\N	1778275473008	2026-05-08 23:24:33.008+02	2026-05-08 23:24:34.033751+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:34.033751+02
+17357	10	E28011704000021D53DAB0CB	\N	-71	0	58	\N	\N	1778275475378	2026-05-08 23:24:35.378+02	2026-05-08 23:24:35.961131+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:35.961131+02
+17359	10	E28011704000021D53DAB0CB	\N	-71	0	11	\N	\N	1778275475529	2026-05-08 23:24:35.529+02	2026-05-08 23:24:35.9688+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:35.9688+02
+17361	10	E28011704000021D53DAB0CB	\N	-68	0	47	\N	\N	1778275475979	2026-05-08 23:24:35.979+02	2026-05-08 23:24:37.371201+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:37.371201+02
+17237	10	E28011704000021D53DAB0CB	\N	-73	0	30	\N	\N	1778275417328	2026-05-08 23:23:37.328+02	2026-05-08 23:23:37.67171+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:37.67171+02
+17243	10	E28011704000021D53DAB0CB	\N	-58	0	8	\N	\N	1778275418394	2026-05-08 23:23:38.394+02	2026-05-08 23:23:38.9408+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.9408+02
+17246	10	E28011704000021D53DAB0CB	\N	-61	0	38	\N	\N	1778275418528	2026-05-08 23:23:38.528+02	2026-05-08 23:23:38.970685+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.970685+02
+17251	10	E28011704000021D53DAB0CB	\N	-55	0	40	\N	\N	1778275418990	2026-05-08 23:23:38.99+02	2026-05-08 23:23:40.056283+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.056283+02
+17254	10	E28011704000021D53DAB0CB	\N	-58	0	33	\N	\N	1778275419128	2026-05-08 23:23:39.128+02	2026-05-08 23:23:40.065266+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.065266+02
+17258	10	E28011704000021D53DAB0CB	\N	-58	0	36	\N	\N	1778275419440	2026-05-08 23:23:39.44+02	2026-05-08 23:23:40.459966+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.459966+02
+17261	10	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778275419579	2026-05-08 23:23:39.579+02	2026-05-08 23:23:40.46903+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.46903+02
+17270	9	E28011704000021D53DAB0CB	\N	-64	0	25	\N	\N	1778275420493	2026-05-08 23:23:40.493+02	2026-05-08 23:23:40.734146+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.734146+02
+17294	9	E28011704000021D53DAB0CB	\N	-64	0	26	\N	\N	1778275435794	2026-05-08 23:23:55.794+02	2026-05-08 23:23:56.351436+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.351436+02
+17295	9	E28011704000021D53DAB0CB	\N	-62	0	22	\N	\N	1778275435944	2026-05-08 23:23:55.944+02	2026-05-08 23:23:56.439396+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.439396+02
+17297	9	E28011704000021D53DAB0CB	\N	-64	0	55	\N	\N	1778275436245	2026-05-08 23:23:56.245+02	2026-05-08 23:23:56.529107+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.529107+02
+17300	9	E28011704000021D53DAB0CB	\N	-59	0	55	\N	\N	1778275436547	2026-05-08 23:23:56.547+02	2026-05-08 23:23:57.674961+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:57.674961+02
+17305	9	E28011704000021D53DAB0CB	\N	-67	0	35	\N	\N	1778275436995	2026-05-08 23:23:56.995+02	2026-05-08 23:23:57.775032+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:57.775032+02
+17307	10	E28011704000021D53DAB0CB	\N	-59	0	58	\N	\N	1778275437737	2026-05-08 23:23:57.737+02	2026-05-08 23:23:58.078351+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:58.078351+02
+17630	10	E28011704000021D53DAB0CB	\N	-64	0	34	\N	\N	1778275763378	2026-05-08 23:29:23.378+02	2026-05-08 23:29:24.605554+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:24.605554+02
+17634	10	E28011704000021D53DAB0CB	\N	-61	0	27	\N	\N	1778275763684	2026-05-08 23:29:23.684+02	2026-05-08 23:29:25.219947+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:25.219947+02
+17369	10	E28011704000021D53DAB0CB	\N	-68	0	17	\N	\N	1778275476429	2026-05-08 23:24:36.429+02	2026-05-08 23:24:38.294995+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.294995+02
+17370	10	E28011704000021D53DAB0CB	\N	-71	0	54	\N	\N	1778275476578	2026-05-08 23:24:36.578+02	2026-05-08 23:24:38.599866+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.599866+02
+17637	10	E28011704000021D53DAB0CB	\N	-65	0	17	\N	\N	1778275763828	2026-05-08 23:29:23.828+02	2026-05-08 23:29:25.529532+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:25.529532+02
+17626	10	E28011704000021D53DAB0CB	\N	-60	0	32	\N	\N	1778275762928	2026-05-08 23:29:22.928+02	2026-05-08 23:29:23.493695+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:23.493695+02
+17631	10	E28011704000021D53DAB0CB	\N	-60	0	33	\N	\N	1778275763378	2026-05-08 23:29:23.378+02	2026-05-08 23:29:24.60901+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:24.60901+02
+17632	10	E28011704000021D53DAB0CB	\N	-57	0	21	\N	\N	1778275763528	2026-05-08 23:29:23.528+02	2026-05-08 23:29:24.913347+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:24.913347+02
+17627	10	E28011704000021D53DAB0CB	\N	-65	0	34	\N	\N	1778275763085	2026-05-08 23:29:23.085+02	2026-05-08 23:29:23.503421+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:23.503421+02
+17162	10	E28011704000021D53DAB0CB	\N	-67	0	46	\N	\N	1778275384028	2026-05-08 23:23:04.028+02	2026-05-08 23:23:05.035784+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.035784+02
+17165	10	E28011704000021D53DAB0CB	\N	-62	0	22	\N	\N	1778275384188	2026-05-08 23:23:04.188+02	2026-05-08 23:23:05.046781+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.046781+02
+17168	10	E28011704000021D53DAB0CB	\N	-64	0	7	\N	\N	1778275384328	2026-05-08 23:23:04.328+02	2026-05-08 23:23:05.059657+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.059657+02
+17173	10	E28011704000021D53DAB0CB	\N	-64	0	59	\N	\N	1778275384778	2026-05-08 23:23:04.778+02	2026-05-08 23:23:05.090332+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.090332+02
+17175	9	E28011704000021D53DAB0CB	\N	-65	0	32	\N	\N	1778275385093	2026-05-08 23:23:05.093+02	2026-05-08 23:23:05.881784+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.881784+02
+17180	9	E28011704000021D53DAB0CB	\N	-67	0	37	\N	\N	1778275385544	2026-05-08 23:23:05.544+02	2026-05-08 23:23:05.978799+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.978799+02
+17186	9	E28011704000021D53DAB0CB	\N	-57	0	22	\N	\N	1778275386444	2026-05-08 23:23:06.444+02	2026-05-08 23:23:07.181069+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.181069+02
+17191	9	E28011704000021D53DAB0CB	\N	-67	0	8	\N	\N	1778275386894	2026-05-08 23:23:06.894+02	2026-05-08 23:23:07.262608+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.262608+02
+17200	9	E28011704000021D53DAB0CB	\N	-59	0	57	\N	\N	1778275387793	2026-05-08 23:23:07.793+02	2026-05-08 23:23:08.970982+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:08.970982+02
+17635	10	E28011704000021D53DAB0CB	\N	-61	0	49	\N	\N	1778275763684	2026-05-08 23:29:23.684+02	2026-05-08 23:29:25.221773+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:25.221773+02
+17640	10	E28011704000021D53DAB0CB	\N	-62	0	11	\N	\N	1778275764128	2026-05-08 23:29:24.128+02	2026-05-08 23:29:26.141572+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.141572+02
+17645	9	E28011704000021D53DAB0CB	\N	-63	0	37	\N	\N	1778275765493	2026-05-08 23:29:25.493+02	2026-05-08 23:29:26.309736+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.309736+02
+17650	9	E28011704000021D53DAB0CB	\N	-68	0	13	\N	\N	1778275765944	2026-05-08 23:29:25.944+02	2026-05-08 23:29:26.368774+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.368774+02
+17382	10	E28011704000021D53DAB0CB	\N	-71	0	42	\N	\N	1778275506578	2026-05-08 23:25:06.578+02	2026-05-08 23:25:08.398839+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:08.398839+02
+17386	10	E28011704000021D53DAB0CB	\N	-67	0	16	\N	\N	1778275506730	2026-05-08 23:25:06.73+02	2026-05-08 23:25:10.258125+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.258125+02
+17389	10	E28011704000021D53DAB0CB	\N	-68	0	47	\N	\N	1778275507028	2026-05-08 23:25:07.028+02	2026-05-08 23:25:10.263281+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.263281+02
+17207	9	E28011704000021D53DAB0CB	\N	-62	0	58	\N	\N	1778275401899	2026-05-08 23:23:21.899+02	2026-05-08 23:23:23.030047+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.030047+02
+17214	9	E28011704000021D53DAB0CB	\N	-68	0	33	\N	\N	1778275402675	2026-05-08 23:23:22.675+02	2026-05-08 23:23:23.213295+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.213295+02
+17216	10	E28011704000021D53DAB0CB	\N	-68	0	38	\N	\N	1778275403378	2026-05-08 23:23:23.378+02	2026-05-08 23:23:23.745262+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.745262+02
+17219	10	E28011704000021D53DAB0CB	\N	-64	0	24	\N	\N	1778275403686	2026-05-08 23:23:23.686+02	2026-05-08 23:23:24.059035+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:24.059035+02
+17226	10	E28011704000021D53DAB0CB	\N	-57	0	16	\N	\N	1778275404284	2026-05-08 23:23:24.284+02	2026-05-08 23:23:25.420831+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.420831+02
+17229	10	E28011704000021D53DAB0CB	\N	-62	0	55	\N	\N	1778275404428	2026-05-08 23:23:24.428+02	2026-05-08 23:23:25.428702+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.428702+02
+17232	10	E28011704000021D53DAB0CB	\N	-51	0	56	\N	\N	1778275404578	2026-05-08 23:23:24.578+02	2026-05-08 23:23:25.440127+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.440127+02
+17235	10	E28011704000021D53DAB0CB	\N	-65	0	57	\N	\N	1778275404878	2026-05-08 23:23:24.878+02	2026-05-08 23:23:25.456837+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.456837+02
+17391	10	E28011704000021D53DAB0CB	\N	-73	0	25	\N	\N	1778275507178	2026-05-08 23:25:07.178+02	2026-05-08 23:25:10.27742+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.27742+02
+17393	9	E28011704000021D53DAB0CB	\N	-69	0	55	\N	\N	1778275510043	2026-05-08 23:25:10.043+02	2026-05-08 23:25:10.370229+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.370229+02
+17394	9	E28011704000021D53DAB0CB	\N	-70	0	53	\N	\N	1778275510193	2026-05-08 23:25:10.193+02	2026-05-08 23:25:11.470845+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.470845+02
+17399	9	E28011704000021D53DAB0CB	\N	-68	0	46	\N	\N	1778275510644	2026-05-08 23:25:10.644+02	2026-05-08 23:25:11.567391+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.567391+02
+17404	9	E28011704000021D53DAB0CB	\N	-64	0	40	\N	\N	1778275511111	2026-05-08 23:25:11.111+02	2026-05-08 23:25:11.669141+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.669141+02
+17410	9	E28011704000021D53DAB0CB	\N	-70	0	40	\N	\N	1778275511695	2026-05-08 23:25:11.695+02	2026-05-08 23:25:13.341537+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:13.341537+02
+17242	10	E28011704000021D53DAB0CB	\N	-61	0	23	\N	\N	1778275418228	2026-05-08 23:23:38.228+02	2026-05-08 23:23:38.930933+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.930933+02
+17245	10	E28011704000021D53DAB0CB	\N	-56	0	10	\N	\N	1778275418394	2026-05-08 23:23:38.394+02	2026-05-08 23:23:38.944588+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.944588+02
+17247	10	E28011704000021D53DAB0CB	\N	-59	0	25	\N	\N	1778275418678	2026-05-08 23:23:38.678+02	2026-05-08 23:23:38.98736+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.98736+02
+17250	10	E28011704000021D53DAB0CB	\N	-59	0	58	\N	\N	1778275418828	2026-05-08 23:23:38.828+02	2026-05-08 23:23:40.047631+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.047631+02
+17253	10	E28011704000021D53DAB0CB	\N	-55	0	27	\N	\N	1778275418990	2026-05-08 23:23:38.99+02	2026-05-08 23:23:40.060478+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.060478+02
+17262	10	E28011704000021D53DAB0CB	\N	-63	0	32	\N	\N	1778275419728	2026-05-08 23:23:39.728+02	2026-05-08 23:23:40.477794+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.477794+02
+17269	9	E28011704000021D53DAB0CB	\N	-64	0	9	\N	\N	1778275420347	2026-05-08 23:23:40.347+02	2026-05-08 23:23:40.708627+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.708627+02
+17271	9	E28011704000021D53DAB0CB	\N	-60	0	39	\N	\N	1778275420659	2026-05-08 23:23:40.659+02	2026-05-08 23:23:41.801187+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.801187+02
+17278	9	E28011704000021D53DAB0CB	\N	-62	0	36	\N	\N	1778275421426	2026-05-08 23:23:41.426+02	2026-05-08 23:23:41.934383+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.934383+02
+17282	9	E28011704000021D53DAB0CB	\N	-61	0	24	\N	\N	1778275421845	2026-05-08 23:23:41.845+02	2026-05-08 23:23:43.100799+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:43.100799+02
+17284	9	E28011704000021D53DAB0CB	\N	-61	0	48	\N	\N	1778275422145	2026-05-08 23:23:42.145+02	2026-05-08 23:23:43.156182+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:43.156182+02
+17290	9	E28011704000021D53DAB0CB	\N	-70	0	25	\N	\N	1778275435221	2026-05-08 23:23:55.221+02	2026-05-08 23:23:56.001571+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.001571+02
+17292	9	E28011704000021D53DAB0CB	\N	-70	0	49	\N	\N	1778275435644	2026-05-08 23:23:55.644+02	2026-05-08 23:23:56.26647+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.26647+02
+17298	9	E28011704000021D53DAB0CB	\N	-61	0	32	\N	\N	1778275436245	2026-05-08 23:23:56.245+02	2026-05-08 23:23:56.530944+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.530944+02
+17301	9	E28011704000021D53DAB0CB	\N	-56	0	18	\N	\N	1778275436547	2026-05-08 23:23:56.547+02	2026-05-08 23:23:57.676895+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:57.676895+02
+17303	9	E28011704000021D53DAB0CB	\N	-56	0	32	\N	\N	1778275436844	2026-05-08 23:23:56.844+02	2026-05-08 23:23:57.706775+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:57.706775+02
+17308	10	E28011704000021D53DAB0CB	\N	-59	0	22	\N	\N	1778275437737	2026-05-08 23:23:57.737+02	2026-05-08 23:23:58.080665+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:58.080665+02
+17312	10	E28011704000021D53DAB0CB	\N	-55	0	11	\N	\N	1778275438028	2026-05-08 23:23:58.028+02	2026-05-08 23:23:59.514816+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:59.514816+02
+17654	9	E28011704000021D53DAB0CB	\N	-70	0	31	\N	\N	1778275766394	2026-05-08 23:29:26.394+02	2026-05-08 23:29:27.702076+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:27.702076+02
+17374	10	E28011704000021D53DAB0CB	\N	-73	0	17	\N	\N	1778275476887	2026-05-08 23:24:36.887+02	2026-05-08 23:24:38.631377+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.631377+02
+17636	10	E28011704000021D53DAB0CB	\N	-62	0	19	\N	\N	1778275763828	2026-05-08 23:29:23.828+02	2026-05-08 23:29:25.52762+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:25.52762+02
+17639	10	E28011704000021D53DAB0CB	\N	-68	0	44	\N	\N	1778275763978	2026-05-08 23:29:23.978+02	2026-05-08 23:29:25.836266+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:25.836266+02
+17646	9	E28011704000021D53DAB0CB	\N	-63	0	16	\N	\N	1778275765658	2026-05-08 23:29:25.658+02	2026-05-08 23:29:26.327182+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.327182+02
+17651	9	E28011704000021D53DAB0CB	\N	-64	0	40	\N	\N	1778275766097	2026-05-08 23:29:26.097+02	2026-05-08 23:29:26.419567+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.419567+02
+17653	9	E28011704000021D53DAB0CB	\N	-68	0	58	\N	\N	1778275766244	2026-05-08 23:29:26.244+02	2026-05-08 23:29:27.577566+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:27.577566+02
+17655	9	E28011704000021D53DAB0CB	\N	-76	0	7	\N	\N	1778275766546	2026-05-08 23:29:26.546+02	2026-05-08 23:29:27.714354+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:27.714354+02
+17643	9	E28011704000021D53DAB0CB	\N	-68	0	47	\N	\N	1778275765193	2026-05-08 23:29:25.193+02	2026-05-08 23:29:26.261253+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.261253+02
+17381	10	E28011704000021D53DAB0CB	\N	-71	0	34	\N	\N	1778275506428	2026-05-08 23:25:06.428+02	2026-05-08 23:25:08.098791+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:08.098791+02
+17384	10	E28011704000021D53DAB0CB	\N	-67	0	14	\N	\N	1778275506730	2026-05-08 23:25:06.73+02	2026-05-08 23:25:10.251735+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.251735+02
+17148	10	E28011704000021D53DAB0CB	\N	-73	0	42	\N	\N	1778275381928	2026-05-08 23:23:01.928+02	2026-05-08 23:23:02.548902+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:02.548902+02
+17149	10	E28011704000021D53DAB0CB	\N	-74	0	48	\N	\N	1778275382978	2026-05-08 23:23:02.978+02	2026-05-08 23:23:03.776904+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.776904+02
+17150	10	E28011704000021D53DAB0CB	\N	-64	0	56	\N	\N	1778275383137	2026-05-08 23:23:03.137+02	2026-05-08 23:23:03.914626+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.914626+02
+17151	10	E28011704000021D53DAB0CB	\N	-62	0	34	\N	\N	1778275383137	2026-05-08 23:23:03.137+02	2026-05-08 23:23:03.919154+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.919154+02
+17152	10	E28011704000021D53DAB0CB	\N	-54	0	13	\N	\N	1778275383137	2026-05-08 23:23:03.137+02	2026-05-08 23:23:03.921614+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.921614+02
+17153	10	E28011704000021D53DAB0CB	\N	-59	0	44	\N	\N	1778275383278	2026-05-08 23:23:03.278+02	2026-05-08 23:23:03.934189+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.934189+02
+17154	10	E28011704000021D53DAB0CB	\N	-59	0	22	\N	\N	1778275383428	2026-05-08 23:23:03.428+02	2026-05-08 23:23:03.943688+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.943688+02
+17155	10	E28011704000021D53DAB0CB	\N	-63	0	42	\N	\N	1778275383428	2026-05-08 23:23:03.428+02	2026-05-08 23:23:03.949732+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.949732+02
+17156	10	E28011704000021D53DAB0CB	\N	-62	0	42	\N	\N	1778275383590	2026-05-08 23:23:03.59+02	2026-05-08 23:23:03.953842+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.953842+02
+17157	10	E28011704000021D53DAB0CB	\N	-68	0	27	\N	\N	1778275383590	2026-05-08 23:23:03.59+02	2026-05-08 23:23:03.955943+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.955943+02
+17158	10	E28011704000021D53DAB0CB	\N	-68	0	45	\N	\N	1778275383590	2026-05-08 23:23:03.59+02	2026-05-08 23:23:03.958051+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:03.958051+02
+17159	10	E28011704000021D53DAB0CB	\N	-61	0	49	\N	\N	1778275383728	2026-05-08 23:23:03.728+02	2026-05-08 23:23:05.006324+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.006324+02
+17160	10	E28011704000021D53DAB0CB	\N	-58	0	19	\N	\N	1778275383878	2026-05-08 23:23:03.878+02	2026-05-08 23:23:05.024878+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.024878+02
+17163	10	E28011704000021D53DAB0CB	\N	-62	0	44	\N	\N	1778275384028	2026-05-08 23:23:04.028+02	2026-05-08 23:23:05.037566+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.037566+02
+17166	10	E28011704000021D53DAB0CB	\N	-62	0	55	\N	\N	1778275384188	2026-05-08 23:23:04.188+02	2026-05-08 23:23:05.049583+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.049583+02
+17171	10	E28011704000021D53DAB0CB	\N	-62	0	20	\N	\N	1778275384632	2026-05-08 23:23:04.632+02	2026-05-08 23:23:05.081968+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.081968+02
+17176	9	E28011704000021D53DAB0CB	\N	-65	0	56	\N	\N	1778275385093	2026-05-08 23:23:05.093+02	2026-05-08 23:23:05.8847+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.8847+02
+17178	9	E28011704000021D53DAB0CB	\N	-63	0	46	\N	\N	1778275385395	2026-05-08 23:23:05.395+02	2026-05-08 23:23:05.917986+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.917986+02
+17181	9	E28011704000021D53DAB0CB	\N	-71	0	23	\N	\N	1778275385544	2026-05-08 23:23:05.544+02	2026-05-08 23:23:05.981064+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.981064+02
+17182	9	E28011704000021D53DAB0CB	\N	-64	0	47	\N	\N	1778275385998	2026-05-08 23:23:05.998+02	2026-05-08 23:23:07.002456+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.002456+02
+17184	9	E28011704000021D53DAB0CB	\N	-64	0	49	\N	\N	1778275386295	2026-05-08 23:23:06.295+02	2026-05-08 23:23:07.119195+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.119195+02
+17187	9	E28011704000021D53DAB0CB	\N	-65	0	23	\N	\N	1778275386444	2026-05-08 23:23:06.444+02	2026-05-08 23:23:07.183216+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.183216+02
+17189	9	E28011704000021D53DAB0CB	\N	-64	0	43	\N	\N	1778275386759	2026-05-08 23:23:06.759+02	2026-05-08 23:23:07.215838+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.215838+02
+17192	9	E28011704000021D53DAB0CB	\N	-68	0	15	\N	\N	1778275386894	2026-05-08 23:23:06.894+02	2026-05-08 23:23:07.264346+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.264346+02
+17196	9	E28011704000021D53DAB0CB	\N	-61	0	38	\N	\N	1778275387343	2026-05-08 23:23:07.343+02	2026-05-08 23:23:08.854126+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:08.854126+02
+17198	9	E28011704000021D53DAB0CB	\N	-58	0	20	\N	\N	1778275387671	2026-05-08 23:23:07.671+02	2026-05-08 23:23:08.88369+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:08.88369+02
+17203	9	E28011704000021D53DAB0CB	\N	-70	0	9	\N	\N	1778275388095	2026-05-08 23:23:08.095+02	2026-05-08 23:23:09.537457+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:09.537457+02
+17208	9	E28011704000021D53DAB0CB	\N	-58	0	49	\N	\N	1778275402065	2026-05-08 23:23:22.065+02	2026-05-08 23:23:23.063156+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.063156+02
+17215	9	E28011704000021D53DAB0CB	\N	-63	0	41	\N	\N	1778275402794	2026-05-08 23:23:22.794+02	2026-05-08 23:23:23.229484+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.229484+02
+17221	10	E28011704000021D53DAB0CB	\N	-60	0	41	\N	\N	1778275403828	2026-05-08 23:23:23.828+02	2026-05-08 23:23:24.17275+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:24.17275+02
+17225	10	E28011704000021D53DAB0CB	\N	-65	0	13	\N	\N	1778275404132	2026-05-08 23:23:24.132+02	2026-05-08 23:23:25.415361+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.415361+02
+17228	10	E28011704000021D53DAB0CB	\N	-56	0	18	\N	\N	1778275404284	2026-05-08 23:23:24.284+02	2026-05-08 23:23:25.426+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.426+02
+17233	10	E28011704000021D53DAB0CB	\N	-56	0	38	\N	\N	1778275404734	2026-05-08 23:23:24.734+02	2026-05-08 23:23:25.441545+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.441545+02
+17236	10	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778275404878	2026-05-08 23:23:24.878+02	2026-05-08 23:23:25.458965+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.458965+02
+17272	9	E28011704000021D53DAB0CB	\N	-62	0	14	\N	\N	1778275420823	2026-05-08 23:23:40.823+02	2026-05-08 23:23:41.821867+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.821867+02
+17277	9	E28011704000021D53DAB0CB	\N	-61	0	52	\N	\N	1778275421264	2026-05-08 23:23:41.264+02	2026-05-08 23:23:41.910983+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.910983+02
+17279	9	E28011704000021D53DAB0CB	\N	-61	0	11	\N	\N	1778275421543	2026-05-08 23:23:41.543+02	2026-05-08 23:23:41.961963+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.961963+02
+17283	9	E28011704000021D53DAB0CB	\N	-59	0	40	\N	\N	1778275421993	2026-05-08 23:23:41.993+02	2026-05-08 23:23:43.144992+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:43.144992+02
+17240	10	E28011704000021D53DAB0CB	\N	-68	0	22	\N	\N	1778275417928	2026-05-08 23:23:37.928+02	2026-05-08 23:23:38.919925+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.919925+02
+17248	10	E28011704000021D53DAB0CB	\N	-61	0	34	\N	\N	1778275418678	2026-05-08 23:23:38.678+02	2026-05-08 23:23:38.989587+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.989587+02
+17256	10	E28011704000021D53DAB0CB	\N	-64	0	29	\N	\N	1778275419278	2026-05-08 23:23:39.278+02	2026-05-08 23:23:40.14162+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.14162+02
+17257	10	E28011704000021D53DAB0CB	\N	-67	0	54	\N	\N	1778275419440	2026-05-08 23:23:39.44+02	2026-05-08 23:23:40.457558+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.457558+02
+17260	10	E28011704000021D53DAB0CB	\N	-68	0	36	\N	\N	1778275419579	2026-05-08 23:23:39.579+02	2026-05-08 23:23:40.466852+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.466852+02
+17263	10	E28011704000021D53DAB0CB	\N	-67	0	29	\N	\N	1778275419728	2026-05-08 23:23:39.728+02	2026-05-08 23:23:40.479677+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.479677+02
+17265	9	E28011704000021D53DAB0CB	\N	-65	0	30	\N	\N	1778275419765	2026-05-08 23:23:39.765+02	2026-05-08 23:23:40.595606+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.595606+02
+17267	9	E28011704000021D53DAB0CB	\N	-61	0	21	\N	\N	1778275420043	2026-05-08 23:23:40.043+02	2026-05-08 23:23:40.678442+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.678442+02
+17364	10	E28011704000021D53DAB0CB	\N	-66	0	38	\N	\N	1778275476128	2026-05-08 23:24:36.128+02	2026-05-08 23:24:37.680729+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:37.680729+02
+17367	10	E28011704000021D53DAB0CB	\N	-63	0	45	\N	\N	1778275476289	2026-05-08 23:24:36.289+02	2026-05-08 23:24:37.99249+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:37.99249+02
+17373	10	E28011704000021D53DAB0CB	\N	-76	0	55	\N	\N	1778275476887	2026-05-08 23:24:36.887+02	2026-05-08 23:24:38.625165+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.625165+02
+17376	10	E28011704000021D53DAB0CB	\N	-70	0	20	\N	\N	1778275477028	2026-05-08 23:24:37.028+02	2026-05-08 23:24:38.634775+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.634775+02
+17352	9	E28011704000021D53DAB0CB	\N	-79	0	49	\N	\N	1778275473308	2026-05-08 23:24:33.308+02	2026-05-08 23:24:34.059901+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:34.059901+02
+17358	10	E28011704000021D53DAB0CB	\N	-65	0	56	\N	\N	1778275475529	2026-05-08 23:24:35.529+02	2026-05-08 23:24:35.966761+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:35.966761+02
+17360	10	E28011704000021D53DAB0CB	\N	-68	0	58	\N	\N	1778275475829	2026-05-08 23:24:35.829+02	2026-05-08 23:24:37.064397+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:37.064397+02
+17365	10	E28011704000021D53DAB0CB	\N	-66	0	45	\N	\N	1778275476289	2026-05-08 23:24:36.289+02	2026-05-08 23:24:37.986535+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:37.986535+02
+17368	10	E28011704000021D53DAB0CB	\N	-70	0	19	\N	\N	1778275476429	2026-05-08 23:24:36.429+02	2026-05-08 23:24:38.292939+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.292939+02
+17372	10	E28011704000021D53DAB0CB	\N	-72	0	18	\N	\N	1778275476728	2026-05-08 23:24:36.728+02	2026-05-08 23:24:38.619716+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.619716+02
+17164	10	E28011704000021D53DAB0CB	\N	-62	0	44	\N	\N	1778275384188	2026-05-08 23:23:04.188+02	2026-05-08 23:23:05.044771+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.044771+02
+17167	10	E28011704000021D53DAB0CB	\N	-64	0	25	\N	\N	1778275384328	2026-05-08 23:23:04.328+02	2026-05-08 23:23:05.057494+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.057494+02
+17170	10	E28011704000021D53DAB0CB	\N	-58	0	23	\N	\N	1778275384479	2026-05-08 23:23:04.479+02	2026-05-08 23:23:05.075125+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.075125+02
+17177	9	E28011704000021D53DAB0CB	\N	-67	0	30	\N	\N	1778275385243	2026-05-08 23:23:05.243+02	2026-05-08 23:23:05.900326+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:05.900326+02
+17183	9	E28011704000021D53DAB0CB	\N	-61	0	39	\N	\N	1778275386167	2026-05-08 23:23:06.167+02	2026-05-08 23:23:07.10445+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.10445+02
+17188	9	E28011704000021D53DAB0CB	\N	-62	0	21	\N	\N	1778275386594	2026-05-08 23:23:06.594+02	2026-05-08 23:23:07.194809+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.194809+02
+17193	9	E28011704000021D53DAB0CB	\N	-61	0	25	\N	\N	1778275387058	2026-05-08 23:23:07.058+02	2026-05-08 23:23:07.296936+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:07.296936+02
+17195	9	E28011704000021D53DAB0CB	\N	-63	0	7	\N	\N	1778275387225	2026-05-08 23:23:07.225+02	2026-05-08 23:23:08.605504+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:08.605504+02
+17197	9	E28011704000021D53DAB0CB	\N	-61	0	47	\N	\N	1778275387493	2026-05-08 23:23:07.493+02	2026-05-08 23:23:08.873021+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:08.873021+02
+17202	9	E28011704000021D53DAB0CB	\N	-66	0	28	\N	\N	1778275387943	2026-05-08 23:23:07.943+02	2026-05-08 23:23:09.031002+02	2026-05-08 23:23:12.42+02	\N	\N	realtime	synced	2026-05-08 23:23:09.031002+02
+17375	10	E28011704000021D53DAB0CB	\N	-73	0	20	\N	\N	1778275476887	2026-05-08 23:24:36.887+02	2026-05-08 23:24:38.633866+02	2026-05-08 23:24:42.471+02	\N	\N	realtime	synced	2026-05-08 23:24:38.633866+02
+17648	9	E28011704000021D53DAB0CB	\N	-60	0	28	\N	\N	1778275765821	2026-05-08 23:29:25.821+02	2026-05-08 23:29:26.332768+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.332768+02
+17652	9	E28011704000021D53DAB0CB	\N	-67	0	54	\N	\N	1778275766244	2026-05-08 23:29:26.244+02	2026-05-08 23:29:27.575426+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:27.575426+02
+17642	9	E28011704000021D53DAB0CB	\N	-74	0	33	\N	\N	1778275765076	2026-05-08 23:29:25.076+02	2026-05-08 23:29:26.232321+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.232321+02
+17644	9	E28011704000021D53DAB0CB	\N	-67	0	28	\N	\N	1778275765493	2026-05-08 23:29:25.493+02	2026-05-08 23:29:26.30795+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.30795+02
+17647	9	E28011704000021D53DAB0CB	\N	-67	0	28	\N	\N	1778275765658	2026-05-08 23:29:25.658+02	2026-05-08 23:29:26.328813+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.328813+02
+17649	9	E28011704000021D53DAB0CB	\N	-61	0	47	\N	\N	1778275765944	2026-05-08 23:29:25.944+02	2026-05-08 23:29:26.366663+02	2026-05-08 23:29:30.724+02	\N	\N	realtime	synced	2026-05-08 23:29:26.366663+02
+17205	10	E28011704000021D53DAB0CB	\N	-82	0	11	\N	\N	1778275402178	2026-05-08 23:23:22.178+02	2026-05-08 23:23:22.637342+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:22.637342+02
+17210	9	E28011704000021D53DAB0CB	\N	-59	0	50	\N	\N	1778275402225	2026-05-08 23:23:22.225+02	2026-05-08 23:23:23.082103+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.082103+02
+17212	9	E28011704000021D53DAB0CB	\N	-59	0	51	\N	\N	1778275402516	2026-05-08 23:23:22.516+02	2026-05-08 23:23:23.157836+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.157836+02
+17217	10	E28011704000021D53DAB0CB	\N	-69	0	48	\N	\N	1778275403378	2026-05-08 23:23:23.378+02	2026-05-08 23:23:23.749247+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:23.749247+02
+17220	10	E28011704000021D53DAB0CB	\N	-64	0	17	\N	\N	1778275403686	2026-05-08 23:23:23.686+02	2026-05-08 23:23:24.060899+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:24.060899+02
+17224	10	E28011704000021D53DAB0CB	\N	-62	0	52	\N	\N	1778275404132	2026-05-08 23:23:24.132+02	2026-05-08 23:23:25.413071+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.413071+02
+17227	10	E28011704000021D53DAB0CB	\N	-61	0	31	\N	\N	1778275404284	2026-05-08 23:23:24.284+02	2026-05-08 23:23:25.423923+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.423923+02
+17230	10	E28011704000021D53DAB0CB	\N	-59	0	14	\N	\N	1778275404428	2026-05-08 23:23:24.428+02	2026-05-08 23:23:25.430501+02	2026-05-08 23:23:30.429+02	\N	\N	realtime	synced	2026-05-08 23:23:25.430501+02
+17377	10	E28011704000021D53DAB0CB	\N	-70	0	15	\N	\N	1778275505978	2026-05-08 23:25:05.978+02	2026-05-08 23:25:07.067665+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:07.067665+02
+17379	10	E28011704000021D53DAB0CB	\N	-63	0	53	\N	\N	1778275506278	2026-05-08 23:25:06.278+02	2026-05-08 23:25:07.785522+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:07.785522+02
+17387	10	E28011704000021D53DAB0CB	\N	-67	0	11	\N	\N	1778275506878	2026-05-08 23:25:06.878+02	2026-05-08 23:25:10.258991+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.258991+02
+17395	9	E28011704000021D53DAB0CB	\N	-67	0	56	\N	\N	1778275510193	2026-05-08 23:25:10.193+02	2026-05-08 23:25:11.474546+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.474546+02
+17397	9	E28011704000021D53DAB0CB	\N	-60	0	26	\N	\N	1778275510493	2026-05-08 23:25:10.493+02	2026-05-08 23:25:11.51609+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.51609+02
+17402	9	E28011704000021D53DAB0CB	\N	-67	0	52	\N	\N	1778275510969	2026-05-08 23:25:10.969+02	2026-05-08 23:25:11.61991+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.61991+02
+17407	9	E28011704000021D53DAB0CB	\N	-68	0	25	\N	\N	1778275511394	2026-05-08 23:25:11.394+02	2026-05-08 23:25:11.72185+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.72185+02
+17238	10	E28011704000021D53DAB0CB	\N	-73	0	24	\N	\N	1778275417328	2026-05-08 23:23:37.328+02	2026-05-08 23:23:37.673947+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:37.673947+02
+17239	10	E28011704000021D53DAB0CB	\N	-70	0	31	\N	\N	1778275417478	2026-05-08 23:23:37.478+02	2026-05-08 23:23:38.79766+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.79766+02
+17241	10	E28011704000021D53DAB0CB	\N	-62	0	30	\N	\N	1778275418228	2026-05-08 23:23:38.228+02	2026-05-08 23:23:38.929171+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.929171+02
+17244	10	E28011704000021D53DAB0CB	\N	-57	0	47	\N	\N	1778275418394	2026-05-08 23:23:38.394+02	2026-05-08 23:23:38.94284+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:38.94284+02
+17249	10	E28011704000021D53DAB0CB	\N	-53	0	12	\N	\N	1778275418828	2026-05-08 23:23:38.828+02	2026-05-08 23:23:40.045455+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.045455+02
+17252	10	E28011704000021D53DAB0CB	\N	-53	0	45	\N	\N	1778275418990	2026-05-08 23:23:38.99+02	2026-05-08 23:23:40.058483+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.058483+02
+17255	10	E28011704000021D53DAB0CB	\N	-59	0	18	\N	\N	1778275419128	2026-05-08 23:23:39.128+02	2026-05-08 23:23:40.067181+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.067181+02
+17259	10	E28011704000021D53DAB0CB	\N	-67	0	44	\N	\N	1778275419440	2026-05-08 23:23:39.44+02	2026-05-08 23:23:40.462014+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.462014+02
+17289	9	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778275435066	2026-05-08 23:23:55.066+02	2026-05-08 23:23:55.697558+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:55.697558+02
+17291	9	E28011704000021D53DAB0CB	\N	-68	0	57	\N	\N	1778275435343	2026-05-08 23:23:55.343+02	2026-05-08 23:23:56.206003+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.206003+02
+17293	9	E28011704000021D53DAB0CB	\N	-68	0	7	\N	\N	1778275435794	2026-05-08 23:23:55.794+02	2026-05-08 23:23:56.348601+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.348601+02
+17302	9	E28011704000021D53DAB0CB	\N	-56	0	7	\N	\N	1778275436719	2026-05-08 23:23:56.719+02	2026-05-08 23:23:57.691177+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:57.691177+02
+17304	9	E28011704000021D53DAB0CB	\N	-61	0	11	\N	\N	1778275436995	2026-05-08 23:23:56.995+02	2026-05-08 23:23:57.772771+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:57.772771+02
+17311	10	E28011704000021D53DAB0CB	\N	-59	0	22	\N	\N	1778275437879	2026-05-08 23:23:57.879+02	2026-05-08 23:23:59.178611+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:59.178611+02
+17274	9	E28011704000021D53DAB0CB	\N	-61	0	58	\N	\N	1778275420944	2026-05-08 23:23:40.944+02	2026-05-08 23:23:41.842221+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.842221+02
+17276	9	E28011704000021D53DAB0CB	\N	-58	0	29	\N	\N	1778275421264	2026-05-08 23:23:41.264+02	2026-05-08 23:23:41.908931+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.908931+02
+17285	9	E28011704000021D53DAB0CB	\N	-63	0	40	\N	\N	1778275422145	2026-05-08 23:23:42.145+02	2026-05-08 23:23:43.15802+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:43.15802+02
+17287	9	E28011704000021D53DAB0CB	\N	-64	0	45	\N	\N	1778275422445	2026-05-08 23:23:42.445+02	2026-05-08 23:23:43.184564+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:43.184564+02
+17264	10	E28011704000021D53DAB0CB	\N	-63	0	31	\N	\N	1778275419878	2026-05-08 23:23:39.878+02	2026-05-08 23:23:40.490211+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.490211+02
+17266	9	E28011704000021D53DAB0CB	\N	-67	0	56	\N	\N	1778275419921	2026-05-08 23:23:39.921+02	2026-05-08 23:23:40.648792+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.648792+02
+17268	9	E28011704000021D53DAB0CB	\N	-65	0	31	\N	\N	1778275420347	2026-05-08 23:23:40.347+02	2026-05-08 23:23:40.706078+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:40.706078+02
+17273	9	E28011704000021D53DAB0CB	\N	-61	0	44	\N	\N	1778275420823	2026-05-08 23:23:40.823+02	2026-05-08 23:23:41.823945+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.823945+02
+17275	9	E28011704000021D53DAB0CB	\N	-58	0	32	\N	\N	1778275421099	2026-05-08 23:23:41.099+02	2026-05-08 23:23:41.857822+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.857822+02
+17280	9	E28011704000021D53DAB0CB	\N	-60	0	56	\N	\N	1778275421543	2026-05-08 23:23:41.543+02	2026-05-08 23:23:41.963867+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:41.963867+02
+17281	9	E28011704000021D53DAB0CB	\N	-62	0	15	\N	\N	1778275421845	2026-05-08 23:23:41.845+02	2026-05-08 23:23:43.09892+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:43.09892+02
+17286	9	E28011704000021D53DAB0CB	\N	-65	0	46	\N	\N	1778275422293	2026-05-08 23:23:42.293+02	2026-05-08 23:23:43.171545+02	2026-05-08 23:23:48.435+02	\N	\N	realtime	synced	2026-05-08 23:23:43.171545+02
+17380	10	E28011704000021D53DAB0CB	\N	-62	0	28	\N	\N	1778275506428	2026-05-08 23:25:06.428+02	2026-05-08 23:25:08.096943+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:08.096943+02
+17383	10	E28011704000021D53DAB0CB	\N	-70	0	45	\N	\N	1778275506578	2026-05-08 23:25:06.578+02	2026-05-08 23:25:08.400994+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:08.400994+02
+17385	10	E28011704000021D53DAB0CB	\N	-67	0	54	\N	\N	1778275506878	2026-05-08 23:25:06.878+02	2026-05-08 23:25:10.251726+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.251726+02
+17388	10	E28011704000021D53DAB0CB	\N	-67	0	45	\N	\N	1778275507028	2026-05-08 23:25:07.028+02	2026-05-08 23:25:10.261443+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.261443+02
+17396	9	E28011704000021D53DAB0CB	\N	-63	0	17	\N	\N	1778275510343	2026-05-08 23:25:10.343+02	2026-05-08 23:25:11.489978+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.489978+02
+17401	9	E28011704000021D53DAB0CB	\N	-61	0	36	\N	\N	1778275510815	2026-05-08 23:25:10.815+02	2026-05-08 23:25:11.606891+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.606891+02
+17403	9	E28011704000021D53DAB0CB	\N	-69	0	38	\N	\N	1778275511111	2026-05-08 23:25:11.111+02	2026-05-08 23:25:11.66718+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.66718+02
+17288	9	E28011704000021D53DAB0CB	\N	-63	0	20	\N	\N	1778275435066	2026-05-08 23:23:55.066+02	2026-05-08 23:23:55.693929+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:55.693929+02
+17296	9	E28011704000021D53DAB0CB	\N	-62	0	37	\N	\N	1778275436109	2026-05-08 23:23:56.109+02	2026-05-08 23:23:56.500079+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:56.500079+02
+17299	9	E28011704000021D53DAB0CB	\N	-61	0	53	\N	\N	1778275436393	2026-05-08 23:23:56.393+02	2026-05-08 23:23:57.639905+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:57.639905+02
+17306	10	E28011704000021D53DAB0CB	\N	-59	0	18	\N	\N	1778275437578	2026-05-08 23:23:57.578+02	2026-05-08 23:23:58.05698+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:58.05698+02
+17309	10	E28011704000021D53DAB0CB	\N	-56	0	49	\N	\N	1778275437737	2026-05-08 23:23:57.737+02	2026-05-08 23:23:58.083569+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:58.083569+02
+17310	10	E28011704000021D53DAB0CB	\N	-55	0	43	\N	\N	1778275437879	2026-05-08 23:23:57.879+02	2026-05-08 23:23:59.175942+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:59.175942+02
+17313	10	E28011704000021D53DAB0CB	\N	-55	0	48	\N	\N	1778275438028	2026-05-08 23:23:58.028+02	2026-05-08 23:23:59.516953+02	2026-05-08 23:24:02.443+02	\N	\N	realtime	synced	2026-05-08 23:23:59.516953+02
+17406	9	E28011704000021D53DAB0CB	\N	-67	0	37	\N	\N	1778275511266	2026-05-08 23:25:11.266+02	2026-05-08 23:25:11.69233+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.69233+02
+17412	9	E28011704000021D53DAB0CB	\N	-73	0	10	\N	\N	1778275512017	2026-05-08 23:25:12.017+02	2026-05-08 23:25:13.405889+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:13.405889+02
+17390	10	E28011704000021D53DAB0CB	\N	-73	0	25	\N	\N	1778275507178	2026-05-08 23:25:07.178+02	2026-05-08 23:25:10.270083+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.270083+02
+17392	9	E28011704000021D53DAB0CB	\N	-66	0	20	\N	\N	1778275509455	2026-05-08 23:25:09.455+02	2026-05-08 23:25:10.318921+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:10.318921+02
+17398	9	E28011704000021D53DAB0CB	\N	-68	0	52	\N	\N	1778275510493	2026-05-08 23:25:10.493+02	2026-05-08 23:25:11.518902+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.518902+02
+17400	9	E28011704000021D53DAB0CB	\N	-62	0	39	\N	\N	1778275510815	2026-05-08 23:25:10.815+02	2026-05-08 23:25:11.604849+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.604849+02
+17405	9	E28011704000021D53DAB0CB	\N	-68	0	43	\N	\N	1778275511266	2026-05-08 23:25:11.266+02	2026-05-08 23:25:11.690431+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:11.690431+02
+17409	9	E28011704000021D53DAB0CB	\N	-68	0	36	\N	\N	1778275511547	2026-05-08 23:25:11.547+02	2026-05-08 23:25:12.906652+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:12.906652+02
+17411	9	E28011704000021D53DAB0CB	\N	-70	0	24	\N	\N	1778275511858	2026-05-08 23:25:11.858+02	2026-05-08 23:25:13.358006+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:13.358006+02
+17408	9	E28011704000021D53DAB0CB	\N	-65	0	46	\N	\N	1778275511547	2026-05-08 23:25:11.547+02	2026-05-08 23:25:12.904511+02	2026-05-08 23:25:16.491+02	\N	\N	realtime	synced	2026-05-08 23:25:12.904511+02
+17657	10	E28011704000021D53DAB0CB	\N	-63	0	51	\N	\N	1778275777779	2026-05-08 23:29:37.779+02	2026-05-08 23:29:38.839417+02	\N	2026-05-08 23:29:46.73+02	insufficient_data	realtime	synced	2026-05-08 23:29:38.839417+02
+17663	10	E28011704000021D53DAB0CB	\N	-61	0	32	\N	\N	1778275786778	2026-05-08 23:29:46.778+02	2026-05-08 23:29:47.584625+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.584625+02
+17666	10	E28011704000021D53DAB0CB	\N	-73	0	58	\N	\N	1778275786928	2026-05-08 23:29:46.928+02	2026-05-08 23:29:47.619847+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.619847+02
+17667	10	E28011704000021D53DAB0CB	\N	-71	0	20	\N	\N	1778275787086	2026-05-08 23:29:47.086+02	2026-05-08 23:29:47.647992+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.647992+02
+17468	10	E28011704000021D53DAB0CB	\N	-73	0	40	\N	\N	1778275551136	2026-05-08 23:25:51.136+02	2026-05-08 23:25:52.329068+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:52.329068+02
+17469	10	E28011704000021D53DAB0CB	\N	-71	0	15	\N	\N	1778275551279	2026-05-08 23:25:51.279+02	2026-05-08 23:25:52.636055+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:52.636055+02
+17472	10	E28011704000021D53DAB0CB	\N	-67	0	27	\N	\N	1778275554129	2026-05-08 23:25:54.129+02	2026-05-08 23:25:54.708701+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:54.708701+02
+17480	10	E28011704000021D53DAB0CB	\N	-68	0	52	\N	\N	1778275554728	2026-05-08 23:25:54.728+02	2026-05-08 23:25:55.82861+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:55.82861+02
+17482	9	E28011704000021D53DAB0CB	\N	-64	0	56	\N	\N	1778275555043	2026-05-08 23:25:55.043+02	2026-05-08 23:25:56.084771+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.084771+02
+17487	9	E28011704000021D53DAB0CB	\N	-55	0	24	\N	\N	1778275555517	2026-05-08 23:25:55.517+02	2026-05-08 23:25:56.187396+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.187396+02
+17465	10	E28011704000021D53DAB0CB	\N	-74	0	59	\N	\N	1778275529978	2026-05-08 23:25:29.978+02	2026-05-08 23:25:31.986219+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.986219+02
+17474	10	E28011704000021D53DAB0CB	\N	-62	0	49	\N	\N	1778275554278	2026-05-08 23:25:54.278+02	2026-05-08 23:25:54.719585+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:54.719585+02
+17477	10	E28011704000021D53DAB0CB	\N	-58	0	8	\N	\N	1778275554436	2026-05-08 23:25:54.436+02	2026-05-08 23:25:54.730805+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:54.730805+02
+17484	9	E28011704000021D53DAB0CB	\N	-67	0	7	\N	\N	1778275555194	2026-05-08 23:25:55.194+02	2026-05-08 23:25:56.100476+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.100476+02
+17489	9	E28011704000021D53DAB0CB	\N	-56	0	12	\N	\N	1778275555678	2026-05-08 23:25:55.678+02	2026-05-08 23:25:56.250474+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.250474+02
+17491	9	E28011704000021D53DAB0CB	\N	-61	0	37	\N	\N	1778275555944	2026-05-08 23:25:55.944+02	2026-05-08 23:25:56.329513+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.329513+02
+17473	10	E28011704000021D53DAB0CB	\N	-65	0	40	\N	\N	1778275554129	2026-05-08 23:25:54.129+02	2026-05-08 23:25:54.710967+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:54.710967+02
+17475	10	E28011704000021D53DAB0CB	\N	-58	0	32	\N	\N	1778275554436	2026-05-08 23:25:54.436+02	2026-05-08 23:25:54.727262+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:54.727262+02
+17478	10	E28011704000021D53DAB0CB	\N	-65	0	53	\N	\N	1778275554578	2026-05-08 23:25:54.578+02	2026-05-08 23:25:55.810191+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:55.810191+02
+17483	9	E28011704000021D53DAB0CB	\N	-67	0	24	\N	\N	1778275555043	2026-05-08 23:25:55.043+02	2026-05-08 23:25:56.087616+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.087616+02
+17485	9	E28011704000021D53DAB0CB	\N	-64	0	13	\N	\N	1778275555348	2026-05-08 23:25:55.348+02	2026-05-08 23:25:56.152156+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.152156+02
+17670	10	E28011704000021D53DAB0CB	\N	-64	0	8	\N	\N	1778275787229	2026-05-08 23:29:47.229+02	2026-05-08 23:29:47.666235+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.666235+02
+17675	9	E28011704000021D53DAB0CB	\N	-67	0	52	\N	\N	1778275788315	2026-05-08 23:29:48.315+02	2026-05-08 23:29:48.632849+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.632849+02
+17678	10	E28011704000021D53DAB0CB	\N	-68	0	27	\N	\N	1778275787678	2026-05-08 23:29:47.678+02	2026-05-08 23:29:48.736627+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.736627+02
+17681	10	E28011704000021D53DAB0CB	\N	-62	0	19	\N	\N	1778275787838	2026-05-08 23:29:47.838+02	2026-05-08 23:29:48.753029+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.753029+02
+17686	10	E28011704000021D53DAB0CB	\N	-71	0	21	\N	\N	1778275788278	2026-05-08 23:29:48.278+02	2026-05-08 23:29:48.784126+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.784126+02
+17691	9	E28011704000021D53DAB0CB	\N	-62	0	38	\N	\N	1778275788916	2026-05-08 23:29:48.916+02	2026-05-08 23:29:50.540859+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.540859+02
+17693	9	E28011704000021D53DAB0CB	\N	-62	0	10	\N	\N	1778275789193	2026-05-08 23:29:49.193+02	2026-05-08 23:29:50.572715+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.572715+02
+17698	9	E28011704000021D53DAB0CB	\N	-62	0	47	\N	\N	1778275789666	2026-05-08 23:29:49.666+02	2026-05-08 23:29:50.672295+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.672295+02
+17704	9	E28011704000021D53DAB0CB	\N	-59	0	27	\N	\N	1778275790244	2026-05-08 23:29:50.244+02	2026-05-08 23:29:50.851463+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.851463+02
+17706	9	E28011704000021D53DAB0CB	\N	-65	0	15	\N	\N	1778275790544	2026-05-08 23:29:50.544+02	2026-05-08 23:29:50.909303+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.909303+02
+17712	10	E28011704000021D53DAB0CB	\N	-66	0	18	\N	\N	1778275845579	2026-05-08 23:30:45.579+02	2026-05-08 23:30:45.886726+02	2026-05-08 23:30:50.803+02	\N	\N	realtime	synced	2026-05-08 23:30:45.886726+02
+17714	10	E28011704000021D53DAB0CB	\N	-68	0	43	\N	\N	1778275845730	2026-05-08 23:30:45.73+02	2026-05-08 23:30:46.937569+02	2026-05-08 23:30:50.803+02	\N	\N	realtime	synced	2026-05-08 23:30:46.937569+02
+17718	10	E28011704000021D53DAB0CB	\N	-68	0	27	\N	\N	1778275868681	2026-05-08 23:31:08.681+02	2026-05-08 23:31:08.974457+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:08.974457+02
+17721	10	E28011704000021D53DAB0CB	\N	-62	0	53	\N	\N	1778275868828	2026-05-08 23:31:08.828+02	2026-05-08 23:31:10.332356+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:10.332356+02
+17466	10	E28011704000021D53DAB0CB	\N	-65	0	8	\N	\N	1778275529978	2026-05-08 23:25:29.978+02	2026-05-08 23:25:31.990705+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.990705+02
+17470	10	E28011704000021D53DAB0CB	\N	-63	0	30	\N	\N	1778275553828	2026-05-08 23:25:53.828+02	2026-05-08 23:25:54.172182+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:54.172182+02
+17471	10	E28011704000021D53DAB0CB	\N	-67	0	12	\N	\N	1778275553978	2026-05-08 23:25:53.978+02	2026-05-08 23:25:54.582212+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:54.582212+02
+17476	10	E28011704000021D53DAB0CB	\N	-56	0	50	\N	\N	1778275554436	2026-05-08 23:25:54.436+02	2026-05-08 23:25:54.729155+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:54.729155+02
+17479	10	E28011704000021D53DAB0CB	\N	-67	0	46	\N	\N	1778275554578	2026-05-08 23:25:54.578+02	2026-05-08 23:25:55.812044+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:55.812044+02
+17481	9	E28011704000021D53DAB0CB	\N	-67	0	54	\N	\N	1778275554921	2026-05-08 23:25:54.921+02	2026-05-08 23:25:56.058765+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.058765+02
+17486	9	E28011704000021D53DAB0CB	\N	-59	0	29	\N	\N	1778275555348	2026-05-08 23:25:55.348+02	2026-05-08 23:25:56.154466+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.154466+02
+17488	9	E28011704000021D53DAB0CB	\N	-56	0	49	\N	\N	1778275555678	2026-05-08 23:25:55.678+02	2026-05-08 23:25:56.247921+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.247921+02
+17671	10	E28011704000021D53DAB0CB	\N	-68	0	29	\N	\N	1778275787379	2026-05-08 23:29:47.379+02	2026-05-08 23:29:47.688758+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.688758+02
+17676	10	E28011704000021D53DAB0CB	\N	-68	0	49	\N	\N	1778275787529	2026-05-08 23:29:47.529+02	2026-05-08 23:29:48.725898+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.725898+02
+17680	10	E28011704000021D53DAB0CB	\N	-68	0	47	\N	\N	1778275787838	2026-05-08 23:29:47.838+02	2026-05-08 23:29:48.750615+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.750615+02
+17683	10	E28011704000021D53DAB0CB	\N	-64	0	14	\N	\N	1778275787979	2026-05-08 23:29:47.979+02	2026-05-08 23:29:48.759809+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.759809+02
+17688	9	E28011704000021D53DAB0CB	\N	-65	0	55	\N	\N	1778275788594	2026-05-08 23:29:48.594+02	2026-05-08 23:29:49.798652+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:49.798652+02
+17695	9	E28011704000021D53DAB0CB	\N	-57	0	48	\N	\N	1778275789344	2026-05-08 23:29:49.344+02	2026-05-08 23:29:50.600763+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.600763+02
+17697	9	E28011704000021D53DAB0CB	\N	-65	0	13	\N	\N	1778275789666	2026-05-08 23:29:49.666+02	2026-05-08 23:29:50.67047+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.67047+02
+17700	9	E28011704000021D53DAB0CB	\N	-67	0	40	\N	\N	1778275789828	2026-05-08 23:29:49.828+02	2026-05-08 23:29:50.689606+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.689606+02
+17701	9	E28011704000021D53DAB0CB	\N	-64	0	26	\N	\N	1778275789944	2026-05-08 23:29:49.944+02	2026-05-08 23:29:50.747832+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.747832+02
+17703	9	E28011704000021D53DAB0CB	\N	-64	0	23	\N	\N	1778275790244	2026-05-08 23:29:50.244+02	2026-05-08 23:29:50.845953+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.845953+02
+17715	10	E28011704000021D53DAB0CB	\N	-66	0	54	\N	\N	1778275845878	2026-05-08 23:30:45.878+02	2026-05-08 23:30:46.954864+02	2026-05-08 23:30:50.803+02	\N	\N	realtime	synced	2026-05-08 23:30:46.954864+02
+17716	10	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778275868381	2026-05-08 23:31:08.381+02	2026-05-08 23:31:08.852792+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:08.852792+02
+17719	10	E28011704000021D53DAB0CB	\N	-64	0	57	\N	\N	1778275868681	2026-05-08 23:31:08.681+02	2026-05-08 23:31:08.979253+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:08.979253+02
+17722	10	E28011704000021D53DAB0CB	\N	-68	0	32	\N	\N	1778275868828	2026-05-08 23:31:08.828+02	2026-05-08 23:31:10.334295+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:10.334295+02
+17724	10	E28011704000021D53DAB0CB	\N	-65	0	32	\N	\N	1778275869128	2026-05-08 23:31:09.128+02	2026-05-08 23:31:10.81058+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:10.81058+02
+17728	9	E28011704000021D53DAB0CB	\N	-62	0	17	\N	\N	1778275871122	2026-05-08 23:31:11.122+02	2026-05-08 23:31:11.921788+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:11.921788+02
+17723	10	E28011704000021D53DAB0CB	\N	-64	0	44	\N	\N	1778275868978	2026-05-08 23:31:08.978+02	2026-05-08 23:31:10.561788+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:10.561788+02
+17727	10	E28011704000021D53DAB0CB	\N	-68	0	41	\N	\N	1778275869278	2026-05-08 23:31:09.278+02	2026-05-08 23:31:10.821541+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:10.821541+02
+17413	9	E28011704000021D53DAB0CB	\N	-64	0	44	\N	\N	1778275523844	2026-05-08 23:25:23.844+02	2026-05-08 23:25:24.886131+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:24.886131+02
+17415	9	E28011704000021D53DAB0CB	\N	-67	0	49	\N	\N	1778275524304	2026-05-08 23:25:24.304+02	2026-05-08 23:25:25.373814+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:25.373814+02
+17422	9	E28011704000021D53DAB0CB	\N	-62	0	19	\N	\N	1778275525221	2026-05-08 23:25:25.221+02	2026-05-08 23:25:26.363935+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.363935+02
+17430	9	E28011704000021D53DAB0CB	\N	-74	0	41	\N	\N	1778275526126	2026-05-08 23:25:26.126+02	2026-05-08 23:25:26.603605+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.603605+02
+17433	10	E28011704000021D53DAB0CB	\N	-70	0	31	\N	\N	1778275527578	2026-05-08 23:25:27.578+02	2026-05-08 23:25:27.959617+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:27.959617+02
+17441	10	E28011704000021D53DAB0CB	\N	-64	0	51	\N	\N	1778275528328	2026-05-08 23:25:28.328+02	2026-05-08 23:25:28.9406+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.9406+02
+17444	10	E28011704000021D53DAB0CB	\N	-60	0	40	\N	\N	1778275528483	2026-05-08 23:25:28.483+02	2026-05-08 23:25:28.965987+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.965987+02
+17447	10	E28011704000021D53DAB0CB	\N	-61	0	40	\N	\N	1778275528778	2026-05-08 23:25:28.778+02	2026-05-08 23:25:30.209855+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:30.209855+02
+17448	10	E28011704000021D53DAB0CB	\N	-61	0	34	\N	\N	1778275528778	2026-05-08 23:25:28.778+02	2026-05-08 23:25:30.213716+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:30.213716+02
+17449	10	E28011704000021D53DAB0CB	\N	-61	0	24	\N	\N	1778275528928	2026-05-08 23:25:28.928+02	2026-05-08 23:25:30.518207+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:30.518207+02
+17451	10	E28011704000021D53DAB0CB	\N	-65	0	21	\N	\N	1778275529078	2026-05-08 23:25:29.078+02	2026-05-08 23:25:30.824469+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:30.824469+02
+17452	10	E28011704000021D53DAB0CB	\N	-57	0	38	\N	\N	1778275529078	2026-05-08 23:25:29.078+02	2026-05-08 23:25:30.826881+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:30.826881+02
+17414	9	E28011704000021D53DAB0CB	\N	-68	0	35	\N	\N	1778275524146	2026-05-08 23:25:24.146+02	2026-05-08 23:25:25.295565+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:25.295565+02
+17416	9	E28011704000021D53DAB0CB	\N	-65	0	39	\N	\N	1778275524466	2026-05-08 23:25:24.466+02	2026-05-08 23:25:26.216748+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.216748+02
+17423	9	E28011704000021D53DAB0CB	\N	-62	0	58	\N	\N	1778275525343	2026-05-08 23:25:25.343+02	2026-05-08 23:25:26.373902+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.373902+02
+17429	9	E28011704000021D53DAB0CB	\N	-58	0	9	\N	\N	1778275525949	2026-05-08 23:25:25.949+02	2026-05-08 23:25:26.585904+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.585904+02
+17431	9	E28011704000021D53DAB0CB	\N	-80	0	39	\N	\N	1778275526243	2026-05-08 23:25:26.243+02	2026-05-08 23:25:26.613916+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.613916+02
+17434	10	E28011704000021D53DAB0CB	\N	-66	0	43	\N	\N	1778275527731	2026-05-08 23:25:27.731+02	2026-05-08 23:25:28.469052+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.469052+02
+17435	10	E28011704000021D53DAB0CB	\N	-70	0	38	\N	\N	1778275527878	2026-05-08 23:25:27.878+02	2026-05-08 23:25:28.776588+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.776588+02
+17438	10	E28011704000021D53DAB0CB	\N	-63	0	39	\N	\N	1778275528042	2026-05-08 23:25:28.042+02	2026-05-08 23:25:28.897763+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.897763+02
+17443	10	E28011704000021D53DAB0CB	\N	-62	0	14	\N	\N	1778275528483	2026-05-08 23:25:28.483+02	2026-05-08 23:25:28.964257+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.964257+02
+17417	9	E28011704000021D53DAB0CB	\N	-68	0	35	\N	\N	1778275524466	2026-05-08 23:25:24.466+02	2026-05-08 23:25:26.219895+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.219895+02
+17419	9	E28011704000021D53DAB0CB	\N	-58	0	14	\N	\N	1778275524893	2026-05-08 23:25:24.893+02	2026-05-08 23:25:26.272919+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.272919+02
+17421	9	E28011704000021D53DAB0CB	\N	-64	0	46	\N	\N	1778275525221	2026-05-08 23:25:25.221+02	2026-05-08 23:25:26.361856+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.361856+02
+17424	9	E28011704000021D53DAB0CB	\N	-62	0	59	\N	\N	1778275525343	2026-05-08 23:25:25.343+02	2026-05-08 23:25:26.37595+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.37595+02
+17427	9	E28011704000021D53DAB0CB	\N	-64	0	47	\N	\N	1778275525793	2026-05-08 23:25:25.793+02	2026-05-08 23:25:26.530798+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.530798+02
+17432	10	E28011704000021D53DAB0CB	\N	-70	0	10	\N	\N	1778275527578	2026-05-08 23:25:27.578+02	2026-05-08 23:25:27.957634+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:27.957634+02
+17436	10	E28011704000021D53DAB0CB	\N	-67	0	24	\N	\N	1778275527878	2026-05-08 23:25:27.878+02	2026-05-08 23:25:28.77856+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.77856+02
+17439	10	E28011704000021D53DAB0CB	\N	-68	0	42	\N	\N	1778275528042	2026-05-08 23:25:28.042+02	2026-05-08 23:25:28.899567+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.899567+02
+17418	9	E28011704000021D53DAB0CB	\N	-54	0	26	\N	\N	1778275524745	2026-05-08 23:25:24.745+02	2026-05-08 23:25:26.24797+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.24797+02
+17420	9	E28011704000021D53DAB0CB	\N	-62	0	25	\N	\N	1778275525049	2026-05-08 23:25:25.049+02	2026-05-08 23:25:26.33917+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.33917+02
+17425	9	E28011704000021D53DAB0CB	\N	-62	0	21	\N	\N	1778275525493	2026-05-08 23:25:25.493+02	2026-05-08 23:25:26.431364+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.431364+02
+17426	9	E28011704000021D53DAB0CB	\N	-54	0	52	\N	\N	1778275525645	2026-05-08 23:25:25.645+02	2026-05-08 23:25:26.514522+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.514522+02
+17428	9	E28011704000021D53DAB0CB	\N	-60	0	46	\N	\N	1778275525949	2026-05-08 23:25:25.949+02	2026-05-08 23:25:26.583466+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:26.583466+02
+17437	10	E28011704000021D53DAB0CB	\N	-71	0	28	\N	\N	1778275528042	2026-05-08 23:25:28.042+02	2026-05-08 23:25:28.896051+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.896051+02
+17440	10	E28011704000021D53DAB0CB	\N	-61	0	27	\N	\N	1778275528181	2026-05-08 23:25:28.181+02	2026-05-08 23:25:28.911196+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.911196+02
+17442	10	E28011704000021D53DAB0CB	\N	-61	0	38	\N	\N	1778275528483	2026-05-08 23:25:28.483+02	2026-05-08 23:25:28.962542+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.962542+02
+17445	10	E28011704000021D53DAB0CB	\N	-63	0	16	\N	\N	1778275528630	2026-05-08 23:25:28.63+02	2026-05-08 23:25:28.973912+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.973912+02
+17446	10	E28011704000021D53DAB0CB	\N	-54	0	35	\N	\N	1778275528630	2026-05-08 23:25:28.63+02	2026-05-08 23:25:28.975597+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:28.975597+02
+17450	10	E28011704000021D53DAB0CB	\N	-62	0	10	\N	\N	1778275528928	2026-05-08 23:25:28.928+02	2026-05-08 23:25:30.520469+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:30.520469+02
+17453	10	E28011704000021D53DAB0CB	\N	-60	0	28	\N	\N	1778275529229	2026-05-08 23:25:29.229+02	2026-05-08 23:25:31.131617+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.131617+02
+17454	10	E28011704000021D53DAB0CB	\N	-60	0	49	\N	\N	1778275529229	2026-05-08 23:25:29.229+02	2026-05-08 23:25:31.134979+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.134979+02
+17455	10	E28011704000021D53DAB0CB	\N	-61	0	46	\N	\N	1778275529378	2026-05-08 23:25:29.378+02	2026-05-08 23:25:31.438977+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.438977+02
+17456	10	E28011704000021D53DAB0CB	\N	-67	0	22	\N	\N	1778275529378	2026-05-08 23:25:29.378+02	2026-05-08 23:25:31.440605+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.440605+02
+17457	10	E28011704000021D53DAB0CB	\N	-67	0	8	\N	\N	1778275529378	2026-05-08 23:25:29.378+02	2026-05-08 23:25:31.442199+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.442199+02
+17458	10	E28011704000021D53DAB0CB	\N	-64	0	16	\N	\N	1778275529528	2026-05-08 23:25:29.528+02	2026-05-08 23:25:31.745875+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.745875+02
+17459	10	E28011704000021D53DAB0CB	\N	-62	0	23	\N	\N	1778275529528	2026-05-08 23:25:29.528+02	2026-05-08 23:25:31.749217+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.749217+02
+17460	10	E28011704000021D53DAB0CB	\N	-62	0	12	\N	\N	1778275529678	2026-05-08 23:25:29.678+02	2026-05-08 23:25:31.9619+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.9619+02
+17461	10	E28011704000021D53DAB0CB	\N	-62	0	59	\N	\N	1778275529678	2026-05-08 23:25:29.678+02	2026-05-08 23:25:31.963984+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.963984+02
+17462	10	E28011704000021D53DAB0CB	\N	-62	0	39	\N	\N	1778275529828	2026-05-08 23:25:29.828+02	2026-05-08 23:25:31.972806+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.972806+02
+17463	10	E28011704000021D53DAB0CB	\N	-58	0	44	\N	\N	1778275529828	2026-05-08 23:25:29.828+02	2026-05-08 23:25:31.974754+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.974754+02
+17464	10	E28011704000021D53DAB0CB	\N	-65	0	8	\N	\N	1778275529978	2026-05-08 23:25:29.978+02	2026-05-08 23:25:31.983874+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.983874+02
+17467	10	E28011704000021D53DAB0CB	\N	-74	0	59	\N	\N	1778275529978	2026-05-08 23:25:29.978+02	2026-05-08 23:25:31.992834+02	2026-05-08 23:25:34.506+02	\N	\N	realtime	synced	2026-05-08 23:25:31.992834+02
+17699	9	E28011704000021D53DAB0CB	\N	-62	0	18	\N	\N	1778275789828	2026-05-08 23:29:49.828+02	2026-05-08 23:29:50.687109+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.687109+02
+17705	9	E28011704000021D53DAB0CB	\N	-56	0	33	\N	\N	1778275790394	2026-05-08 23:29:50.394+02	2026-05-08 23:29:50.860341+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.860341+02
+17710	10	E28011704000021D53DAB0CB	\N	-68	0	13	\N	\N	1778275845429	2026-05-08 23:30:45.429+02	2026-05-08 23:30:45.863877+02	2026-05-08 23:30:50.803+02	\N	\N	realtime	synced	2026-05-08 23:30:45.863877+02
+17660	10	E28011704000021D53DAB0CB	\N	-67	0	41	\N	\N	1778275786478	2026-05-08 23:29:46.478+02	2026-05-08 23:29:47.440824+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.440824+02
+17665	10	E28011704000021D53DAB0CB	\N	-65	0	52	\N	\N	1778275786928	2026-05-08 23:29:46.928+02	2026-05-08 23:29:47.617762+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.617762+02
+17668	10	E28011704000021D53DAB0CB	\N	-68	0	17	\N	\N	1778275787086	2026-05-08 23:29:47.086+02	2026-05-08 23:29:47.650573+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.650573+02
+17490	9	E28011704000021D53DAB0CB	\N	-65	0	56	\N	\N	1778275555793	2026-05-08 23:25:55.793+02	2026-05-08 23:25:56.308042+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.308042+02
+17492	9	E28011704000021D53DAB0CB	\N	-67	0	9	\N	\N	1778275556094	2026-05-08 23:25:56.094+02	2026-05-08 23:25:56.343278+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.343278+02
+17493	9	E28011704000021D53DAB0CB	\N	-61	0	15	\N	\N	1778275556266	2026-05-08 23:25:56.266+02	2026-05-08 23:25:56.730019+02	2026-05-08 23:26:00.524+02	\N	\N	realtime	synced	2026-05-08 23:25:56.730019+02
+17673	9	E28011704000021D53DAB0CB	\N	-65	0	25	\N	\N	1778275788145	2026-05-08 23:29:48.145+02	2026-05-08 23:29:48.567673+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.567673+02
+17685	10	E28011704000021D53DAB0CB	\N	-67	0	52	\N	\N	1778275788128	2026-05-08 23:29:48.128+02	2026-05-08 23:29:48.770249+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.770249+02
+17687	9	E28011704000021D53DAB0CB	\N	-59	0	14	\N	\N	1778275788594	2026-05-08 23:29:48.594+02	2026-05-08 23:29:49.796454+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:49.796454+02
+17690	9	E28011704000021D53DAB0CB	\N	-62	0	56	\N	\N	1778275788752	2026-05-08 23:29:48.752+02	2026-05-08 23:29:50.207305+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.207305+02
+17692	9	E28011704000021D53DAB0CB	\N	-60	0	47	\N	\N	1778275789043	2026-05-08 23:29:49.043+02	2026-05-08 23:29:50.556806+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.556806+02
+17664	10	E28011704000021D53DAB0CB	\N	-61	0	54	\N	\N	1778275786778	2026-05-08 23:29:46.778+02	2026-05-08 23:29:47.586789+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.586789+02
+17669	10	E28011704000021D53DAB0CB	\N	-63	0	33	\N	\N	1778275787229	2026-05-08 23:29:47.229+02	2026-05-08 23:29:47.660998+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.660998+02
+17672	10	E28011704000021D53DAB0CB	\N	-67	0	59	\N	\N	1778275787379	2026-05-08 23:29:47.379+02	2026-05-08 23:29:47.690668+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:47.690668+02
+17494	10	E28011704000021D53DAB0CB	\N	-71	0	37	\N	\N	1778275609328	2026-05-08 23:26:49.328+02	2026-05-08 23:26:49.67296+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:49.67296+02
+17495	9	E28011704000021D53DAB0CB	\N	-62	0	50	\N	\N	1778275608926	2026-05-08 23:26:48.926+02	2026-05-08 23:26:49.802712+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:49.802712+02
+17496	9	E28011704000021D53DAB0CB	\N	-56	0	44	\N	\N	1778275608926	2026-05-08 23:26:48.926+02	2026-05-08 23:26:49.805241+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:49.805241+02
+17497	9	E28011704000021D53DAB0CB	\N	-58	0	37	\N	\N	1778275609043	2026-05-08 23:26:49.043+02	2026-05-08 23:26:49.823034+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:49.823034+02
+17498	9	E28011704000021D53DAB0CB	\N	-58	0	44	\N	\N	1778275609043	2026-05-08 23:26:49.043+02	2026-05-08 23:26:49.824965+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:49.824965+02
+17499	9	E28011704000021D53DAB0CB	\N	-62	0	33	\N	\N	1778275609193	2026-05-08 23:26:49.193+02	2026-05-08 23:26:49.833744+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:49.833744+02
+17500	9	E28011704000021D53DAB0CB	\N	-65	0	20	\N	\N	1778275609343	2026-05-08 23:26:49.343+02	2026-05-08 23:26:49.890109+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:49.890109+02
+17501	10	E28011704000021D53DAB0CB	\N	-73	0	18	\N	\N	1778275609478	2026-05-08 23:26:49.478+02	2026-05-08 23:26:50.800119+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.800119+02
+17502	10	E28011704000021D53DAB0CB	\N	-71	0	8	\N	\N	1778275609478	2026-05-08 23:26:49.478+02	2026-05-08 23:26:50.802102+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.802102+02
+17503	10	E28011704000021D53DAB0CB	\N	-71	0	45	\N	\N	1778275609639	2026-05-08 23:26:49.639+02	2026-05-08 23:26:50.918983+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.918983+02
+17504	10	E28011704000021D53DAB0CB	\N	-67	0	10	\N	\N	1778275609639	2026-05-08 23:26:49.639+02	2026-05-08 23:26:50.921161+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.921161+02
+17505	10	E28011704000021D53DAB0CB	\N	-62	0	8	\N	\N	1778275609780	2026-05-08 23:26:49.78+02	2026-05-08 23:26:50.936672+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.936672+02
+17506	10	E28011704000021D53DAB0CB	\N	-61	0	33	\N	\N	1778275609780	2026-05-08 23:26:49.78+02	2026-05-08 23:26:50.938714+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.938714+02
+17507	10	E28011704000021D53DAB0CB	\N	-63	0	13	\N	\N	1778275609928	2026-05-08 23:26:49.928+02	2026-05-08 23:26:50.943612+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.943612+02
+17508	10	E28011704000021D53DAB0CB	\N	-67	0	47	\N	\N	1778275609928	2026-05-08 23:26:49.928+02	2026-05-08 23:26:50.945853+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.945853+02
+17509	10	E28011704000021D53DAB0CB	\N	-66	0	32	\N	\N	1778275610085	2026-05-08 23:26:50.085+02	2026-05-08 23:26:50.955714+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.955714+02
+17510	10	E28011704000021D53DAB0CB	\N	-59	0	37	\N	\N	1778275610085	2026-05-08 23:26:50.085+02	2026-05-08 23:26:50.957747+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.957747+02
+17511	10	E28011704000021D53DAB0CB	\N	-61	0	14	\N	\N	1778275610228	2026-05-08 23:26:50.228+02	2026-05-08 23:26:50.970035+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.970035+02
+17512	10	E28011704000021D53DAB0CB	\N	-57	0	48	\N	\N	1778275610228	2026-05-08 23:26:50.228+02	2026-05-08 23:26:50.972073+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.972073+02
+17513	10	E28011704000021D53DAB0CB	\N	-68	0	24	\N	\N	1778275610378	2026-05-08 23:26:50.378+02	2026-05-08 23:26:50.979769+02	2026-05-08 23:26:54.581+02	\N	\N	realtime	synced	2026-05-08 23:26:50.979769+02
+17514	10	E28011704000021D53DAB0CB	\N	-62	0	46	\N	\N	1778275644878	2026-05-08 23:27:24.878+02	2026-05-08 23:27:25.514334+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.514334+02
+17515	10	E28011704000021D53DAB0CB	\N	-57	0	29	\N	\N	1778275645028	2026-05-08 23:27:25.028+02	2026-05-08 23:27:25.687594+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.687594+02
+17516	10	E28011704000021D53DAB0CB	\N	-59	0	52	\N	\N	1778275645028	2026-05-08 23:27:25.028+02	2026-05-08 23:27:25.690979+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.690979+02
+17517	10	E28011704000021D53DAB0CB	\N	-56	0	59	\N	\N	1778275645179	2026-05-08 23:27:25.179+02	2026-05-08 23:27:25.693963+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.693963+02
+17518	10	E28011704000021D53DAB0CB	\N	-54	0	53	\N	\N	1778275645179	2026-05-08 23:27:25.179+02	2026-05-08 23:27:25.69602+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.69602+02
+17519	10	E28011704000021D53DAB0CB	\N	-62	0	9	\N	\N	1778275645334	2026-05-08 23:27:25.334+02	2026-05-08 23:27:25.733266+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.733266+02
+17520	10	E28011704000021D53DAB0CB	\N	-56	0	29	\N	\N	1778275645334	2026-05-08 23:27:25.334+02	2026-05-08 23:27:25.737195+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.737195+02
+17521	10	E28011704000021D53DAB0CB	\N	-62	0	11	\N	\N	1778275645486	2026-05-08 23:27:25.486+02	2026-05-08 23:27:25.758999+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.758999+02
+17522	10	E28011704000021D53DAB0CB	\N	-62	0	26	\N	\N	1778275645486	2026-05-08 23:27:25.486+02	2026-05-08 23:27:25.761117+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:25.761117+02
+17523	10	E28011704000021D53DAB0CB	\N	-66	0	27	\N	\N	1778275645628	2026-05-08 23:27:25.628+02	2026-05-08 23:27:26.787546+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.787546+02
+17524	10	E28011704000021D53DAB0CB	\N	-59	0	46	\N	\N	1778275645778	2026-05-08 23:27:25.778+02	2026-05-08 23:27:26.799571+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.799571+02
+17525	10	E28011704000021D53DAB0CB	\N	-58	0	55	\N	\N	1778275645778	2026-05-08 23:27:25.778+02	2026-05-08 23:27:26.801323+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.801323+02
+17526	10	E28011704000021D53DAB0CB	\N	-59	0	14	\N	\N	1778275645928	2026-05-08 23:27:25.928+02	2026-05-08 23:27:26.809753+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.809753+02
+17537	9	E28011704000021D53DAB0CB	\N	-68	0	47	\N	\N	1778275677743	2026-05-08 23:27:57.743+02	2026-05-08 23:27:58.244728+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:27:58.244728+02
+17538	9	E28011704000021D53DAB0CB	\N	-68	0	40	\N	\N	1778275677893	2026-05-08 23:27:57.893+02	2026-05-08 23:27:58.410888+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:27:58.410888+02
+17540	9	E28011704000021D53DAB0CB	\N	-68	0	24	\N	\N	1778275678074	2026-05-08 23:27:58.074+02	2026-05-08 23:27:58.553623+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:27:58.553623+02
+17541	10	E28011704000021D53DAB0CB	\N	-61	0	58	\N	\N	1778275679678	2026-05-08 23:27:59.678+02	2026-05-08 23:28:00.227772+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:00.227772+02
+17543	10	E28011704000021D53DAB0CB	\N	-62	0	43	\N	\N	1778275679981	2026-05-08 23:27:59.981+02	2026-05-08 23:28:00.386531+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:00.386531+02
+17544	10	E28011704000021D53DAB0CB	\N	-65	0	35	\N	\N	1778275679981	2026-05-08 23:27:59.981+02	2026-05-08 23:28:00.388738+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:00.388738+02
+17545	10	E28011704000021D53DAB0CB	\N	-64	0	46	\N	\N	1778275680139	2026-05-08 23:28:00.139+02	2026-05-08 23:28:00.411751+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:00.411751+02
+17546	10	E28011704000021D53DAB0CB	\N	-61	0	19	\N	\N	1778275680139	2026-05-08 23:28:00.139+02	2026-05-08 23:28:00.419965+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:00.419965+02
+17547	10	E28011704000021D53DAB0CB	\N	-59	0	29	\N	\N	1778275680278	2026-05-08 23:28:00.278+02	2026-05-08 23:28:01.558895+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:01.558895+02
+17548	10	E28011704000021D53DAB0CB	\N	-65	0	17	\N	\N	1778275680428	2026-05-08 23:28:00.428+02	2026-05-08 23:28:01.968115+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:01.968115+02
+17527	10	E28011704000021D53DAB0CB	\N	-59	0	12	\N	\N	1778275645928	2026-05-08 23:27:25.928+02	2026-05-08 23:27:26.81182+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.81182+02
+17528	10	E28011704000021D53DAB0CB	\N	-61	0	46	\N	\N	1778275646078	2026-05-08 23:27:26.078+02	2026-05-08 23:27:26.822173+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.822173+02
+17529	10	E28011704000021D53DAB0CB	\N	-61	0	31	\N	\N	1778275646078	2026-05-08 23:27:26.078+02	2026-05-08 23:27:26.824746+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.824746+02
+17530	10	E28011704000021D53DAB0CB	\N	-62	0	31	\N	\N	1778275646234	2026-05-08 23:27:26.234+02	2026-05-08 23:27:26.834736+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.834736+02
+17531	10	E28011704000021D53DAB0CB	\N	-51	0	45	\N	\N	1778275646234	2026-05-08 23:27:26.234+02	2026-05-08 23:27:26.839218+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.839218+02
+17532	10	E28011704000021D53DAB0CB	\N	-59	0	12	\N	\N	1778275646234	2026-05-08 23:27:26.234+02	2026-05-08 23:27:26.841014+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.841014+02
+17533	10	E28011704000021D53DAB0CB	\N	-56	0	56	\N	\N	1778275646379	2026-05-08 23:27:26.379+02	2026-05-08 23:27:26.847209+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.847209+02
+17534	10	E28011704000021D53DAB0CB	\N	-56	0	28	\N	\N	1778275646379	2026-05-08 23:27:26.379+02	2026-05-08 23:27:26.85014+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.85014+02
+17535	10	E28011704000021D53DAB0CB	\N	-59	0	43	\N	\N	1778275646528	2026-05-08 23:27:26.528+02	2026-05-08 23:27:26.857613+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:26.857613+02
+17536	9	E28011704000021D53DAB0CB	\N	-64	0	56	\N	\N	1778275647624	2026-05-08 23:27:27.624+02	2026-05-08 23:27:28.587632+02	2026-05-08 23:27:32.611+02	\N	\N	realtime	synced	2026-05-08 23:27:28.587632+02
+17674	9	E28011704000021D53DAB0CB	\N	-67	0	20	\N	\N	1778275788315	2026-05-08 23:29:48.315+02	2026-05-08 23:29:48.630524+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.630524+02
+17677	10	E28011704000021D53DAB0CB	\N	-67	0	20	\N	\N	1778275787529	2026-05-08 23:29:47.529+02	2026-05-08 23:29:48.727955+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.727955+02
+17679	10	E28011704000021D53DAB0CB	\N	-65	0	53	\N	\N	1778275787678	2026-05-08 23:29:47.678+02	2026-05-08 23:29:48.738861+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.738861+02
+17549	10	E28011704000021D53DAB0CB	\N	-61	0	33	\N	\N	1778275680428	2026-05-08 23:28:00.428+02	2026-05-08 23:28:01.970857+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:01.970857+02
+17539	9	E28011704000021D53DAB0CB	\N	-73	0	20	\N	\N	1778275677893	2026-05-08 23:27:57.893+02	2026-05-08 23:27:58.419203+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:27:58.419203+02
+17542	10	E28011704000021D53DAB0CB	\N	-57	0	44	\N	\N	1778275679828	2026-05-08 23:27:59.828+02	2026-05-08 23:28:00.351581+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:00.351581+02
+17550	10	E28011704000021D53DAB0CB	\N	-64	0	43	\N	\N	1778275680578	2026-05-08 23:28:00.578+02	2026-05-08 23:28:02.275215+02	2026-05-08 23:28:04.632+02	\N	\N	realtime	synced	2026-05-08 23:28:02.275215+02
+17682	10	E28011704000021D53DAB0CB	\N	-60	0	38	\N	\N	1778275787838	2026-05-08 23:29:47.838+02	2026-05-08 23:29:48.755144+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.755144+02
+17684	10	E28011704000021D53DAB0CB	\N	-63	0	44	\N	\N	1778275788128	2026-05-08 23:29:48.128+02	2026-05-08 23:29:48.768301+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:48.768301+02
+17689	9	E28011704000021D53DAB0CB	\N	-58	0	30	\N	\N	1778275788752	2026-05-08 23:29:48.752+02	2026-05-08 23:29:50.205616+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.205616+02
+17694	9	E28011704000021D53DAB0CB	\N	-67	0	32	\N	\N	1778275789193	2026-05-08 23:29:49.193+02	2026-05-08 23:29:50.574453+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.574453+02
+17696	9	E28011704000021D53DAB0CB	\N	-58	0	9	\N	\N	1778275789497	2026-05-08 23:29:49.497+02	2026-05-08 23:29:50.651904+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.651904+02
+17702	9	E28011704000021D53DAB0CB	\N	-61	0	21	\N	\N	1778275790095	2026-05-08 23:29:50.095+02	2026-05-08 23:29:50.832535+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.832535+02
+17707	9	E28011704000021D53DAB0CB	\N	-66	0	50	\N	\N	1778275790706	2026-05-08 23:29:50.706+02	2026-05-08 23:29:50.934536+02	2026-05-08 23:29:54.744+02	\N	\N	realtime	synced	2026-05-08 23:29:50.934536+02
+17708	9	E28011704000021D53DAB0CB	\N	-69	0	11	\N	\N	1778275843344	2026-05-08 23:30:43.344+02	2026-05-08 23:30:44.375861+02	2026-05-08 23:30:50.803+02	\N	\N	realtime	synced	2026-05-08 23:30:44.375861+02
+17551	10	E28011704000021D53DAB0CB	\N	-57	0	20	\N	\N	1778275707129	2026-05-08 23:28:27.129+02	2026-05-08 23:28:28.388187+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.388187+02
+17556	10	E28011704000021D53DAB0CB	\N	-55	0	56	\N	\N	1778275707578	2026-05-08 23:28:27.578+02	2026-05-08 23:28:28.433281+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.433281+02
+17559	10	E28011704000021D53DAB0CB	\N	-67	0	33	\N	\N	1778275707728	2026-05-08 23:28:27.728+02	2026-05-08 23:28:28.443641+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.443641+02
+17564	10	E28011704000021D53DAB0CB	\N	-58	0	36	\N	\N	1778275708178	2026-05-08 23:28:28.178+02	2026-05-08 23:28:28.503534+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.503534+02
+17568	9	E28011704000021D53DAB0CB	\N	-77	0	55	\N	\N	1778275708651	2026-05-08 23:28:28.651+02	2026-05-08 23:28:29.818025+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:29.818025+02
+17570	9	E28011704000021D53DAB0CB	\N	-71	0	38	\N	\N	1778275709095	2026-05-08 23:28:29.095+02	2026-05-08 23:28:30.052724+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.052724+02
+17575	9	E28011704000021D53DAB0CB	\N	-64	0	26	\N	\N	1778275709565	2026-05-08 23:28:29.565+02	2026-05-08 23:28:30.519004+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.519004+02
+17581	9	E28011704000021D53DAB0CB	\N	-65	0	40	\N	\N	1778275710143	2026-05-08 23:28:30.143+02	2026-05-08 23:28:30.725675+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.725675+02
+17586	9	E28011704000021D53DAB0CB	\N	-68	0	40	\N	\N	1778275710594	2026-05-08 23:28:30.594+02	2026-05-08 23:28:30.832862+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.832862+02
+17591	9	E28011704000021D53DAB0CB	\N	-71	0	12	\N	\N	1778275711045	2026-05-08 23:28:31.045+02	2026-05-08 23:28:31.994486+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:31.994486+02
+17598	9	E28011704000021D53DAB0CB	\N	-68	0	11	\N	\N	1778275711794	2026-05-08 23:28:31.794+02	2026-05-08 23:28:32.290182+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.290182+02
+17602	9	E28011704000021D53DAB0CB	\N	-74	0	38	\N	\N	1778275712244	2026-05-08 23:28:32.244+02	2026-05-08 23:28:33.400628+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:33.400628+02
+17709	10	E28011704000021D53DAB0CB	\N	-70	0	30	\N	\N	1778275845278	2026-05-08 23:30:45.278+02	2026-05-08 23:30:45.809456+02	2026-05-08 23:30:50.803+02	\N	\N	realtime	synced	2026-05-08 23:30:45.809456+02
+17711	10	E28011704000021D53DAB0CB	\N	-68	0	13	\N	\N	1778275845579	2026-05-08 23:30:45.579+02	2026-05-08 23:30:45.884604+02	2026-05-08 23:30:50.803+02	\N	\N	realtime	synced	2026-05-08 23:30:45.884604+02
+17713	10	E28011704000021D53DAB0CB	\N	-66	0	8	\N	\N	1778275845730	2026-05-08 23:30:45.73+02	2026-05-08 23:30:46.935728+02	2026-05-08 23:30:50.803+02	\N	\N	realtime	synced	2026-05-08 23:30:46.935728+02
+17607	9	E28011704000021D53DAB0CB	\N	-68	0	27	\N	\N	1778275723345	2026-05-08 23:28:43.345+02	2026-05-08 23:28:43.900053+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:43.900053+02
+17609	9	E28011704000021D53DAB0CB	\N	-64	0	21	\N	\N	1778275723655	2026-05-08 23:28:43.655+02	2026-05-08 23:28:43.935228+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:43.935228+02
+17615	10	E28011704000021D53DAB0CB	\N	-65	0	32	\N	\N	1778275725128	2026-05-08 23:28:45.128+02	2026-05-08 23:28:45.837196+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.837196+02
+17618	10	E28011704000021D53DAB0CB	\N	-66	0	27	\N	\N	1778275725278	2026-05-08 23:28:45.278+02	2026-05-08 23:28:45.855323+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.855323+02
+17717	10	E28011704000021D53DAB0CB	\N	-68	0	47	\N	\N	1778275868381	2026-05-08 23:31:08.381+02	2026-05-08 23:31:08.855968+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:08.855968+02
+17720	10	E28011704000021D53DAB0CB	\N	-68	0	45	\N	\N	1778275868681	2026-05-08 23:31:08.681+02	2026-05-08 23:31:08.981801+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:08.981801+02
+17725	10	E28011704000021D53DAB0CB	\N	-67	0	37	\N	\N	1778275869128	2026-05-08 23:31:09.128+02	2026-05-08 23:31:10.812576+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:10.812576+02
+17726	10	E28011704000021D53DAB0CB	\N	-67	0	17	\N	\N	1778275869278	2026-05-08 23:31:09.278+02	2026-05-08 23:31:10.819622+02	2026-05-08 23:31:16.827+02	\N	\N	realtime	synced	2026-05-08 23:31:10.819622+02
+17729	9	E28011704000021D53DAB0CB	\N	-68	0	14	\N	\N	1778275887743	2026-05-08 23:31:27.743+02	2026-05-08 23:31:28.920712+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:28.920712+02
+17731	9	E28011704000021D53DAB0CB	\N	-68	0	56	\N	\N	1778275888055	2026-05-08 23:31:28.055+02	2026-05-08 23:31:28.989591+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:28.989591+02
+17734	10	E28011704000021D53DAB0CB	\N	-67	0	23	\N	\N	1778275889828	2026-05-08 23:31:29.828+02	2026-05-08 23:31:30.617754+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:30.617754+02
+17737	10	E28011704000021D53DAB0CB	\N	-62	0	28	\N	\N	1778275889978	2026-05-08 23:31:29.978+02	2026-05-08 23:31:30.630041+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:30.630041+02
+17552	10	E28011704000021D53DAB0CB	\N	-58	0	32	\N	\N	1778275707278	2026-05-08 23:28:27.278+02	2026-05-08 23:28:28.405867+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.405867+02
+17553	10	E28011704000021D53DAB0CB	\N	-57	0	18	\N	\N	1778275707278	2026-05-08 23:28:27.278+02	2026-05-08 23:28:28.407859+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.407859+02
+17554	10	E28011704000021D53DAB0CB	\N	-55	0	32	\N	\N	1778275707428	2026-05-08 23:28:27.428+02	2026-05-08 23:28:28.422914+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.422914+02
+17555	10	E28011704000021D53DAB0CB	\N	-54	0	44	\N	\N	1778275707428	2026-05-08 23:28:27.428+02	2026-05-08 23:28:28.425065+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.425065+02
+17557	10	E28011704000021D53DAB0CB	\N	-64	0	44	\N	\N	1778275707578	2026-05-08 23:28:27.578+02	2026-05-08 23:28:28.435104+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.435104+02
+17558	10	E28011704000021D53DAB0CB	\N	-65	0	51	\N	\N	1778275707728	2026-05-08 23:28:27.728+02	2026-05-08 23:28:28.441851+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.441851+02
+17560	10	E28011704000021D53DAB0CB	\N	-57	0	53	\N	\N	1778275707878	2026-05-08 23:28:27.878+02	2026-05-08 23:28:28.479031+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.479031+02
+17561	10	E28011704000021D53DAB0CB	\N	-61	0	8	\N	\N	1778275707878	2026-05-08 23:28:27.878+02	2026-05-08 23:28:28.481606+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.481606+02
+17562	10	E28011704000021D53DAB0CB	\N	-56	0	17	\N	\N	1778275708028	2026-05-08 23:28:28.028+02	2026-05-08 23:28:28.492092+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.492092+02
+17563	10	E28011704000021D53DAB0CB	\N	-56	0	9	\N	\N	1778275708028	2026-05-08 23:28:28.028+02	2026-05-08 23:28:28.493943+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.493943+02
+17565	10	E28011704000021D53DAB0CB	\N	-59	0	18	\N	\N	1778275708178	2026-05-08 23:28:28.178+02	2026-05-08 23:28:28.505517+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:28.505517+02
+17566	10	E28011704000021D53DAB0CB	\N	-61	0	36	\N	\N	1778275708328	2026-05-08 23:28:28.328+02	2026-05-08 23:28:29.722758+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:29.722758+02
+17571	9	E28011704000021D53DAB0CB	\N	-76	0	35	\N	\N	1778275709095	2026-05-08 23:28:29.095+02	2026-05-08 23:28:30.054319+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.054319+02
+17573	9	E28011704000021D53DAB0CB	\N	-70	0	15	\N	\N	1778275709398	2026-05-08 23:28:29.398+02	2026-05-08 23:28:30.454668+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.454668+02
+17578	9	E28011704000021D53DAB0CB	\N	-66	0	44	\N	\N	1778275709866	2026-05-08 23:28:29.866+02	2026-05-08 23:28:30.630593+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.630593+02
+17579	9	E28011704000021D53DAB0CB	\N	-68	0	43	\N	\N	1778275709994	2026-05-08 23:28:29.994+02	2026-05-08 23:28:30.707841+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.707841+02
+17584	9	E28011704000021D53DAB0CB	\N	-65	0	14	\N	\N	1778275710444	2026-05-08 23:28:30.444+02	2026-05-08 23:28:30.805272+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.805272+02
+17589	9	E28011704000021D53DAB0CB	\N	-65	0	48	\N	\N	1778275710893	2026-05-08 23:28:30.893+02	2026-05-08 23:28:31.963454+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:31.963454+02
+17594	9	E28011704000021D53DAB0CB	\N	-68	0	12	\N	\N	1778275711344	2026-05-08 23:28:31.344+02	2026-05-08 23:28:32.091474+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.091474+02
+17596	9	E28011704000021D53DAB0CB	\N	-66	0	36	\N	\N	1778275711661	2026-05-08 23:28:31.661+02	2026-05-08 23:28:32.270065+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.270065+02
+17601	9	E28011704000021D53DAB0CB	\N	-64	0	7	\N	\N	1778275712094	2026-05-08 23:28:32.094+02	2026-05-08 23:28:32.354589+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.354589+02
+17603	9	E28011704000021D53DAB0CB	\N	-73	0	46	\N	\N	1778275712244	2026-05-08 23:28:32.244+02	2026-05-08 23:28:33.402954+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:33.402954+02
+17606	9	E28011704000021D53DAB0CB	\N	-65	0	46	\N	\N	1778275723193	2026-05-08 23:28:43.193+02	2026-05-08 23:28:43.88002+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:43.88002+02
+17608	9	E28011704000021D53DAB0CB	\N	-68	0	52	\N	\N	1778275723493	2026-05-08 23:28:43.493+02	2026-05-08 23:28:43.921725+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:43.921725+02
+17619	10	E28011704000021D53DAB0CB	\N	-59	0	55	\N	\N	1778275725433	2026-05-08 23:28:45.433+02	2026-05-08 23:28:45.863457+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.863457+02
+17622	10	E28011704000021D53DAB0CB	\N	-74	0	17	\N	\N	1778275725585	2026-05-08 23:28:45.585+02	2026-05-08 23:28:45.875626+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.875626+02
+17623	10	E28011704000021D53DAB0CB	\N	-66	0	28	\N	\N	1778275725728	2026-05-08 23:28:45.728+02	2026-05-08 23:28:46.922163+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:46.922163+02
+17730	9	E28011704000021D53DAB0CB	\N	-57	0	29	\N	\N	1778275887893	2026-05-08 23:31:27.893+02	2026-05-08 23:31:28.940267+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:28.940267+02
+17738	10	E28011704000021D53DAB0CB	\N	-64	0	18	\N	\N	1778275890128	2026-05-08 23:31:30.128+02	2026-05-08 23:31:30.637325+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:30.637325+02
+17567	10	E28011704000021D53DAB0CB	\N	-67	0	59	\N	\N	1778275708328	2026-05-08 23:28:28.328+02	2026-05-08 23:28:29.724651+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:29.724651+02
+17569	9	E28011704000021D53DAB0CB	\N	-73	0	40	\N	\N	1778275708944	2026-05-08 23:28:28.944+02	2026-05-08 23:28:29.881523+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:29.881523+02
+17576	9	E28011704000021D53DAB0CB	\N	-67	0	51	\N	\N	1778275709727	2026-05-08 23:28:29.727+02	2026-05-08 23:28:30.543244+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.543244+02
+17580	9	E28011704000021D53DAB0CB	\N	-62	0	30	\N	\N	1778275709994	2026-05-08 23:28:29.994+02	2026-05-08 23:28:30.709533+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.709533+02
+17582	9	E28011704000021D53DAB0CB	\N	-60	0	28	\N	\N	1778275710303	2026-05-08 23:28:30.303+02	2026-05-08 23:28:30.753633+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.753633+02
+17585	9	E28011704000021D53DAB0CB	\N	-60	0	54	\N	\N	1778275710444	2026-05-08 23:28:30.444+02	2026-05-08 23:28:30.807041+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.807041+02
+17587	9	E28011704000021D53DAB0CB	\N	-68	0	59	\N	\N	1778275710781	2026-05-08 23:28:30.781+02	2026-05-08 23:28:31.910421+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:31.910421+02
+17590	9	E28011704000021D53DAB0CB	\N	-68	0	42	\N	\N	1778275710893	2026-05-08 23:28:30.893+02	2026-05-08 23:28:31.965614+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:31.965614+02
+17592	9	E28011704000021D53DAB0CB	\N	-64	0	22	\N	\N	1778275711193	2026-05-08 23:28:31.193+02	2026-05-08 23:28:32.023333+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.023333+02
+17597	9	E28011704000021D53DAB0CB	\N	-67	0	56	\N	\N	1778275711661	2026-05-08 23:28:31.661+02	2026-05-08 23:28:32.273265+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.273265+02
+17599	9	E28011704000021D53DAB0CB	\N	-68	0	52	\N	\N	1778275711944	2026-05-08 23:28:31.944+02	2026-05-08 23:28:32.305064+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.305064+02
+17604	9	E28011704000021D53DAB0CB	\N	-67	0	42	\N	\N	1778275723067	2026-05-08 23:28:43.067+02	2026-05-08 23:28:43.851322+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:43.851322+02
+17612	10	E28011704000021D53DAB0CB	\N	-73	0	11	\N	\N	1778275724678	2026-05-08 23:28:44.678+02	2026-05-08 23:28:45.386265+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.386265+02
+17614	10	E28011704000021D53DAB0CB	\N	-65	0	17	\N	\N	1778275725128	2026-05-08 23:28:45.128+02	2026-05-08 23:28:45.834824+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.834824+02
+17617	10	E28011704000021D53DAB0CB	\N	-60	0	58	\N	\N	1778275725278	2026-05-08 23:28:45.278+02	2026-05-08 23:28:45.853594+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.853594+02
+17620	10	E28011704000021D53DAB0CB	\N	-67	0	11	\N	\N	1778275725433	2026-05-08 23:28:45.433+02	2026-05-08 23:28:45.865502+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.865502+02
+17733	9	E28011704000021D53DAB0CB	\N	-63	0	27	\N	\N	1778275888214	2026-05-08 23:31:28.214+02	2026-05-08 23:31:29.041026+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:29.041026+02
+17736	10	E28011704000021D53DAB0CB	\N	-63	0	43	\N	\N	1778275889978	2026-05-08 23:31:29.978+02	2026-05-08 23:31:30.626845+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:30.626845+02
+17739	10	E28011704000021D53DAB0CB	\N	-67	0	58	\N	\N	1778275890128	2026-05-08 23:31:30.128+02	2026-05-08 23:31:30.639221+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:30.639221+02
+17732	9	E28011704000021D53DAB0CB	\N	-61	0	53	\N	\N	1778275888055	2026-05-08 23:31:28.055+02	2026-05-08 23:31:28.991239+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:28.991239+02
+17735	10	E28011704000021D53DAB0CB	\N	-58	0	53	\N	\N	1778275889828	2026-05-08 23:31:29.828+02	2026-05-08 23:31:30.619794+02	2026-05-08 23:31:34.839+02	\N	\N	realtime	synced	2026-05-08 23:31:30.619794+02
+17572	9	E28011704000021D53DAB0CB	\N	-70	0	52	\N	\N	1778275709243	2026-05-08 23:28:29.243+02	2026-05-08 23:28:30.333466+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.333466+02
+17574	9	E28011704000021D53DAB0CB	\N	-67	0	34	\N	\N	1778275709565	2026-05-08 23:28:29.565+02	2026-05-08 23:28:30.516286+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.516286+02
+17577	9	E28011704000021D53DAB0CB	\N	-64	0	15	\N	\N	1778275709727	2026-05-08 23:28:29.727+02	2026-05-08 23:28:30.545369+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.545369+02
+17583	9	E28011704000021D53DAB0CB	\N	-62	0	31	\N	\N	1778275710303	2026-05-08 23:28:30.303+02	2026-05-08 23:28:30.755667+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:30.755667+02
+17588	9	E28011704000021D53DAB0CB	\N	-67	0	52	\N	\N	1778275710781	2026-05-08 23:28:30.781+02	2026-05-08 23:28:31.913856+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:31.913856+02
+17593	9	E28011704000021D53DAB0CB	\N	-69	0	56	\N	\N	1778275711193	2026-05-08 23:28:31.193+02	2026-05-08 23:28:32.025433+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.025433+02
+17595	9	E28011704000021D53DAB0CB	\N	-68	0	35	\N	\N	1778275711508	2026-05-08 23:28:31.508+02	2026-05-08 23:28:32.154352+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.154352+02
+17600	9	E28011704000021D53DAB0CB	\N	-74	0	30	\N	\N	1778275711944	2026-05-08 23:28:31.944+02	2026-05-08 23:28:32.307122+02	2026-05-08 23:28:36.662+02	\N	\N	realtime	synced	2026-05-08 23:28:32.307122+02
+17605	9	E28011704000021D53DAB0CB	\N	-64	0	50	\N	\N	1778275723193	2026-05-08 23:28:43.193+02	2026-05-08 23:28:43.877858+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:43.877858+02
+17610	9	E28011704000021D53DAB0CB	\N	-65	0	12	\N	\N	1778275723655	2026-05-08 23:28:43.655+02	2026-05-08 23:28:43.937543+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:43.937543+02
+17611	9	E28011704000021D53DAB0CB	\N	-65	0	58	\N	\N	1778275723793	2026-05-08 23:28:43.793+02	2026-05-08 23:28:45.079068+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.079068+02
+17613	10	E28011704000021D53DAB0CB	\N	-68	0	36	\N	\N	1778275724828	2026-05-08 23:28:44.828+02	2026-05-08 23:28:45.693485+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.693485+02
+17616	10	E28011704000021D53DAB0CB	\N	-67	0	49	\N	\N	1778275725128	2026-05-08 23:28:45.128+02	2026-05-08 23:28:45.839214+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.839214+02
+17621	10	E28011704000021D53DAB0CB	\N	-69	0	35	\N	\N	1778275725585	2026-05-08 23:28:45.585+02	2026-05-08 23:28:45.873445+02	2026-05-08 23:28:50.675+02	\N	\N	realtime	synced	2026-05-08 23:28:45.873445+02
+\.
+
+
+--
+-- Data for Name: tag_assignments; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.tag_assignments (id, user_id, tag_epc, assigned_at, deactivated_at, notes, created_at) FROM stdin;
+bcfc66c5-9c3a-4967-ab2f-97b6356d87c9	\N	E28011704000021D53DAB0CB	2026-05-08 22:41:26.244+02	2026-05-08 22:48:04.44+02	\N	2026-05-08 22:41:26.244+02
+35905927-6d51-4a83-b2fe-2df54d382e9f	f908224d-2e38-409a-bc7f-81902406f95b	E28011704000021D53DAB0CB	2026-05-08 22:50:24.28+02	\N	\N	2026-05-08 22:50:24.28+02
+\.
+
+
+--
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.users (id, sync_id, name, email, is_active, created_at, updated_at) FROM stdin;
+f908224d-2e38-409a-bc7f-81902406f95b	153	Richard Adamec	\N	t	2026-05-08 22:50:24.28+02	2026-05-08 22:50:24.28+02
+\.
+
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 1, false);
+
+
+--
+-- Name: lighthouse_connection_events_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.lighthouse_connection_events_id_seq', 280, true);
+
+
+--
+-- Name: lighthouse_groups_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.lighthouse_groups_id_seq', 5, true);
+
+
+--
+-- Name: lighthouse_health_snapshots_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.lighthouse_health_snapshots_id_seq', 6618, true);
+
+
+--
+-- Name: lighthouses_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.lighthouses_id_seq', 10, true);
+
+
+--
+-- Name: processed_event_scans_raw_scan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.processed_event_scans_raw_scan_id_seq', 1, false);
+
+
+--
+-- Name: raw_scans_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.raw_scans_id_seq', 17739, true);
+
+
+--
+-- Name: raw_scans_timestamp_ms_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.raw_scans_timestamp_ms_seq', 1, false);
+
+
+--
+-- Name: audit_logs audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.audit_logs
+    ADD CONSTRAINT audit_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dashboard_users dashboard_users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dashboard_users
+    ADD CONSTRAINT dashboard_users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dashboard_users dashboard_users_username_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dashboard_users
+    ADD CONSTRAINT dashboard_users_username_unique UNIQUE (username);
+
+
+--
+-- Name: lighthouse_connection_events lighthouse_connection_events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_connection_events
+    ADD CONSTRAINT lighthouse_connection_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lighthouse_groups lighthouse_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_groups
+    ADD CONSTRAINT lighthouse_groups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lighthouse_health_snapshots lighthouse_health_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_health_snapshots
+    ADD CONSTRAINT lighthouse_health_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lighthouses lighthouses_deviceId_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses
+    ADD CONSTRAINT "lighthouses_deviceId_unique" UNIQUE (device_id);
+
+
+--
+-- Name: lighthouses lighthouses_name_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses
+    ADD CONSTRAINT lighthouses_name_unique UNIQUE (name);
+
+
+--
+-- Name: lighthouses lighthouses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses
+    ADD CONSTRAINT lighthouses_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mqtt_clients mqtt_clients_clientId_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mqtt_clients
+    ADD CONSTRAINT "mqtt_clients_clientId_unique" UNIQUE (client_id);
+
+
+--
+-- Name: mqtt_clients mqtt_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mqtt_clients
+    ADD CONSTRAINT mqtt_clients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: processed_event_scans processed_event_scans_processed_event_id_raw_scan_id_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_event_scans
+    ADD CONSTRAINT processed_event_scans_processed_event_id_raw_scan_id_pk PRIMARY KEY (processed_event_id, raw_scan_id);
+
+
+--
+-- Name: processed_events processed_events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_events
+    ADD CONSTRAINT processed_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: raw_scans raw_scans_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.raw_scans
+    ADD CONSTRAINT raw_scans_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tag_assignments tag_assignments_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tag_assignments
+    ADD CONSTRAINT tag_assignments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_audit_logs_resource_type; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_audit_logs_resource_type ON public.audit_logs USING btree (resource_type);
+
+
+--
+-- Name: idx_audit_logs_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_audit_logs_timestamp ON public.audit_logs USING btree ("timestamp");
+
+
+--
+-- Name: idx_audit_logsuser_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_audit_logsuser_id ON public.audit_logs USING btree (user_id);
+
+
+--
+-- Name: idx_connection_events_lighthouse_recorded; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_connection_events_lighthouse_recorded ON public.lighthouse_connection_events USING btree (lighthouse_id, recorded_at);
+
+
+--
+-- Name: idx_connection_events_recorded; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_connection_events_recorded ON public.lighthouse_connection_events USING btree (recorded_at);
+
+
+--
+-- Name: idx_dashboard_users_username; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dashboard_users_username ON public.dashboard_users USING btree (username);
+
+
+--
+-- Name: idx_health_snapshots_lighthouse_recorded; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_health_snapshots_lighthouse_recorded ON public.lighthouse_health_snapshots USING btree (lighthouse_id, recorded_at);
+
+
+--
+-- Name: idx_health_snapshots_recorded; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_health_snapshots_recorded ON public.lighthouse_health_snapshots USING btree (recorded_at);
+
+
+--
+-- Name: idx_lighthouse_groups_label; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lighthouse_groups_label ON public.lighthouse_groups USING btree (label);
+
+
+--
+-- Name: idx_lighthouses_device_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lighthouses_device_id ON public.lighthouses USING btree (device_id);
+
+
+--
+-- Name: idx_lighthouses_group_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lighthouses_group_id ON public.lighthouses USING btree (group_id);
+
+
+--
+-- Name: idx_lighthouses_name; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_lighthouses_name ON public.lighthouses USING btree (name);
+
+
+--
+-- Name: idx_mqtt_clients_client_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_mqtt_clients_client_id ON public.mqtt_clients USING btree (client_id);
+
+
+--
+-- Name: idx_mqtt_clients_lighthouse_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_mqtt_clients_lighthouse_id ON public.mqtt_clients USING btree (lighthouse_id);
+
+
+--
+-- Name: idx_processed_event_scans_raw_scan; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_event_scans_raw_scan ON public.processed_event_scans USING btree (raw_scan_id);
+
+
+--
+-- Name: idx_processed_events_algorithm; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_algorithm ON public.processed_events USING btree (algorithm_id, "timestamp");
+
+
+--
+-- Name: idx_processed_events_group; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_group ON public.processed_events USING btree (group_id, "timestamp");
+
+
+--
+-- Name: idx_processed_events_synced; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_synced ON public.processed_events USING btree (synced_to_integration);
+
+
+--
+-- Name: idx_processed_events_tag_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_tag_timestamp ON public.processed_events USING btree (tag_epc, "timestamp");
+
+
+--
+-- Name: idx_processed_events_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_timestamp ON public.processed_events USING btree ("timestamp");
+
+
+--
+-- Name: idx_processed_events_user_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_processed_events_user_timestamp ON public.processed_events USING btree (user_id, "timestamp");
+
+
+--
+-- Name: idx_raw_scans_epc_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_raw_scans_epc_timestamp ON public.raw_scans USING btree (epc, "timestamp");
+
+
+--
+-- Name: idx_raw_scans_lighthouse_timestamp; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_raw_scans_lighthouse_timestamp ON public.raw_scans USING btree (lighthouse_id, "timestamp");
+
+
+--
+-- Name: idx_raw_scans_orphaned; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_raw_scans_orphaned ON public.raw_scans USING btree (orphaned_at) WHERE (orphaned_at IS NOT NULL);
+
+
+--
+-- Name: idx_raw_scans_unprocessed; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_raw_scans_unprocessed ON public.raw_scans USING btree (epc, "timestamp") WHERE ((processed_at IS NULL) AND (orphaned_at IS NULL));
+
+
+--
+-- Name: idx_tag_assignments_active; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_tag_assignments_active ON public.tag_assignments USING btree (tag_epc) WHERE (deactivated_at IS NULL);
+
+
+--
+-- Name: idx_tag_assignments_epc; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_tag_assignments_epc ON public.tag_assignments USING btree (tag_epc);
+
+
+--
+-- Name: idx_tag_assignments_user_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_tag_assignments_user_id ON public.tag_assignments USING btree (user_id);
+
+
+--
+-- Name: idx_users_sync_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_users_sync_id ON public.users USING btree (sync_id);
+
+
+--
+-- Name: lighthouse_connection_events lighthouse_connection_events_lighthouse_id_lighthouses_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_connection_events
+    ADD CONSTRAINT lighthouse_connection_events_lighthouse_id_lighthouses_id_fk FOREIGN KEY (lighthouse_id) REFERENCES public.lighthouses(id);
+
+
+--
+-- Name: lighthouse_health_snapshots lighthouse_health_snapshots_lighthouse_id_lighthouses_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouse_health_snapshots
+    ADD CONSTRAINT lighthouse_health_snapshots_lighthouse_id_lighthouses_id_fk FOREIGN KEY (lighthouse_id) REFERENCES public.lighthouses(id);
+
+
+--
+-- Name: lighthouses lighthouses_group_id_lighthouse_groups_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.lighthouses
+    ADD CONSTRAINT lighthouses_group_id_lighthouse_groups_id_fk FOREIGN KEY (group_id) REFERENCES public.lighthouse_groups(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mqtt_clients mqtt_clients_lighthouse_id_lighthouses_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mqtt_clients
+    ADD CONSTRAINT mqtt_clients_lighthouse_id_lighthouses_id_fk FOREIGN KEY (lighthouse_id) REFERENCES public.lighthouses(id);
+
+
+--
+-- Name: processed_event_scans processed_event_scans_processed_event_id_processed_events_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_event_scans
+    ADD CONSTRAINT processed_event_scans_processed_event_id_processed_events_id_fk FOREIGN KEY (processed_event_id) REFERENCES public.processed_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: processed_event_scans processed_event_scans_raw_scan_id_raw_scans_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_event_scans
+    ADD CONSTRAINT processed_event_scans_raw_scan_id_raw_scans_id_fk FOREIGN KEY (raw_scan_id) REFERENCES public.raw_scans(id);
+
+
+--
+-- Name: processed_events processed_events_group_id_lighthouse_groups_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.processed_events
+    ADD CONSTRAINT processed_events_group_id_lighthouse_groups_id_fk FOREIGN KEY (group_id) REFERENCES public.lighthouse_groups(id);
+
+
+--
+-- Name: raw_scans raw_scans_lighthouse_id_lighthouses_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.raw_scans
+    ADD CONSTRAINT raw_scans_lighthouse_id_lighthouses_id_fk FOREIGN KEY (lighthouse_id) REFERENCES public.lighthouses(id);
+
+
+--
+-- Name: tag_assignments tag_assignments_user_id_users_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tag_assignments
+    ADD CONSTRAINT tag_assignments_user_id_users_id_fk FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict uW0vtMHa7LvcLCAe8QUbdXTGyMD8N1bY7F7A1p4GawuuwufdH8hQPgQvvz1ATQe
+

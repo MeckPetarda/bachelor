@@ -1,0 +1,80 @@
+[19:48:41] [EventSweeper] Sweep done in 7ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:48:41] [API] -> GET /api/v1/events/0d43c0ff-64a6-45d4-8e4c-0251ec4dc7b7
+[19:48:41] [API] -> GET /api/v1/events/0d43c0ff-64a6-45d4-8e4c-0251ec4dc7b7
+[19:48:41] [API] <- GET /api/v1/events/0d43c0ff-64a6-45d4-8e4c-0251ec4dc7b7 200 (6.26ms)
+[19:48:41] [API] <- GET /api/v1/events/0d43c0ff-64a6-45d4-8e4c-0251ec4dc7b7 200 (6.79ms)
+[19:48:45] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:48:47] [EventSweeper] Sweep done in 7ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:48:51] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:48:57] [EventProcessor] Processed EPC E28011704000021D53DAB0CB group 5: algo1=out(0.014) algo2=out(0.007)
+[19:48:57] [EventSweeper] Sweep done in 11ms - found: 1, processed: 1, orphaned: 0, skipped: 0
+[19:48:58] [MQTT Broker] ERROR: Client error for 68:FE:71:0D:D0:74: no such packet
+[19:48:58] [MQTT Broker] Client disconnected: 68:FE:71:0D:D0:74
+[19:48:58] [Status Handler] Lighthouse 68:FE:71:0D:D0:74 disconnected (graceful: true)
+[19:48:59] [EventSweeper] Sweep done in 7ms - found: 1, processed: 0, orphaned: 9, skipped: 0
+[19:49:00] [API] -> GET /api/v1/events
+[19:49:00] [API] -> GET /api/v1/events
+[19:49:00] [API] <- GET /api/v1/events 200 (3.17ms)
+[19:49:00] [API] <- GET /api/v1/events 200 (3.55ms)
+[19:49:02] [MQTT Broker] Client connected: 68:FE:71:0D:D0:74
+[19:49:02] [Status Handler] Lighthouse 68:FE:71:0D:D0:74 connected
+[19:49:03] [EventSweeper] Sweep done in 9ms - found: 1, processed: 0, orphaned: 4, skipped: 0
+[19:49:04] [API] -> GET /api/v1/events/70474112-60ee-4b84-9e19-d15159675dcf
+[19:49:04] [API] -> GET /api/v1/events/70474112-60ee-4b84-9e19-d15159675dcf
+[19:49:04] [API] <- GET /api/v1/events/70474112-60ee-4b84-9e19-d15159675dcf 200 (4.77ms)
+[19:49:04] [API] <- GET /api/v1/events/70474112-60ee-4b84-9e19-d15159675dcf 200 (5.17ms)
+[19:49:05] [EventProcessor] Processed EPC E28011704000021D53DAB0CB group 5: algo1=out(0.079) algo2=out(0.039)
+[19:49:05] [EventSweeper] Sweep done in 11ms - found: 1, processed: 1, orphaned: 0, skipped: 0
+[19:49:07] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 8, skipped: 0
+[19:49:09] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:49:16] [MQTT Broker] ERROR: Client error for 00:70:07:25:15:00: no such packet
+[19:49:16] [MQTT Broker] Client disconnected: 00:70:07:25:15:00
+[19:49:16] [Status Handler] Lighthouse 00:70:07:25:15:00 disconnected (graceful: true)
+[19:49:17] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:49:23] [MQTT Broker] Client connected: 00:70:07:25:15:00
+[19:49:23] [Status Handler] Lighthouse 00:70:07:25:15:00 connected
+[19:49:25] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:49:35] [EventSweeper] Sweep done in 5ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:49:44] [API] -> GET /api/v1/events
+[19:49:44] [API] -> GET /api/v1/events
+[19:49:44] [API] <- GET /api/v1/events 200 (3.22ms)
+[19:49:44] [API] <- GET /api/v1/events 200 (3.53ms)
+[19:49:45] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:49:47] [API] -> GET /api/v1/events/70474112-60ee-4b84-9e19-d15159675dcf
+[19:49:47] [API] -> GET /api/v1/events/70474112-60ee-4b84-9e19-d15159675dcf
+[19:49:47] [API] <- GET /api/v1/events/70474112-60ee-4b84-9e19-d15159675dcf 200 (5.77ms)
+[19:49:47] [API] <- GET /api/v1/events/70474112-60ee-4b84-9e19-d15159675dcf 200 (6.30ms)
+[19:49:51] [API] -> GET /api/v1/events/e0327451-1ca0-442f-8196-f96875e56d09
+[19:49:51] [API] -> GET /api/v1/events/e0327451-1ca0-442f-8196-f96875e56d09
+[19:49:51] [API] <- GET /api/v1/events/e0327451-1ca0-442f-8196-f96875e56d09 200 (4.37ms)
+[19:49:51] [API] <- GET /api/v1/events/e0327451-1ca0-442f-8196-f96875e56d09 200 (4.72ms)
+[19:49:55] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:50:03] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:50:13] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:50:23] [EventSweeper] Sweep done in 5ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:50:33] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:50:43] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:50:53] [EventSweeper] Sweep done in 7ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:51:01] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:51:11] [EventSweeper] Sweep done in 5ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:51:21] [EventSweeper] Sweep done in 5ms - found: 1, processed: 0, orphaned: 1, skipped: 0
+[19:51:31] [EventSweeper] Sweep done in 6ms - found: 1, processed: 0, orphaned: 10, skipped: 0
+[19:51:33] [EventSweeper] Sweep done in 8ms - found: 1, processed: 0, orphaned: 17, skipped: 0
+[19:51:35] [EventSweeper] Sweep done in 5ms - found: 1, processed: 0, orphaned: 16, skipped: 0
+[19:51:37] [EventSweeper] Sweep done in 5ms - found: 1, processed: 0, orphaned: 9, skipped: 0
+^C[19:52:40] [Server]
+Received SIGINT, starting graceful shutdown...
+[19:52:40] [Server] Stopping HTTP server...
+[19:52:40] [WebSocket] WebSocket client disconnected. Total clients: 0
+[19:52:40] [WebSocket] All WebSocket connections closed
+[19:52:40] [Retention Cleanup] Retention cleanup scheduler stopped
+[19:52:40] [Navigo3Poller] Navigo3 poller stopped
+[19:52:40] [EventSweeper] Event sweeper stopped
+[19:52:40] [MQTT Broker] Closing MQTT broker...
+[19:52:40] [Server] Shutdown already in progress, ignoring SIGINT
+[19:52:40] [MQTT Broker] Client disconnected: 68:FE:71:0D:D0:74
+[19:52:40] [MQTT Broker] Client disconnected: 00:70:07:25:15:00
+[19:52:40] [MQTT Broker] MQTT broker closed successfully
+[19:52:40] [Database] Closing database connection pool...
+[19:52:40] [Database] Connection pool closed successfully
+[19:52:40] [Server] Graceful shutdown completed
