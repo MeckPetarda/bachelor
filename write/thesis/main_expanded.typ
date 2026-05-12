@@ -804,22 +804,9 @@ Errors encountered during retry are logged with the event ID and exception detai
 
 === Architecture and Stack <dashboard-arch>
 
-The dashboard is a single-page application built with SolidJS, chosen for its
-fine-grained reactivity model: component state updates propagate directly to the DOM
-without a virtual-DOM diffing pass, keeping the runtime footprint small. Client-side
-routing is handled by `@solidjs/router` with five declared routes; the compiled static
-build is served directly from the BunJS process that hosts the REST API and MQTT broker,
-eliminating the need for a separate static file server. Per-component CSS modules provide
-style encapsulation.
+The dashboard is a single-page application built with SolidJS, chosen for its fine-grained reactivity model: component state updates propagate directly to the DOM without a virtual-DOM diffing pass, keeping the runtime footprint small. Client-side routing is handled by `@solidjs/router` with five declared routes; the compiled static build is served directly from the BunJS process that hosts the REST API and MQTT broker, eliminating the need for a separate static file server. Per-component CSS modules provide style encapsulation. 
 
-Real-time updates are delivered over a single WebSocket connection opened on application
-mount in `App.tsx`. A central WebSocket store receives incoming messages and dispatches
-them to page-specific reactive stores, so only the relevant page re-renders on each
-incoming event; no polling is required. Table~@tbl-ws-messages lists the seven message
-types produced by the server and their consumer pages. Authentication is outside the scope
-of this prototype; the dashboard and REST API are accessible without credentials on the
-local network, with session management and role-based access control identified as future
-work.
+Real-time updates are delivered over a single WebSocket connection opened on application mount in `App.tsx`. A central WebSocket store receives incoming messages and dispatches them to page-specific reactive stores, so only the relevant page re-renders on each incoming event; no polling is required. Table~@tbl-ws-messages lists the seven message types produced by the server and their consumer pages. Authentication is outside the scope of this prototype; the dashboard and REST API are accessible without credentials on the local network, with session management and role-based access control identified as future work. 
 
 #figure(
   table(
@@ -840,41 +827,19 @@ work.
 
 ==== Lighthouses (`/`) <page-lighthouses>
 
-The root page lists all registered Lighthouse devices with their current status:
-online/offline indicator and the most recent health telemetry payload - uptime, WiFi RSSI,
-and RFID reader state. Health data arrives via `device:health` WebSocket messages and
-updates the display without a page refresh. Devices that connect to the MQTT broker but
-are not yet registered appear in a separate _pending_ section; the operator assigns a name
-and a placement (inside/outside) to claim the device. The ESP32 eFuse MAC address serves
-as the stable device identifier throughout registration.
+The root page lists all registered Lighthouse devices with their current status: online/offline indicator and the most recent health telemetry payload - uptime, WiFi RSSI, and RFID reader state. Health data arrives via `device:health` WebSocket messages and updates the display without a page refresh. Devices that connect to the MQTT broker but are not yet registered appear in a separate _pending_ section; the operator assigns a name and a placement (inside/outside) to claim the device. The ESP32 eFuse MAC address serves as the stable device identifier throughout registration. 
 
 ==== Groups (`/groups`) <page-groups>
 
-A group pairs two Lighthouses - one designated outside, one inside - into a detection
-portal. The page manages the group label and description; the two per-group timing
-parameters (`activityTimeoutMs`, default 4 000 ms; `orphanTimeoutMs`, default 8 000 ms)
-are stored in the database and configurable via the REST API, but UI controls for these
-values are out of scope for this prototype. A Lighthouse may belong to at most one group;
-scans from ungrouped units are orphaned by the event sweeper and never produce processed
-events.
+A group pairs two Lighthouses - one designated outside, one inside - into a detection portal. The page manages the group label and description; the two per-group timing parameters (`activityTimeoutMs`, default 4 000 ms; `orphanTimeoutMs`, default 8 000 ms) are stored in the database and configurable via the REST API, but UI controls for these values are out of scope for this prototype. A Lighthouse may belong to at most one group; scans from ungrouped units are orphaned by the event sweeper and never produce processed events. 
 
 ==== Events (`/events`) <page-events>
 
-The Events page is a live feed of raw scan records as they arrive from Lighthouse units.
-New scans are prepended to the table via the `scan` WebSocket message. The table is
-filterable by Lighthouse, EPC (partial match), scan source (`realtime` / `offline_sync`),
-and date range. The page serves as a diagnostic tool, allowing the operator to confirm
-that both units in a portal are detecting tags before trusting the direction detection
-output.
+The Events page is a live feed of raw scan records as they arrive from Lighthouse units. New scans are prepended to the table via the `scan` WebSocket message. The table is filterable by Lighthouse, EPC (partial match), scan source (`realtime` / `offline_sync`), and date range. The page serves as a diagnostic tool, allowing the operator to confirm that both units in a portal are detecting tags before trusting the direction detection output. 
 
 ==== Processed Events (`/processed`) <page-processed>
 
-This page displays the output of the direction detection pipeline. Each row represents one
-processed event and shows direction, confidence, algorithm, tag EPC, assigned user, group,
-and timestamp. Rows are filterable by algorithm, direction, user, group, and date range;
-both algorithms can be viewed simultaneously in a merged, time-sorted view. A notification
-banner appears when new `event:new` WebSocket messages arrive while the page is open,
-allowing the operator to refresh without leaving the page.
+This page displays the output of the direction detection pipeline. Each row represents one processed event and shows direction, confidence, algorithm, tag EPC, assigned user, group, and timestamp. Rows are filterable by algorithm, direction, user, group, and date range; both algorithms can be viewed simultaneously in a merged, time-sorted view. A notification banner appears when new `event:new` WebSocket messages arrive while the page is open, allowing the operator to refresh without leaving the page. 
 
 Each row opens a detail modal with three tabs:
 
@@ -905,129 +870,110 @@ Each row opens a detail modal with three tabs:
 
 ==== Users (`/users`) <page-users>
 
-The Users page manages user records comprising a display name, email address, and a
-Navigo3 sync ID used by the integration layer. Each user may have multiple EPC tag
-assignments active simultaneously; deactivated assignments are retained with a
-`deactivatedAt` timestamp for audit purposes rather than being deleted.
+The Users page manages user records comprising a display name, email address, and a Navigo3 sync ID used by the integration layer. Each user may have multiple EPC tag assignments active simultaneously; deactivated assignments are retained with a `deactivatedAt` timestamp for audit purposes rather than being deleted. 
 
 
 === Lab Validation
 
-- Test hardware: two Board v2 units in final enclosures (not breadboard prototypes); production firmware
-- Test environment: two units mounted at doorway-width separation in a controlled indoor space; server running on LAN;
-  Navigo3 test instance connected
-- Test protocol: controlled tag traversals at fixed distances and walking speeds; each traversal logged as a processed
-  event and verified end-to-end in Navigo3
+All validation was conducted using three Board v2 Lighthouse units running production firmware, each assembled in its final 3D-printed enclosure. The detection portal for all multi-unit tests was formed by the Red unit (designated OUTSIDE) and the Yellow unit (designated INSIDE); both portal units are equipped with IPEX/U.FL receptacle antenna connections. The Blue unit participated only in the standalone detection range measurement. The server ran on a local area network with an embedded Aedes MQTT broker, PostgreSQL storage, and a Navigo3 test instance connected via the integration layer described in #ref(<navigo3_integration>). The event sweeper was configured with `activityTimeoutMs = 4000 ms` and a polling interval of 2 seconds throughout all sessions. 
+
 
 ==== Detection range
 
-- Per-unit detection range measured by approaching a passive UHF tag toward the antenna at a fixed angle; furthest
-  distance at which the tag is reliably detected within a single 5 s scan window recorded
-- Both units measured independently; range difference between units documented and attributed to antenna feed path
-  quality (per #ref(<antenna_and_rf_considerations>))
+Per-unit detection range was measured with each unit in isolation. A passive UHF tag was held up eriented directly toward the antenna. Maximum reliable range was defined as the furthest distance at which the tag was detected in every one of three consecutive scan windows; distance was stepped in 0.5 m increments. Red was measured at two points in the test campaign due to a mechanical event discussed below. 
 
 #figure(
   table(
     columns: (auto, auto, auto, auto),
-    table.header[Unit][Antenna connection method][Max reliable range \[m\]][Notes],
-    [Unit 1], [TODO], [TODO], [],
-    [Unit 2], [TODO], [TODO], [],
+    table.header[Unit][Antenna connection][Max reliable range \[m\]][Condition],
+    [Red],    [IPEX/U.FL],    [2.5], [Pre-drop],
+    [Red],    [IPEX/U.FL],    [1.5], [Post-repair],
+    [Yellow],  [IPEX/U.FL],    [3.0], [N/A],
+    [Blue],           [Direct-solder],   [3.0], [N/A],
   ),
   caption: [Table 3.6.1-1 - Detection range per unit],
 )
 
+Yellow and Blue produce identical 3.0 m maximum reliable ranges despite using different antenna connection methods, demonstrating that an IPEX/U.FL receptacle carries no measurable range penalty relative to a direct-solder pigtail when joint quality is consistent. Detection range at this power level is bounded by the YPD-R300 module's transmit power ceiling and antenna gain, not by the connection type itself. Red's pre-drop range of 2.5 m was already 0.5 m below the other two units, attributable to assembly-level variance in the IPEX cable and connector as discussed in #ref(<antenna_and_rf_considerations>). 
+
 ==== Direction detection accuracy
 
-- N controlled traversals performed: equal split IN and OUT; both algorithms evaluated on each traversal
-- Accuracy = fraction of traversals where the algorithm produced a correct direction call (IN/OUT); unknown calls
-  treated as incorrect for accuracy purposes
-- Confidence distribution recorded alongside accuracy
+Controlled traversals were performed through the portal at normal walking pace. Each traversal was logged as a processed event by the server; the algorithm's direction output was compared against the intended direction. Detection rate is reported as $(n_"detected" / n_"attempted") times 100%$ with 95% Wilson score confidence intervals; missed detections were identified post-hoc from raw scan data as one-sided clusters orphaned by the sweeper as `insufficient_data` (per #ref(<orphan_handling>)). 
 
 #figure(
   table(
     columns: (auto, auto, auto, auto, auto),
     table.header[Algorithm][Correct \[n\]][Incorrect \[n\]][Unknown \[n\]][Accuracy \[%\]],
-    [Temporal Centroid (C₁)], [TODO], [TODO], [TODO], [TODO],
-    [RSSI-Weighted (C₂)],     [TODO], [TODO], [TODO], [TODO],
+    [Temporal Centroid ($C_1$)], [78], [0], [0], [100.0],
+    [RSSI-Weighted ($C_2$)],     [78], [0], [0], [100.0],
   ),
-  caption: [Table 3.6.1-2 - Direction detection accuracy per algorithm],
+  caption: [Table 3.6.1-2 - Direction detection accuracy per algorithm (combined dataset, n = 78 detected traversals)],
 )
 
-#fig-placeholder[Figure 3.6.1-1: Confidence distribution histogram - both algorithms overlaid; x-axis confidence [0,1]; y-axis traversal count; separate bars for correct / incorrect / unknown per algorithm]
+Direction accuracy across the full test campaign was 100% on both algorithms over 78 detected traversals. The detection rate, however, varied substantially with tag carry method. Under unobstructed hand-held conditions, 41 of 42 attempted traversals were detected (97.6%; 95% CI: 87.7--99.6%). With the tag carried in a near-side front trouser pocket at close range, 20 of 23 traversals were detected (87.0%; 95% CI: 67.9--95.5%). At longer range in the same pocket position, detection rate fell further (5 of 7; 71.4%; small sample). Tag carry on a lanyard presenting the tag edge-on to the antennas, and carry in a cross-body trouser pocket, produced effectively zero detection in both cases; these failure modes are a consequence of UHF tag polarisation physics interacting with the chosen portal geometry rather than a system limitation. The system's failure mode is exclusively non-detection: the `insufficient_data` orphan logic in the event sweeper guarantees that no direction call is produced from a one-sided cluster, so any event that reaches the database reflects bilateral evidence of traversal. 
+
+The bilateral coverage factor (BCF, defined in #ref(<direction_detection_and_event_processing>)) quantifies the balance of scan counts between the two units per cluster. Its mean shifted from 0.59 under unobstructed hand-held conditions to 0.42 and 0.32 in the near- and far-side pocket sessions respectively, reflecting the signal attenuation introduced by body absorption. Despite this degradation, every detected cluster produced a correct direction call, confirming that the temporal centroid approach is robust to scan asymmetry provided at least one scan is received from each unit. 
+
+Mean $C_1$ confidence across all sessions was 0.327 ± 0.155; mean $C_2$ confidence was 0.176 ± 0.099, a ratio of approximately 1.86:1. The $C_2$ deficit is driven by the RSSI Trend Consistency Factor, which rarely achieves high values during a normal walking traversal because the RSSI signal over a four-second window is noisy rather than monotonic. This does not affect directional accuracy; both algorithms produced identical directional outputs on every detected traversal. 
 
 ==== End-to-end processing time
 
-- The pipeline has a deterministic minimum delay: 5 s scan window + `activityTimeoutMs`
-  (4 s default) + sweeper polling interval (2 s) + Navigo3 HTTP round-trip; theoretical
-  minimum ~11 s under ideal conditions
+End-to-end latency was measured as the interval between `cluster_started_at` - the timestamp of the first RFID scan in a cluster - and the Navigo3 audit log database commit time for the resulting attendance record. This interval captures the full server-side pipeline: scan accumulation, `activityTimeoutMs` expiry, sweeper polling delay, direction detection, HTTP POST to Navigo3, and database write. The `cluster_started_at` timestamp lags the physical IR trigger by approximately 400 ms (200 ms YPD-R300 power-on delay plus 200 ms stabilisation period); true end-to-end latency from IR trigger is therefore approximately 400 ms greater than the values in Table 3.6.1-3. The dataset covers 15 events from 8 attendance records (8 IN and 7 OUT events). 
 
 #figure(
   table(
     columns: (auto, auto),
     table.header[Metric][Value \[s\]],
     [Theoretical minimum], [\~11],
-    [Mean measured],       [TODO],
-    [Min measured],        [TODO],
-    [Max measured],        [TODO],
+    [Mean measured (cluster start → Navigo3)], [9.54 ± 1.16],
+    [Mean measured (IR trigger → Navigo3, adjusted)], [\~9.94],
+    [Min measured],        [7.46],
+    [Max measured],        [11.69],
   ),
   caption: [Table 3.6.1-3 - End-to-end processing time (IR trigger → Navigo3 record)],
 )
 
+All 15 events fell within the theoretical pipeline budget of approximately 11 seconds. The single event that marginally exceeded the budget (11.69 s) is attributable to a worst-case combination of cluster scan distribution and sweeper polling alignment. OUT events completed approximately 1.3 s faster than IN events on average, consistent with OUT traversals producing shorter clusters - the tag approaches the inside antenna after having already passed the outside antenna - which allows `activityTimeoutMs` to expire sooner. The standard deviation of 1.16 s across all events is consistent with the 0--2 s uniform jitter introduced by the sweeper's fixed polling interval, which is the dominant source of latency variance in this pipeline. 
+
 ==== Offline replay verification
 
-- Server taken offline during N tag traversals; firmware caches events to LittleFS ring
-  buffer; server brought back online; replay verified: all cached scans ingested, clusters
-  reconstructed, processed events created with correct timestamps and `timeBasis` field,
-  Navigo3 records created
+Between the testing sessions the Red unit was dropped and subsequently repaired; a post-repair range measurement confirmed the reduction from 2.5 m to 1.5 m recorded in Table 3.6.1-1, which resulted in a scan count asymmetry favouring the Yellow unit during the offline replay session that follows. 
+
+Twelve alternating traversals were performed during a deliberate offline window of approximately four minutes and twenty-five seconds. The server was then restarted and replay was observed to completion. 
 
 #figure(
   table(
     columns: (auto, auto, auto, auto, auto),
-    table.header[Events cached][Events replayed][Events lost][Navigo3 records created][Notes],
-    [TODO], [TODO], [TODO], [TODO], [],
+    table.header[Scans buffered][Scans replayed][Scans lost][Processed events][Navigo3 records],
+    [606], [606], [0], [12 / 12], [12],
   ),
-  caption: [Table 3.6.1-4 - Offline replay results],
+  caption: [Table 3.6.1-4 - Offline replay verification results],
 )
 
-=== Field Testing
-
-- *Status:* planned - deployment at Navigo Solutions s.r.o. offices pending; this section will be completed or 
-  replaced with an expanded lab evaluation depending on whether field deployment is feasible before submission
-- Intended deployment: single doorway at Navigo Solutions office; real employees with passive UHF tags on lanyards or
-  in bags; system running against live Navigo3 instance
-- Evaluation criteria: detection reliability over a full working day, false positive rate, employee feedback on
-  zero-interaction experience
-- If field testing is not completed: this subsection documents the intended methodology and evaluation criteria; lab
-  validation results in 3.6.1 are the primary verification evidence
-
+All 606 replayed scans carried `timeBasis = synced`, confirming that SNTP wall-clock timestamps were preserved correctly through the LittleFS ring buffer. The sweeper successfully clustered every traversal's scans bilaterally despite the replay rate of approximately ten entries per second, producing 12 processed events in perfect alternating OUT/IN sequence. No stale entries from prior sessions were re-delivered. Confidence and BCF distributions were consistent with the hand-held benchmark session, confirming that no degradation in clustering quality results from the replay path relative to live operation. 
 
 === Algorithm comparison
 
-- Head-to-head comparison of Algorithm 1 (Temporal Centroid, C1) and Algorithm 2 (RSSI-Weighted Centroid, C2) on the
-  same traversal dataset collected in 3.6.1 (and 3.6.2 if available)
-- Both algorithms run on every cluster independently; results stored as separate rows per #ref(<direction_detection_and_event_processing>); comparison is
-  a post-hoc analysis of stored outputs - no re-processing required
-- Dataset source: `<PLACEHOLDER - real lab traversals / real field traversals / both>`
+The combined dataset of 78 detected traversals, spanning the hand-held benchmark, near- and far-side pocket sessions, and the offline replay session, was used for a head-to-head comparison of Algorithm 1 (Temporal Centroid, $C_1$) and Algorithm 2 (RSSI-Weighted Centroid, $C_2$). Both algorithms are run on every cluster independently by the event sweeper per #ref(<direction_detection_and_event_processing>); the comparison is therefore a post-hoc analysis of stored outputs requiring no reprocessing. 
 
 #figure(
   table(
-    columns: (auto, auto),
-    table.header[ Metric                          ][ C1 Temporal ][ C2 RSSI-Weighted ],
-[ Overall accuracy [%]            ],[ `<PH>`      ],[ `<PH>`           ],
-[ Mean confidence (correct calls) ],[ `<PH>`      ],[ `<PH>`           ],
-[ Mean confidence (incorrect)     ],[ `<PH>`      ],[ `<PH>`           ],
-[ Unknown rate [%]                ],[ `<PH>`      ],[ `<PH>`           ],
-[ Agreement rate [%]              ],[ `<PH>`      ],[ N/A              ],
+    columns: (auto, auto, auto),
+    table.header[Metric][$C_1$ - Temporal Centroid][$C_2$ - RSSI-Weighted Centroid],
+    [Overall accuracy \[%\]],            [100.0],          [100.0],
+    [Correct directions \[n\]],          [78 / 78],        [78 / 78],
+    [Incorrect directions \[n\]],        [0],              [0],
+    [Unknown directions \[n\]],          [0],              [0],
+    [Mean confidence (all calls)],       [0.327 ± 0.155],  [0.176 ± 0.099],
+    [Confidence ratio ($C_1 : C_2$)],   [1.86 : 1],       [-],
+    [Inter-algorithm agreement \[%\]],   [100.0],          [-],
   ),
-  caption: [Table 3.6.3-1 - Algorithm comparison summary],
+  caption: [Table 3.6.3-1 - Algorithm comparison summary (combined dataset, n = 78)],
 )
 
-#fig-placeholder[Figure 3.6.3-1: Scatter plot - C1 confidence vs. C2 confidence per traversal; colour-coded by correctness agreement (both correct / disagree / both incorrect); diagonal reference line]
+Both algorithms classified direction correctly in every detected case under all tested conditions. The directional outputs of the two algorithms are perfectly correlated across the entire campaign. $C_2$'s lower confidence reflects the additional gating effect of the RSSI Trend Consistency Factor: when RSSI is noisy over the cluster window - which is the common case during a normal walking traversal - the composite $C_2$ confidence is penalised even though the directional inference is correct. $C_1$'s score, computed from centroid separation, cluster size, and bilateral coverage alone, is less susceptible to this penalty and produces confidence values that more directly reflect the geometric quality of the cluster. 
 
-- Cases where algorithms disagree: direction call differs between C1 and C2; analysed separately to understand when
-  RSSI weighting helps or harms
-- Recommendation: which algorithm to use in production deployment and under what conditions; based on accuracy and
-  confidence calibration findings
+$C_1$ is the recommended algorithm for production deployment. It produces identical directional outputs to $C_2$ with consistently higher and more interpretable confidence scores, and its factors map directly to measurable cluster properties that operators can reason about. $C_2$ remains valuable as an independent confirmation channel - agreement between the two algorithms on every processed event strengthens the evidence behind each attendance record - but does not provide additional discriminating power beyond $C_1$ under the conditions tested. Future work involving tag carrier identification or multi-tag clutter rejection may benefit from $C_2$'s RSSI weighting in scenarios where $C_1$'s temporal information alone is insufficient. 
 
 // =============================================================================
 // 4. CONCLUSION
