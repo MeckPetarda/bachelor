@@ -872,15 +872,13 @@ Each row opens a detail modal with three tabs:
 
 The Users page manages user records comprising a display name, email address, and a Navigo3 sync ID used by the integration layer. Each user may have multiple EPC tag assignments active simultaneously; deactivated assignments are retained with a `deactivatedAt` timestamp for audit purposes rather than being deleted. 
 
-
-=== Lab Validation
+== System verification
 
 All validation was conducted using three Board v2 Lighthouse units running production firmware, each assembled in its final 3D-printed enclosure. The detection portal for all multi-unit tests was formed by the Red unit (designated OUTSIDE) and the Yellow unit (designated INSIDE); both portal units are equipped with IPEX/U.FL receptacle antenna connections. The Blue unit participated only in the standalone detection range measurement. The server ran on a local area network with an embedded Aedes MQTT broker, PostgreSQL storage, and a Navigo3 test instance connected via the integration layer described in #ref(<navigo3_integration>). The event sweeper was configured with `activityTimeoutMs = 4000 ms` and a polling interval of 2 seconds throughout all sessions. 
 
+=== Detection range
 
-==== Detection range
-
-Per-unit detection range was measured with each unit in isolation. A passive UHF tag was held up eriented directly toward the antenna. Maximum reliable range was defined as the furthest distance at which the tag was detected in every one of three consecutive scan windows; distance was stepped in 0.5 m increments. Red was measured at two points in the test campaign due to a mechanical event discussed below. 
+Per-unit detection range was measured with each unit in isolation. A passive UHF tag was held up oriented directly toward the antenna. Maximum reliable range was defined as the furthest distance at which the tag was detected in every one of three consecutive scan windows; distance was stepped in 0.5 m increments. Red was measured at two points in the test campaign due to a mechanical event discussed below. 
 
 #figure(
   table(
@@ -896,7 +894,7 @@ Per-unit detection range was measured with each unit in isolation. A passive UHF
 
 Yellow and Blue produce identical 3.0 m maximum reliable ranges despite using different antenna connection methods, demonstrating that an IPEX/U.FL receptacle carries no measurable range penalty relative to a direct-solder pigtail when joint quality is consistent. Detection range at this power level is bounded by the YPD-R300 module's transmit power ceiling and antenna gain, not by the connection type itself. Red's pre-drop range of 2.5 m was already 0.5 m below the other two units, attributable to assembly-level variance in the IPEX cable and connector as discussed in #ref(<antenna_and_rf_considerations>). 
 
-==== Direction detection accuracy
+=== Direction detection accuracy
 
 Controlled traversals were performed through the portal at normal walking pace. Each traversal was logged as a processed event by the server; the algorithm's direction output was compared against the intended direction. Detection rate is reported as $(n_"detected" / n_"attempted") times 100%$ with 95% Wilson score confidence intervals; missed detections were identified post-hoc from raw scan data as one-sided clusters orphaned by the sweeper as `insufficient_data` (per #ref(<orphan_handling>)). 
 
@@ -912,11 +910,11 @@ Controlled traversals were performed through the portal at normal walking pace. 
 
 Direction accuracy across the full test campaign was 100% on both algorithms over 78 detected traversals. The detection rate, however, varied substantially with tag carry method. Under unobstructed hand-held conditions, 41 of 42 attempted traversals were detected (97.6%; 95% CI: 87.7--99.6%). With the tag carried in a near-side front trouser pocket at close range, 20 of 23 traversals were detected (87.0%; 95% CI: 67.9--95.5%). At longer range in the same pocket position, detection rate fell further (5 of 7; 71.4%; small sample). Tag carry on a lanyard presenting the tag edge-on to the antennas, and carry in a cross-body trouser pocket, produced effectively zero detection in both cases; these failure modes are a consequence of UHF tag polarisation physics interacting with the chosen portal geometry rather than a system limitation. The system's failure mode is exclusively non-detection: the `insufficient_data` orphan logic in the event sweeper guarantees that no direction call is produced from a one-sided cluster, so any event that reaches the database reflects bilateral evidence of traversal. 
 
-The bilateral coverage factor (BCF, defined in #ref(<direction_detection_and_event_processing>)) quantifies the balance of scan counts between the two units per cluster. Its mean shifted from 0.59 under unobstructed hand-held conditions to 0.42 and 0.32 in the near- and far-side pocket sessions respectively, reflecting the signal attenuation introduced by body absorption. Despite this degradation, every detected cluster produced a correct direction call, confirming that the temporal centroid approach is robust to scan asymmetry provided at least one scan is received from each unit. 
+The bilateral coverage factor (BCF, defined in #ref(<direction_detection_and_event_processing>)) quantifies the balance of scan counts between the two units per cluster. Its mean shifted from 0.59 under unobstructed hand-held conditions to 0.42 in the close-range pocket session and 0.32 at longer range, reflecting the signal attenuation introduced by body absorption. Despite this degradation, every detected cluster produced a correct direction call, confirming that the temporal centroid approach is robust to scan asymmetry provided at least one scan is received from each unit.
 
 Mean $C_1$ confidence across all sessions was 0.327 ± 0.155; mean $C_2$ confidence was 0.176 ± 0.099, a ratio of approximately 1.86:1. The $C_2$ deficit is driven by the RSSI Trend Consistency Factor, which rarely achieves high values during a normal walking traversal because the RSSI signal over a four-second window is noisy rather than monotonic. This does not affect directional accuracy; both algorithms produced identical directional outputs on every detected traversal. 
 
-==== End-to-end processing time
+=== End-to-end processing time
 
 End-to-end latency was measured as the interval between `cluster_started_at` - the timestamp of the first RFID scan in a cluster - and the Navigo3 audit log database commit time for the resulting attendance record. This interval captures the full server-side pipeline: scan accumulation, `activityTimeoutMs` expiry, sweeper polling delay, direction detection, HTTP POST to Navigo3, and database write. The `cluster_started_at` timestamp lags the physical IR trigger by approximately 400 ms (200 ms YPD-R300 power-on delay plus 200 ms stabilisation period); true end-to-end latency from IR trigger is therefore approximately 400 ms greater than the values in Table 3.6.1-3. The dataset covers 15 events from 8 attendance records (8 IN and 7 OUT events). 
 
@@ -933,9 +931,9 @@ End-to-end latency was measured as the interval between `cluster_started_at` - t
   caption: [Table 3.6.1-3 - End-to-end processing time (IR trigger → Navigo3 record)],
 )
 
-All 15 events fell within the theoretical pipeline budget of approximately 11 seconds. The single event that marginally exceeded the budget (11.69 s) is attributable to a worst-case combination of cluster scan distribution and sweeper polling alignment. OUT events completed approximately 1.3 s faster than IN events on average, consistent with OUT traversals producing shorter clusters - the tag approaches the inside antenna after having already passed the outside antenna - which allows `activityTimeoutMs` to expire sooner. The standard deviation of 1.16 s across all events is consistent with the 0--2 s uniform jitter introduced by the sweeper's fixed polling interval, which is the dominant source of latency variance in this pipeline. 
+All 15 events fell within the theoretical pipeline budget of approximately 11 seconds. The single event that marginally exceeded the budget (11.69 s) is attributable to a worst-case combination of cluster scan distribution and sweeper polling alignment. OUT events completed approximately 1.3 s faster than IN events on average. The standard deviation of 1.16 s across all events is consistent with the 0–2 s uniform jitter introduced by the sweeper's fixed polling interval, which is the dominant source of latency variance in this pipeline.
 
-==== Offline replay verification
+=== Offline replay verification
 
 Between the testing sessions the Red unit was dropped and subsequently repaired; a post-repair range measurement confirmed the reduction from 2.5 m to 1.5 m recorded in Table 3.6.1-1, which resulted in a scan count asymmetry favouring the Yellow unit during the offline replay session that follows. 
 
