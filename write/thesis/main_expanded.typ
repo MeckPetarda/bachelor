@@ -988,7 +988,7 @@ $C_1$ is the recommended algorithm for production deployment. It produces identi
   - (1) review of identification technologies and direction detection methods - completed in Chapter 2
   - (2) architecture design - portal model with server-side processing documented in Chapter 3
   - (3) prototype implementation - three Board v2 units in enclosures, full firmware and server pipeline
-  - (4) system verification - lab validation performed; field deployment at Navigo Solutions pending
+  - (4) system verification - lab validation performed
 - Lab validation confirmed end-to-end operation: tag traversal through the portal produces a correctly
   directed attendance record in Navigo3; detection range and direction detection accuracy measured and documented
   in Section 3.6.1
@@ -1008,6 +1008,5 @@ $C_1$ is the recommended algorithm for production deployment. It produces identi
   - Extended field testing over a full working day with real employee traffic
   - Further software and firmware improvements identified during development
   - Improved API and web interface with proper authentication and session management
-
 
 #bibliography("references.bib", style: "ieee")
