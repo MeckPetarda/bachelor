@@ -75,7 +75,7 @@ static volatile bool ir_trigger_pending  = false; // Set in ISR, cleared in main
 static bool          ir_scan_active      = false; // true = current scan was IR-initiated
 static uint32_t      ir_scan_end_time_ms = 0;     // Tick timestamp when burst should stop
 
-static scan_mode_t scan_mode = SCAN_MODE_MANUAL;      // default on boot
+static scan_mode_t scan_mode = SCAN_MODE_IR;      // default on boot
 
 // LED1 blink state for WiFi-no-MQTT condition
 static uint32_t led1_last_toggle_ms = 0;

@@ -132,57 +132,66 @@ async function sweep(): Promise<void> {
 
       if (rawRows.length === 0) continue; // already handled by a concurrent cycle
 
-      const scans: ScanData[] = rawRows.map((s) => ({
-        id: s.id,
-        lighthouseId: s.lighthouseId,
-        epc: s.epc,
-        rssiDbm: s.rssiDbm ?? null,
-        timestamp: s.timestamp,
-        timeBasis: s.timeBasis,
-      }));
+      // Split on internal gaps exceeding activityTimeoutMs. During live
+      // operation the sweeper would never accumulate two bursts separated by
+      // more than activityTimeoutMs — the first burst would already be closed
+      // and processed. But offline replay delivers all scans at once, so we
+      // must re-apply the same timeout logic post-hoc to avoid merging
+      // separate traversal events into one artificially long cluster.
+      const subClusters = splitByActivityGap(
+        rawRows,
+        clusterMeta.activityTimeoutMs,
+      );
 
-      const result = await processCluster(scans, groupId, epc);
+      // Fetch lighthouse IDs once — same for every sub-cluster in this group.
+      const groupLhIds = await db
+        .select({ id: schema.lighthouses.id })
+        .from(schema.lighthouses)
+        .where(eq(schema.lighthouses.groupId, groupId));
 
-      if (result.processed) {
-        processed++;
-        continue;
-      }
+      for (const subRows of subClusters) {
+        const scans: ScanData[] = subRows.map((s) => ({
+          id: s.id,
+          lighthouseId: s.lighthouseId,
+          epc: s.epc,
+          rssiDbm: s.rssiDbm ?? null,
+          timestamp: s.timestamp,
+          timeBasis: s.timeBasis,
+        }));
 
-      if (result.reason === "misconfigured_group") {
-        // Orphan all scans in the cluster.
-        await orphanScans(rawRows, "misconfigured_group");
-        orphaned += rawRows.length;
-      } else if (result.reason === "unsyncable") {
-        // Only orphan the non-synced scans; synced ones are left untouched.
-        const nonSynced = rawRows.filter((s) => s.timeBasis !== "synced");
-        if (nonSynced.length > 0) {
-          await orphanScans(nonSynced, "unsyncable");
-          orphaned += nonSynced.length;
-        }
-      } else if (result.reason === "insufficient_data") {
-        // Hold off if any lighthouse in this group is currently replaying offline
-        // events — sibling scans haven't been released from offlineSyncPending yet,
-        // so the cluster looks incomplete even though data is on its way.
-        const groupLhIds = await db
-          .select({ id: schema.lighthouses.id })
-          .from(schema.lighthouses)
-          .where(eq(schema.lighthouses.groupId, groupId));
-        if (hasActiveSyncInGroup(groupLhIds.map((l) => l.id))) {
-          skipped++;
+        const result = await processCluster(scans, groupId, epc);
+
+        if (result.processed) {
+          processed++;
           continue;
         }
 
-        // Orphan only if the cluster has also exceeded the orphan timeout.
-        const latestScan =
-          clusterMeta.latestScan instanceof Date
-            ? clusterMeta.latestScan
-            : new Date(clusterMeta.latestScan as unknown as string);
-        const ageMs = Date.now() - latestScan.getTime();
-        if (ageMs > clusterMeta.orphanTimeoutMs) {
-          await orphanScans(rawRows, "insufficient_data");
-          orphaned += rawRows.length;
-        } else {
-          skipped++;
+        if (result.reason === "misconfigured_group") {
+          await orphanScans(subRows, "misconfigured_group");
+          orphaned += subRows.length;
+        } else if (result.reason === "unsyncable") {
+          const nonSynced = subRows.filter((s) => s.timeBasis !== "synced");
+          if (nonSynced.length > 0) {
+            await orphanScans(nonSynced, "unsyncable");
+            orphaned += nonSynced.length;
+          }
+        } else if (result.reason === "insufficient_data") {
+          // Hold off if any lighthouse in this group is currently replaying
+          // offline events.
+          if (hasActiveSyncInGroup(groupLhIds.map((l) => l.id))) {
+            skipped++;
+            continue;
+          }
+
+          // Orphan only if this sub-cluster has exceeded the orphan timeout.
+          const subLatest = subRows[subRows.length - 1]!.timestamp;
+          const ageMs = Date.now() - subLatest.getTime();
+          if (ageMs > clusterMeta.orphanTimeoutMs) {
+            await orphanScans(subRows, "insufficient_data");
+            orphaned += subRows.length;
+          } else {
+            skipped++;
+          }
         }
       }
     }
@@ -274,4 +283,25 @@ async function orphanScans(
       orphanReason: reason,
     });
   }
+}
+
+function splitByActivityGap<T extends { timestamp: Date }>(
+  rows: T[],
+  gapMs: number,
+): T[][] {
+  if (rows.length === 0) return [];
+  const result: T[][] = [];
+  let current: T[] = [rows[0]!];
+  for (let i = 1; i < rows.length; i++) {
+    const gap =
+      rows[i]!.timestamp.getTime() - rows[i - 1]!.timestamp.getTime();
+    if (gap > gapMs) {
+      result.push(current);
+      current = [rows[i]!];
+    } else {
+      current.push(rows[i]!);
+    }
+  }
+  result.push(current);
+  return result;
 }

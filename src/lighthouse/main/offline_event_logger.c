@@ -961,7 +961,20 @@ esp_err_t offline_logger_clear_all(void)
     {
         rtc_write_index = 0;
         rtc_read_index  = 0;
+        rtc_seq_counter = 1;
         nvs_save_pointers();
+
+        // Truncate the file to zero so flash blocks are actually freed
+        int trunc_ret = ftruncate(logger_state.fd, 0);
+        if (trunc_ret != 0)
+        {
+            ESP_LOGW(TAG, "ftruncate failed (%d) — pointers reset but file not truncated", trunc_ret);
+        }
+        else
+        {
+            fsync(logger_state.fd);
+        }
+
         xSemaphoreGive(logger_state.storage_mutex);
 
         ESP_LOGI(TAG, "All events cleared");
