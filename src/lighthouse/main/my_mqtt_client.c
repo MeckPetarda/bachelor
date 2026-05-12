@@ -223,7 +223,7 @@ static esp_err_t replay_offline_event_batch(const offline_replay_entry_t *entrie
 
         if (e->time_quality == TIME_QUALITY_SYNCED && e->rtc_timestamp_s > 0)
         {
-            timestamp_ms = (int64_t)e->rtc_timestamp_s * 1000;
+            timestamp_ms = (int64_t)e->offline_timestamp_ms;
             time_basis   = "synced";
         }
         else

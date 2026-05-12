@@ -107,20 +107,21 @@ static void rfid_event_to_offline_event(const rfid_tag_event_t *rfid_event, offl
 {
     memset(offline_event, 0, sizeof(offline_event_t));
 
-    // Timestamp (milliseconds since boot)
-    offline_event->timestamp_ms = esp_timer_get_time() / 1000;
-
-    // RTC timestamp and time quality — depends on current sync state
+    // Timestamp and time quality — depends on current sync state.
+    // When synced: timestamp_ms holds full Unix ms (ms precision preserved).
+    // When not synced: timestamp_ms holds boot-relative ms for ordering.
+    // rtc_timestamp_s acts as the "synced" flag (> 0 = synced) and stores
+    // Unix seconds for callers that only need second-level resolution.
     time_quality_t quality = time_sync_get_quality();
     if (quality == TIME_QUALITY_SYNCED)
     {
-        // Wall-clock time is available: store Unix seconds
         int64_t ts_ms                  = time_sync_get_timestamp_ms();
+        offline_event->timestamp_ms    = (uint64_t)ts_ms;
         offline_event->rtc_timestamp_s = (uint32_t)(ts_ms / 1000);
     }
     else
     {
-        // No authoritative time — leave rtc_timestamp_s as 0
+        offline_event->timestamp_ms    = esp_timer_get_time() / 1000;
         offline_event->rtc_timestamp_s = 0;
     }
 

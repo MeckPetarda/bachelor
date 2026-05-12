@@ -177,14 +177,27 @@ async function sweep(): Promise<void> {
           }
         } else if (result.reason === "insufficient_data") {
           // Hold off if any lighthouse in this group is currently replaying
-          // offline events.
+          // offline events, or recently completed a replay (partner may not
+          // have connected yet).
           if (hasActiveSyncInGroup(groupLhIds.map((l) => l.id))) {
             skipped++;
             continue;
           }
 
-          // Orphan only if this sub-cluster has exceeded the orphan timeout.
-          const subLatest = subRows[subRows.length - 1]!.timestamp;
+          // For offline-replayed scans the scan timestamp is old (from before
+          // the outage), so age measured against it would always exceed the
+          // orphan timeout. Use receivedAt (server insert time) instead so
+          // the timeout reflects how long the server has been waiting, not
+          // how old the physical scan is.
+          const hasOfflineScan = subRows.some(
+            (s) => s.source === "offline_sync",
+          );
+          const subLatest = hasOfflineScan
+            ? new Date(
+                Math.max(...subRows.map((s) => (s.receivedAt ?? s.timestamp).getTime())),
+              )
+            : subRows[subRows.length - 1]!.timestamp;
+
           const ageMs = Date.now() - subLatest.getTime();
           if (ageMs > clusterMeta.orphanTimeoutMs) {
             await orphanScans(subRows, "insufficient_data");
