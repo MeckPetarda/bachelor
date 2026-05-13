@@ -73,8 +73,8 @@
   set page(
     paper: "a4",
     binding: left,
-    margin: (inside: 30mm, outside: 20mm, top: 22mm, bottom: 20mm),
-    numbering: "1"
+    margin: (left: 30mm, right: 20mm, top: 22mm, bottom: 20mm),
+    numbering: none
   )
 
   set par(justify: true)
@@ -129,6 +129,17 @@
     block(text(size: 12pt,  it.body))
     v(6pt, weak: true)
   }
+
+  show figure.where(kind: table): fg => {
+    block(breakable: false, width: 100%)[
+      #set align(left)
+      #fg.caption
+      #set align(center)
+      #fg.body
+    ]
+  }
+
+  show bibliography: set heading(numbering: "1.")
 
   // ── Cover page ───────────────────────────────────────────────────────────
   // Replicates \titul from VSKP.sty.
@@ -233,8 +244,6 @@
 
   // ── Abstract page ────────────────────────────────────────────────────────
   [
-    *Abstract page placeholder*
-
     *Abstrakt*
 
     #abstract-cs
@@ -273,6 +282,9 @@
   ]
 
   // ── Table of contents ────────────────────────────────────────────────────
+  set page(numbering: "1")
+  counter(page).update(1)
+
   outline(depth: 3, indent: auto)
 
   pagebreak()

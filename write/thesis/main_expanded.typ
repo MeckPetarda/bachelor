@@ -25,10 +25,23 @@
   institute-en: "Institute of Solid Mechanics, Mechatronics and Biomechanics",
   degree: "B",
 
-  abstract-cs: [Zde bude abstrakt.],
-  abstract-en: [Abstract goes here.],
-  keywords-cs: [Klíčová slova zde.],
-  keywords-en: [Keywords here.],
+  abstract-cs: [
+Práce představuje návrh, implementaci a laboratorní ověření pasivního systému evidence docházky zaměstnanců, který nevyžaduje žádnou aktivní činnost ze strany uživatele. Dvě embedded zařízení umístěná na protilehlých stranách dveřního průchodu odesílají surová data z UHF RFID čteček na centrální server, který určuje směr průchodu a předává údaje o docházce na firemní platformu prostřednictvím modulární integrační vrstvy navržené tak, aby byla rozšiřitelná o další systémy.
+
+Práce zahrnuje návrh a výrobu hardwaru na míru, vývoj firmwaru a procesní pipeline na straně serveru s živou integrací s firemním softwarem Navigo3.
+
+Laboratorní validace potvrdila, že každý detekovaný průchod byl správně klasifikován z hlediska směru u všech zaznamenaných průchodů. Bylo zjištěno, že spolehlivost detekce závisí do značné míry na způsobu nošení tagu, přičemž za určitých podmínek dochází k výraznému snížení nebo úplnému zamezení detekce. Systém nikdy nevydá nesprávné určení směru, ale za nepříznivých podmínek nemusí vydat žádný signál. Jde o laboratorně ověřený koncept s identifikovanými podmínkami pro spolehlivý provoz.],
+  abstract-en: [
+This thesis presents the design, implementation and laboratory validation of a passive employee attendance system requiring no deliberate action from the user. Two embedded units mounted on opposite sides of a doorway publish raw UHF RFID readings to a central server, which determines traversal direction and forwards attendance events to an enterprise platform through a modular integration layer designed to be extensible to other systems.
+
+The work encompasses custom hardware design and manufacture, firmware development, and a server-side processing pipeline with live integration with software Navigo3.
+
+Laboratory validation confirmed that every detected traversal was correctly classified for direction across all captured events. Detection reliability was found to depend substantially on tag carry method, with certain conditions resulting in significantly reduced or zero detection rates. The system never produces an incorrect direction call, but may produce no call under unfavourable conditions. It is characterised as a laboratory-validated proof of concept with identified conditions for reliable operation.],
+
+  keywords-cs: [UHF RFID, pasivní RFID, ESP32, FreeRTOS, KiCad, docházkový systém, evidence docházky, portálový model, detekce směru průchodu, temporální centroid, embedded systém, FreeCAD, MQTT, Navigo3],
+  keywords-en: [
+UHF RFID, passive RFID, ESP32, FreeRTOS, KiCad, attendance system, attendance tracking, portal model, direction detection, temporal centroid, embedded system, MQTT, FreeCAD, Navigo3
+  ],
   declaration: [Declaration text goes here.],
   acknowledgements: [Acknowledgements go here.],
 )
@@ -41,15 +54,15 @@
 
 Reliable recording of employee arrivals and departures is a baseline operational requirement for most enterprises, supplying the inputs to payroll, project time allocation, and compliance reporting. The technical realisation of this requirement sits at the intersection of embedded systems, automatic identification (RFID, NFC, or knowledge-based codes), and enterprise human-resources software. This thesis is concerned specifically with that intersection: the design and prototype implementation of an embedded identification platform whose recorded events feed directly into a company information system.
 
-Commercially dominant attendance solutions -- PIN terminals, contact-presented HF RFID card readers, and biometric (facial or fingerprint) terminals -- share a structural property: each requires the employee to perform a deliberate identification action at a fixed point. This introduces friction at the threshold, creates queues at high-traffic times, and remains vulnerable to so-called buddy-punching, in which one employee enters or presents identification on another's behalf. A genuinely passive, zero-interaction system -- one that records arrival and departure without any action from the employee beyond walking through the doorway -- would eliminate all three of these issues simultaneously. No commercial product in the segment currently occupies this niche.
+Commercially dominant attendance solutions - PIN terminals, contact-presented HF RFID card readers, and biometric (facial or fingerprint) terminals - share a structural property: each requires the employee to perform a deliberate identification action at a fixed point. This introduces friction at the threshold, creates queues at high-traffic times, and remains vulnerable to so-called buddy-punching, in which one employee enters or presents identification on another's behalf. A genuinely passive, zero-interaction system - one that records arrival and departure without any action from the employee beyond walking through the doorway - would eliminate all three of these issues simultaneously. No commercial product in the segment currently occupies this niche.
 
 The concrete need for such a system arises at Navigo Solutions s.r.o., a Brno-based software firm whose product Navigo3 is a software-as-a-service company information system used by project-based businesses for project management, finance, capacity planning, and human-resources work, including arrival and departure records and absence tracking @navigo3-website. Prior to this thesis, Navigo3 exposed only a rudimentary internal attendance API and offered no provision for external hardware integrations; attendance entries were made manually through the web interface. As part of the present work, this API has been extended into a form that external clients may use to act on behalf of Navigo3 users, making the system described here the first hardware integration into Navigo3 that is not a bespoke build for a single customer. The same extension admits further integrations beyond the one developed in this thesis.
 
-Two technical requirements follow from the zero-interaction goal. The first is reliable passive identification at a range of two to three metres, through clothing, bags, and pockets -- the tag must be readable wherever an employee normally carries credentials. The second is the recovery of traversal *direction*: confirming that an employee crossed the doorway is not enough, since arrival and departure must be distinguished without any physical gate or turnstile. Resolving both requirements within a single self-contained embedded device, deployable at an arbitrary doorway with only mains power and wireless network connectivity, defines the scope of the system to be designed.
+Two technical requirements follow from the zero-interaction goal. The first is reliable passive identification at a range of two to three metres, through clothing, bags, and pockets - the tag must be readable wherever an employee normally carries credentials. The second is the recovery of traversal direction: confirming that an employee crossed the doorway is not enough, since arrival and departure must be distinguished without any physical gate or turnstile. Resolving both requirements within a single self-contained embedded device, deployable at an arbitrary doorway with only mains power and wireless network connectivity, defines the scope of the system to be designed.
 
-Of the candidate technologies surveyed in @research, only passive UHF RFID at 860--960 MHz combines a read range of several metres with the absence of any required user action. The approach adopted on top of this technology is a *portal model*: two autonomous embedded units, jointly named *Lighthouse*, are mounted on opposite sides of the doorway. Each unit independently publishes raw timestamped RFID readings to a central server over MQTT; the server clusters readings from the pair and infers traversal direction from their joint temporal and signal-strength structure. Direction inference is therefore an entirely server-side responsibility, leaving each Lighthouse stateless with respect to its counterpart and free to operate, cache locally, and recover from network loss on its own terms. Successful direction-detected events are forwarded to Navigo3 through a connector layer isolated behind a single integration interface, so the same core pipeline may be extended to other enterprise platforms without modification.
+Of the candidate technologies surveyed in @research, only passive UHF RFID at 860-960 MHz combines a read range of several metres with the absence of any required user action. The approach adopted on top of this technology is a portal model: two autonomous embedded units, jointly named Lighthouse, are mounted on opposite sides of the doorway. Each unit independently publishes raw timestamped RFID readings to a central server over MQTT; the server clusters readings from the pair and infers traversal direction from their joint temporal and signal-strength structure. Direction inference is therefore an entirely server-side responsibility, leaving each Lighthouse stateless with respect to its counterpart and free to operate, cache locally, and recover from network loss on its own terms. Successful direction-detected events are forwarded to Navigo3 through a connector layer isolated behind a single integration interface, so the same core pipeline may be extended to other enterprise platforms without modification.
 
-#fig-placeholder[Figure 1-1: System concept diagram - two Lighthouse units flanking a doorway, person walking through, MQTT to server, server to Navigo3]
+#fig-placeholder[System concept diagram - two Lighthouse units flanking a doorway, person walking through, MQTT to server, server to Navigo3]
 
 The objectives of this thesis, as set out in the formal assignment, are:
 - a review of existing hardware and software approaches to attendance recording, with attention to their integration into enterprise software environments;
@@ -78,6 +91,7 @@ Token-based identification removes any requirement for the employee to stop or a
 UHF RFID is therefore the only mature passive identification technology meeting the hands-free, 2–3 m range requirement, and is selected as the basis for this system.
 
 #figure(
+  kind: table,
   table(
     columns: (auto, auto, auto, auto, auto),
     table.header[Technology][Read range][User action][Sensitive data][Selected],
@@ -86,7 +100,7 @@ UHF RFID is therefore the only mature passive identification technology meeting 
     [Biometric],            [Contact / ~1 m], [No],  [Yes], [No],
     [UHF RFID (860–960 MHz)],[1–12 m],        [No],  [No],  [*Yes*],
   ),
-  caption: [Table 2.1-1 - Identification technology comparison],
+  caption: [Identification technology comparison],
 )
 
 == Direction Detection Methods <direction_detection_methods>
@@ -101,7 +115,7 @@ A complementary signal is available in the received signal strength indicator (R
 
 Two algorithmic families therefore emerge from this literature: a temporal centroid algorithm following Oikawa's approach, and an RSSI-weighted centroid algorithm based on the Friis-derived peak-time argument. Both require the full set of raw timestamped RSSI readings from both readers - any per-device deduplication or summarisation discards the very signal the algorithms operate on. Detailed mathematical formulations of both families are given in #ref(<direction_detection_and_event_processing>).
 
-#fig-placeholder[Figure 2.2-1: Dual RSSI curves over time for a single traversal; temporal centroids C_out and C_in marked; RSSI peaks labelled; direction arrow outside to inside]
+#fig-placeholder[Dual RSSI curves over time for a single traversal; temporal centroids C_out and C_in marked; RSSI peaks labelled; direction arrow outside to inside]
 
 == Hardware Platforms and Embedded Architectures <hardware_platforms_and_embedded_architectures>
 
@@ -130,12 +144,12 @@ UHF RFID readers are available across a wide cost and integration spectrum, from
     [SparkFun M6E Nano], [+27 dBm], [3.3 V],[UART],          [External], [\$60+],
     [*YPD-R300*],        [*+25 dBm*],[*5 V*],[*UART*],       [*External*],[*~\$15*],
   ),
-  caption: [Table 2.3.2-1 - UHF RFID reader module candidates],
-)
+  caption: [UHF RFID reader module candidates],
+) <uhf_rfid_candidates>
 
 The YPD-R300 therefore best matches the project requirements. Its higher RF output relative to the R200 line supports the 2–3 m range requirement; its 5 V supply matches the board's main power rail directly; and its external SMA connector permits the antenna to be substituted during range testing, which is not possible with the integrated-antenna variant. The bare R-series chip option was rejected as it would require a custom RF front-end design, an unjustifiable scope expansion at the prototype stage. The Impinj R420 and the ThingMagic and SparkFun modules, while well-supported, were excluded on cost grounds; their per-unit price would consume a disproportionate share of the prototype budget for three units.
 
-The 25 dBm RF output value cited in Table 2.3.2-1 reflects the module's actual hardware ceiling rather than the higher 33 dBm nominal value given on the manufacturer's datasheet; the relevant firmware-side handling of this discrepancy is discussed in @uhf_rfid_scan_control.
+The 25 dBm RF output value cited in #ref(<uhf_rfid_candidates>) reflects the module's actual hardware ceiling rather than the higher 33 dBm nominal value given on the manufacturer's datasheet; the relevant firmware-side handling of this discrepancy is discussed in @uhf_rfid_scan_control.
 
 === Power Supply and Battery Considerations <power_supply_and_battery_considerations>
 
@@ -168,7 +182,7 @@ Two distinct communication paths exist in this system, with different requiremen
     [AMQP],       [No lightweight ESP-IDF client],                           [Rejected],
     [*MQTT*],     [*Designed for constrained devices on unreliable networks*],[*Selected*],
   ),
-  caption: [Table 2.4-1 - Communication protocol comparison for firmware transport],
+  caption: [Communication protocol comparison for firmware transport],
 )
 
 For the firmware-to-server path, MQTT is selected. It was designed specifically for constrained devices communicating over unreliable networks and provides tunable Quality-of-Service levels, automatic reconnection in the client library, and a Last Will and Testament (LWT) mechanism that publishes a broker-generated notification on unexpected disconnection @mqtt. The application of these features in the Lighthouse firmware is described in @mqtt_communication_and_offline_caching.
@@ -201,7 +215,7 @@ For initial WiFi credential entry, the ESP-IDF `wifi_provisioning` component (BL
 [ mbedTLS (AES) ],[ Credential encryption via hardware AES accelerator        ],
 [ esp_wifi      ],[ STA + AP mode, captive portal provisioning                ],
   ),
-  caption: [Table 2.5-1 - ESP-IDF components used and their role],
+  caption: [ESP-IDF components used and their role],
 )
 
 // =============================================================================
@@ -216,7 +230,7 @@ The Lighthouse attendance system is built around a portal model: two physically 
 
 Each Lighthouse unit is an embedded device built around the ESP32-WROOM-32 microcontroller communicating with a YPD-R300 UHF RFID reader module over UART (per ESP32 TRM Section 7; YPD-R300 Protocol Section 1.2). The unit includes onboard power management (USB-C input and lithium-ion battery backup), local offline event caching to a LittleFS partition on the ESP32's flash memory, and WiFi/MQTT connectivity for scan data upload and health telemetry reporting. Four status LEDs provide visual feedback on WiFi connection state, MQTT broker connectivity, active RFID scanning, and tag detection events. Two buttons allow manual control of scan mode and WiFi provisioning entry, and an AM312 PIR motion sensor triggers automatic RFID scan windows when movement is detected near the portal.
 
-Lighthouse units are logically paired on the server into a *group*, which becomes the unit of direction detection. Raw scans are clustered and processed per (tag EPC, group) pair. A Lighthouse can belong to at most one group at any given time; scans from ungrouped Lighthouses are orphaned by the event processing pipeline after a configurable timeout. Each group has independently tunable parameters: `activityTimeoutMs` (default 4 000 ms) defines how long after the last scan a cluster is considered closed and ready for processing, while `orphanTimeoutMs` (default 8 000 ms) determines when scans from misconfigured or unpaired devices are discarded.
+Lighthouse units are logically paired on the server into a group, which becomes the unit of direction detection. Raw scans are clustered and processed per (tag EPC, group) pair. A Lighthouse can belong to at most one group at any given time; scans from ungrouped Lighthouses are orphaned by the event processing pipeline after a configurable timeout. Each group has independently tunable parameters: `activityTimeoutMs` (default 4 000 ms) defines how long after the last scan a cluster is considered closed and ready for processing, while `orphanTimeoutMs` (default 8 000 ms) determines when scans from misconfigured or unpaired devices are discarded.
 
 The server is a single BunJS process that hosts an embedded Aedes MQTT broker, a PostgreSQL-backed REST API built with the Hono framework, and a WebSocket gateway for real-time dashboard updates. It also serves the SolidJS web dashboard as a static build from the same process. The server's responsibilities include: ingesting raw scan batches from MQTT and persisting them to the `raw_scans` table; running the EventSweeper background poller that clusters unprocessed scans and invokes both direction detection algorithms; managing user accounts and tag-to-user assignments; and pushing successfully processed events to the Navigo3 REST API with a retry-on-failure mechanism. The Navigo3 integration is isolated behind a connector interface controlled by environment variables, allowing the system to be extended to other enterprise platforms without modifications to the core event processing pipeline.
 
@@ -229,14 +243,14 @@ The server is a single BunJS process that hosts an embedded Aedes MQTT broker, a
     [Dashboard],             [SolidJS SPA],                        [Operator interface: device management, event monitoring, user setup],
     [Navigo3 integration],   [REST connector + background poller], [Translates processed events into attendance records in Navigo3],
   ),
-  caption: [Table 3.1-1 - System components and their responsibilities],
+  caption: [System components and their responsibilities],
 )
 
 The end-to-end event lifecycle from tag detection to attendance record creation proceeds as follows. An IR motion sensor detects movement near the portal, triggering the firmware to open a 5-second RFID scan window. The YPD-R300 reader runs continuous real-time inventory (command `0x89` per YPD-R300 Protocol Section 2.4) during this window, with detections batched on the firmware side and published to the MQTT topic `lighthouse/{id}/scans` as timestamped RSSI arrays. The server's scan handler ingests each batch, validates individual elements, and persists valid scans to the `raw_scans` table while preserving the `timeBasis` field (`synced` / `estimated` / `relative`) that indicates timestamp quality. The EventSweeper background poller runs every 2 seconds, clustering unprocessed scans by (EPC, group). Once a cluster is considered closed (no new scans for `activityTimeoutMs`), both direction detection algorithms execute and each produces an independent row in the `processed_events` table. The processed event is immediately pushed to Navigo3 via its `attendance/embedded/start` or `stop` endpoint depending on the detected direction. If the push fails, a separate background retry sweep picks it up within the configured `NAVIGO3_RETRY_INTERVAL_MS`. If connectivity is lost before the firmware can publish to MQTT, scans are cached to a LittleFS ring buffer on the ESP32's flash and replayed in order on reconnection with QoS 2 for delivery guarantees.
 
 #figure(
   image("./images/3.1-1_system_architecture.png", width: 80%),
-  caption: [Figure 3.1-1: System architecture block diagram - Lighthouse A and B communicating via MQTT to Server; Server connected bidirectionally to Web Client via REST + WebSocket; Server connected to Navigo3 via REST API]
+  caption: [System architecture block diagram - Lighthouse A and B communicating via MQTT to Server; Server connected bidirectionally to Web Client via REST + WebSocket; Server connected to Navigo3 via REST API]
 )
 
 == Hardware Design <hardware_design>
@@ -247,7 +261,7 @@ The first functional prototype was assembled on a breadboard using four off-the-
 
 #figure(
   image("./images/IMG_20260305_011321.jpg", width: 80%),
-  caption: [Figure 3.2.1-1: Photograph of the two Board v1 breadboard prototypes; components labelled: ESP32 dev board, YPD-R300 on carrier, SX1308 boost module, TP4056 charger, battery holder, PIR sensor, status LEDs, buttons, antenna with coaxial pigtail]
+  caption: [Photograph of the two Board v1 breadboard prototypes]
 )
 
 Component selection and concurrency architecture were validated on the breadboard. The ESP32-WROOM-32 proved capable of running the WiFi network stack, MQTT client, and UART-driven RFID operations concurrently using the dual-core Xtensa LX6 architecture, with the WiFi stack pinned to Core 0 and application logic running on Core 1 (per ESP32 TRM Section 1.1). The YPD-R300 reader communicates with the ESP32 via UART at 115 200 baud (per YPD-R300 Protocol Section 1.2). GPIO assignments for UART TX/RX, status LEDs, buttons, PIR motion sensor input, and the BC337 NPN transistor-based RFID power switch were established during breadboard testing and carried forward unchanged to Board v2. Power delivery on the breadboard used point-to-point wiring between the four modules, which introduced uncontrolled trace impedance and measurable voltage drops under pulsed RFID load, motivating the decision to move to a purpose-designed PCB with calculated trace widths and dedicated decoupling capacitance positioned close to load switching points.
@@ -261,14 +275,17 @@ Component selection and concurrency architecture were validated on the breadboar
     [SX1308 boost module],      [SX1308 IC, 4.7 µH inductor, Schottky diode, feedback divider], [Circuit reproduced with confirmed component values],
     [TP4056 charger module],    [TP4056 IC, DW01HA protection, FS8205A dual MOSFET],            [Circuit reproduced; charge current set via programming resistor],
   ),
-  caption: [Table 3.2.1-1 - Reverse-engineered modules and their Board v2 disposition],
+  caption: [Reverse-engineered modules and their Board v2 disposition],
 )
 
 === Board v2 - Custom PCB <board_v2_-_custom_pcb>
 
 Board v2 is a single two-layer PCB integrating all functionality of the four breadboard modules plus additional circuitry for power switching, fuse protection, battery voltage monitoring, and consolidated USB-C connectivity. The board was designed in KiCad with the schematic split into four hierarchical sheets (see Appendix A): a top-level Lighthouse sheet, a Charger submodule sheet, a Step-up DC/DC converter sheet, and a UHF RFID reader sheet. This hierarchical structure mirrors the modular nature of the breadboard prototype and keeps each functional block's schematic content manageable and self-contained. The CP2102 USB-UART bridge present on the original ESP32 development board was intentionally omitted from Board v2 to reduce component cost and simplify SMD assembly. In its place, UART TX, RX, and GND are broken out to a 3-pin header, allowing firmware debugging and flashing via an external USB-UART adapter. The reader is assumed to have the complete schematic sheets from Appendix A available for side-by-side reference; the following subsections describe key design decisions and deviations from the baseline breadboard design rather than replicating full schematic content.
 
-#fig-placeholder[Figure 3.2.2-1: KiCad 3D render of the assembled Board v2 PCB - top view showing component placement: ESP32-WROOM-32 module, USB-C connector, UART pin header, status LEDs, PIR sensor, buttons, SX1308 boost section, TP4056 charger section, battery holder, RFID reader footprint with IPEX antenna connector]
+#figure(
+  image("./images/kicad_render.png", width: 80%),
+  caption: [KiCad 3D render of the assembled Board v2 PCB - top view showing component placement]
+)
 
 ==== GPIO Assignments <gpio_assignments>
 
@@ -290,7 +307,7 @@ The Board v2 schematic defines all GPIO connections between the ESP32-WROOM-32 m
     [GPIO5],  [RFID_POWER_SWITCH], [BC337 base drive for R300 power control],
     [GPIO33], [BATTERY_SENSE],     [ADC1_CH5 for battery voltage monitoring],
   ),
-  caption: [Table 3.2.2-1 - ESP32 GPIO assignments on Board v2],
+  caption: [ESP32 GPIO assignments on Board v2],
 )
 
 GPIO5 is a strapping pin on the ESP32 (per ESP32 Datasheet Section 2.3) and must be held high during boot to select SPI boot mode. The Board v2 schematic includes a 10 kΩ pull-up resistor on GPIO5 to ensure reliable boot behaviour while still allowing it to function as a general-purpose output for the BC337 base drive after boot completes. GPIO33 was selected for battery voltage monitoring because it is connected to ADC1_CH5, which remains available for use during active WiFi operation; ADC2 channels share hardware with the WiFi RF subsystem and cannot be sampled reliably while WiFi is active (per ESP32 TRM Section 31.4.2).
@@ -307,7 +324,7 @@ The 5 V rail downstream of the diode OR junction feeds an AMS1117-3.3 LDO regula
 
 #figure(
   image("./images/3.2.2-2_power_delivery.svg", width: 80%),
-  caption: [Figure 3.2.2-2: Power delivery block diagram - USB-C VBUS and battery cell as inputs -> fuses -> DPDT switch -> SS24A diode OR -> 5 V rail -> AMS1117-3.3 LDO -> 3.3 V rail; battery path includes SX1308 boost (3.2-4.2 V -> 5 V); TP4056/DW01HA charges battery from VBUS when present]
+  caption: [Power delivery block diagram - USB-C VBUS and battery cell as inputs -> fuses -> DPDT switch -> SS24A diode OR -> 5 V rail -> AMS1117-3.3 LDO -> 3.3 V rail; battery path includes SX1308 boost (3.2-4.2 V -> 5 V); TP4056/DW01HA charges battery from VBUS when present]
 )
 
 ==== RFID Reader Power Switching <rfid_reader_power_switching>
@@ -328,7 +345,7 @@ The YPD-R300 reader draws current in sustained 18.8 ms RF transmission pulses oc
     [AMS1117 input (5 V)],  [10 µF],           [Electrolytic; per AMS1117 datasheet],
     [AMS1117 output (3.3 V)], [22 µF],         [Electrolytic; per AMS1117 datasheet],
   ),
-  caption: [Table 3.2.2-2 - Decoupling capacitance placement],
+  caption: [Decoupling capacitance placement],
 )
 
 The 470 µF electrolytic capacitor on the R300 5 V rail was sized to limit voltage droop during the reader's 18.8 ms RF pulses to less than 200 mV, based on the measured current draw and acceptable ripple tolerance. Ceramic 100 nF bypass capacitors are placed immediately adjacent to the power pins of the R300 module and the ESP32-WROOM-32 module to suppress high-frequency switching noise. The SX1308 boost converter and AMS1117 LDO capacitor values follow the respective datasheets' recommended application circuits.
@@ -343,7 +360,7 @@ The second unit was rebuilt with the IPEX receptacle properly populated and a sn
 
 Board v2's 2 cm microstrip trace between the R300 RF pad and the IPEX footprint was not impedance-controlled during layout. Achieving 50 Ω characteristic impedance on a microstrip trace requires specific trace width relative to the PCB substrate thickness, dielectric constant, and copper weight - constraints that were not explicitly calculated or verified during the Board v2 design process. This is identified as a known limitation discovered post-fabrication. While the current units with 5.5 dBi antennas perform adequately at 5 m range, they are likely still subject to some degree of impedance mismatch loss and would probably achieve better range if the trace were eliminated or properly impedance-controlled. A future board revision should reposition the IPEX/U.FL receptacle immediately adjacent to the R300 RF output pad to eliminate the trace entirely, removing the impedance discontinuity and the associated RF loss.
 
-#fig-placeholder[Figure 3.2.3-1: Annotated photograph or diagram comparing the two antenna connection methods - (a) coaxial pigtail soldered directly to R300 RF pad bypassing PCB trace (Unit 1), (b) signal routed through 2 cm PCB trace to board-edge IPEX connector (Units 2 and 3); impedance discontinuity at the trace highlighted as suspected loss source]
+#fig-placeholder[Annotated photograph or diagram comparing the two antenna connection methods - (a) coaxial pigtail soldered directly to R300 RF pad bypassing PCB trace (Unit 1), (b) signal routed through 2 cm PCB trace to board-edge IPEX connector (Units 2 and 3); impedance discontinuity at the trace highlighted as suspected loss source]
 
 === Enclosure <enclosure>
 
@@ -351,12 +368,12 @@ A prototype enclosure was designed in FreeCAD to house the Board v2 PCB, battery
 
 #figure(
   image("./images/3.2.4-1_case.png", width: 80%),
-  caption: [Figure 3.2.4-1: CAD model screenshot - front/side view of the enclosure showing PIR window, antenna position, LED light pipes, and USB-C port access]
+  caption: [CAD model screenshot - front/side view of the enclosure showing PIR window, antenna position, LED light pipes, and USB-C port access]
 )
 
 #figure(
   image("./images/3.2.4-2_case.png", width: 80%),
-  caption: [Figure 3.2.4-2: CAD model screenshot - exploded or open view showing internal component placement: PCB, battery, antenna mounting]
+  caption: [CAD model screenshot - exploded or open view showing internal component placement: PCB, battery, antenna mounting]
 )
 
 Three enclosures were manufactured via 3D printing and assembled, one for each fabricated Board v2 unit currently in operation. Full technical drawings of the enclosure including dimensioned orthographic projections and section views are provided in Appendix B.
@@ -385,12 +402,12 @@ Credentials are encrypted before being written to NVS. The firmware uses AES-128
 
 #figure(
   image("./images/3.3.1-1_boot_sequence.svg", width: 80%),
-  caption: [Figure 3.3.1-1: Provisioning state machine diagram]
+  caption: [Provisioning state machine diagram]
 )
 
 #figure(
   image("./images/3.3.1-2_page.png", height: 8cm),
-  caption: [Figure 3.3.1-2: Screenshot of the provisioning web form as rendered on a mobile device - showing WiFi SSID/password fields, MQTT broker IP/port fields, test buttons, and status display area]
+  caption: [Screenshot of the provisioning web form as rendered on a mobile device - showing WiFi SSID/password fields, MQTT broker IP/port fields, test buttons, and status display area]
 )
 
 === UHF RFID Scan Control <uhf_rfid_scan_control>
@@ -421,7 +438,7 @@ As established in @timekeeping_without_a_hardware_rtc, the ESP32 does not includ
     [Estimated], [`estimated`],  [No SNTP sync yet, but last-known-good time recovered from NVS],                  [Seconds to minutes (RTC drift ~5% at 150 kHz)],
     [Relative],  [`relative`],   [No NVS time available; first boot or NVS lost],                                  [Boot-relative milliseconds only; not a real wall-clock time],
   ),
-  caption: [Table 3.3.3-1 - Time quality tiers],
+  caption: [Time quality tiers],
 )
 
 ==== SNTP Synchronisation <sntp_synchronisation>
@@ -449,7 +466,7 @@ The firmware connects to the MQTT broker using the `esp_mqtt_client` component i
     [`lighthouse/{id}/health`], [Publish],          [1], [Periodic health telemetry (system, RFID, battery)],
     [`lighthouse/{id}/config`], [Subscribe],        [1], [Runtime configuration updates from server],
   ),
-  caption: [Table 3.3.4-1 - MQTT topics and QoS levels],
+  caption: [MQTT topics and QoS levels],
 )
 
 ==== Offline Event Caching <offline_event_caching>
@@ -460,7 +477,7 @@ On MQTT reconnection, a background replay task (`offline_replay_task`) is spawne
 
 #figure(
   image("./images/3.3.4-1_offline_replay.svg", width: 80%),
-  caption: [Figure 3.3.4-1: Offline caching and replay sequence diagram]
+  caption: [Offline caching and replay sequence diagram]
 )
 
 === User Interaction: Buttons, LEDs, and Gestures <user_interaction>
@@ -479,7 +496,7 @@ The IO subsystem manages four status LEDs, two tactile buttons, and one passive 
     [BUTTON2_PIN],   [23], [Status message / WiFi setup trigger],
     [IR_SENSOR_PIN], [19], [AM312 PIR motion sensor],
   ),
-  caption: [Table 3.3.5-1 - GPIO pin assignments],
+  caption: [GPIO pin assignments],
 )
 
 GPIO22 and GPIO23 (button inputs) use external pull-up resistors on the PCB; the ESP32's internal pull-ups are disabled in firmware configuration. Debounce filtering is applied in software using a simple time-threshold approach: a button state change is only registered if the GPIO level remains stable for at least 50 ms after the initial transition. This 50 ms debounce threshold effectively suppresses mechanical contact bounce without introducing perceptible delay in the user experience.
@@ -495,14 +512,14 @@ The firmware operates in one of two scan modes, selectable via a 3-second hold o
     [IR Mode (default)], [Solid on], [Active - triggers 5 s scan bursts], [No-op],              [3 s hold from Manual / Boot],
     [Manual Mode],       [Off],      [Ignored],                           [Toggle RFID on/off], [3 s hold from IR Mode],
   ),
-  caption: [Table 3.3.5-2 - Scan mode behavior],
+  caption: [Scan mode behavior],
 )
 
 Before any mode transition executes, the firmware unconditionally stops any active RFID inventory operation by sending the `0x28` stop command to the R300 module and powers off the reader via the BC337 transistor to ensure a clean state. This prevents mode transitions from leaving the RFID reader in an undefined operational state or consuming power unnecessarily.
 
 #figure(
   image("./images/3.3.5-1_scan_mode_fsm.svg", width: 80%),
-  caption: [Figure 3.3.5-1: Scan mode state machine - two states (IR Mode, Manual Mode); transitions: 3-second BUTTON1 hold in either direction; entry actions listed for each state (stop RFID, set LED2, enable/disable IR)]
+  caption: [Scan mode state machine - two states (IR Mode, Manual Mode); transitions: 3-second BUTTON1 hold in either direction; entry actions listed for each state (stop RFID, set LED2, enable/disable IR)]
 )
 
 ==== Button Gestures <button_gestures>
@@ -519,7 +536,7 @@ The firmware recognizes both short-press (momentary tap) and long-hold gestures 
     [BUTTON2], [5 s hold],    [Enter WiFi AP provisioning (triggers reboot into setup mode)],
     [Both],    [10 s hold],   [Cache purge: clear offline event cache, confirmation LED sequence, restart],
   ),
-  caption: [Table 3.3.5-3 - Complete button gesture reference],
+  caption: [Complete button gesture reference],
 )
 
 ==== Cache Purge Combo Gesture <cache_purge_combo_gesture>
@@ -543,7 +560,7 @@ LED1 (green) provides combined status indication for WiFi and MQTT connectivity.
     [SCANNING_LED (red)],    [No active inventory],        [Off],
     [ACTIVITY_LED (yellow)], [Tag detected],               [Brief 100 ms flash],
   ),
-  caption: [Table 3.3.5-4 - LED states during normal operation],
+  caption: [LED states during normal operation],
 )
 
 #figure(
@@ -555,7 +572,7 @@ LED1 (green) provides combined status indication for WiFi and MQTT connectivity.
     [LED2 (green)], [AP active, MQTT test not yet passed], [Blinking],
     [LED2 (green)], [MQTT test passed],                    [Solid on],
   ),
-  caption: [Table 3.3.5-5 - LED states during AP provisioning],
+  caption: [LED states during AP provisioning],
 )
 
 ==== Battery Status LED Patterns (ACTIVITY_LED, Battery Power Only) <battery_status_led_patterns>
@@ -571,7 +588,7 @@ When the device is running on battery power (USB not connected), ACTIVITY_LED pr
     [Battery 5–10%],  [Pulsing 500 ms on/off],
     [Battery < 5%],   [Rapid pulsing 200 ms on/off],
   ),
-  caption: [Table 3.3.5-6 - Battery level indication],
+  caption: [Battery level indication],
 )
 
 == Server <server>
@@ -593,10 +610,10 @@ The technology choices for each subsystem, with per-component selection rational
     [Navigo3 Poller],    [Custom interval], [Periodic retry of unsynced events],               [Simple polling loop sufficient; avoids queue infrastructure],
     [Event Sweeper],     [Custom interval], [Cluster detection and direction processing],      [Fixed 2 s poll decouples ingestion rate from processing; bounded per-cycle cluster cap prevents starvation],
   ),
-  caption: [Table 3.4.1-1 - Server component responsibilities and selection rationale],
+  caption: [Server component responsibilities and selection rationale],
 ) <tbl-server-components>
 
-#fig-placeholder[Figure 3.4.1-1: Server internal component diagram - showing message flow from MQTT broker through scan handler to DB, and from event sweeper through algorithm layer to processed_events and WebSocket broadcast]
+#fig-placeholder[Server internal component diagram - showing message flow from MQTT broker through scan handler to DB, and from event sweeper through algorithm layer to processed_events and WebSocket broadcast]
 
 === Event Ingestion and Raw Scan Storage <event_ingestion_and_raw_scan_storage>
 
@@ -619,7 +636,7 @@ The `raw_scans` table functions as an immutable audit log. Once inserted, scan r
     [`processedAt`],  [`timestamptz (nullable)`], [Set when cluster is processed],
     [`orphanedAt`],   [`timestamptz (nullable)`], [Set when scan is orphaned],
   ),
-  caption: [Table 3.4.2-1 - `raw_scans` table key fields],
+  caption: [`raw_scans` table key fields],
 )
 
 The `processedAt` and `orphanedAt` columns both default to `NULL` at insertion time, marking the scan as pending. The event sweeper (described in #ref(<direction_detection_and_event_processing>)) queries for scans where both fields are `NULL`, clusters them by tag EPC and lighthouse group, and invokes direction detection algorithms. Scans that successfully contribute to a detected entry or exit event have their `processedAt` field updated to the current timestamp; scans that remain isolated beyond the configured activity timeout are marked as orphans by setting `orphanedAt`.
@@ -632,7 +649,7 @@ The ingestion architecture is designed for append-only, high-throughput write pa
 
 #figure(
   image("./images/3.4.2-1_mqtt_ingestion.svg", width: 80%),
-  caption: [Figure 3.4.2-1: MQTT ingestion sequence - firmware batch publish -> broker -> scan handler -> per-element validation -> DB insert -> WebSocket broadcast of raw scan event]
+  caption: [MQTT ingestion sequence - firmware batch publish -> broker -> scan handler -> per-element validation -> DB insert -> WebSocket broadcast of raw scan event]
 )
 
 === Direction Detection and Event Processing <direction_detection_and_event_processing>
@@ -652,7 +669,7 @@ Scans from ungrouped Lighthouse units-those with `groupId IS NULL`-are handled s
 
 #figure(
   image("./images/3.4.3-1_event_sweeper.svg", width: 80%),
-  caption: [Figure 3.4.3-1: Event sweeper cycle flowchart]
+  caption: [Event sweeper cycle flowchart]
 )
 
 ==== Algorithm 1 - Temporal Centroid (C₁) <algorithm_1_temporal_centroid>
@@ -689,7 +706,7 @@ $ C_1 = "CSF" times "CSzF" times "BCF" $
 
 #figure(
   image("./images/3.4.3-2_dashboard.png", width: 80%),
-  caption: [Figure 3.4.3-2: Cluster timeline diagram - horizontal time axis; two event types (Blue Lighthouse = inside, Orange Lighthouse = outside); scan detections shown as vertical ticks; cluster start/end markers],
+  caption: [Cluster timeline diagram - horizontal time axis; two event types (Blue Lighthouse = inside, Orange Lighthouse = outside); scan detections shown as vertical ticks; cluster start/end markers],
 )
 
 ==== Algorithm 2 - RSSI-Weighted Centroid (C₂) <algorithm_2_rssi-weighted_centroid>
@@ -780,12 +797,12 @@ Errors encountered during retry are logged with the event ID and exception detai
     [`attendance/embedded/stop`], [out], [Register departure],
     [`attendance/embedded/upsert`], [in+out pair], [Create/update closed attendance interval],
   ),
-  caption: [Table 3.4.5-1 - Navigo3 API endpoints used],
+  caption: [Navigo3 API endpoints used],
 )
 
 #figure(
   image("./images/3.4.5-1_navigo3_sequence.svg", width: 80%),
-  caption: [Figure 3.4.5-1: Navigo3 integration sequence diagram - new processed event → eligibility check → immediate pushEvent/pushPair → on success: syncedToIntegration = true; on failure: left false → retry poller picks up on next cycle],
+  caption: [Navigo3 integration sequence diagram - new processed event → eligibility check → immediate pushEvent/pushPair → on success: syncedToIntegration = true; on failure: left false → retry poller picks up on next cycle],
 )
 
 
@@ -795,7 +812,7 @@ Errors encountered during retry are logged with the event ID and exception detai
 
 The dashboard is a single-page application built with SolidJS, chosen for its fine-grained reactivity model: component state updates propagate directly to the DOM without a virtual-DOM diffing pass, keeping the runtime footprint small. Client-side routing is handled by `@solidjs/router` with five declared routes; the compiled static build is served directly from the BunJS process that hosts the REST API and MQTT broker, eliminating the need for a separate static file server. Per-component CSS modules provide style encapsulation. 
 
-Real-time updates are delivered over a single WebSocket connection opened on application mount in `App.tsx`. A central WebSocket store receives incoming messages and dispatches them to page-specific reactive stores, so only the relevant page re-renders on each incoming event; no polling is required. Table~@tbl-ws-messages lists the seven message types produced by the server and their consumer pages. Authentication is outside the scope of this prototype; the dashboard and REST API are accessible without credentials on the local network, with session management and role-based access control identified as future work. 
+Real-time updates are delivered over a single WebSocket connection opened on application mount in `App.tsx`. A central WebSocket store receives incoming messages and dispatches them to page-specific reactive stores, so only the relevant page re-renders on each incoming event; no polling is required. #ref<tbl_ws_messages>) lists the seven message types produced by the server and their consumer pages. Authentication is outside the scope of this prototype; the dashboard and REST API are accessible without credentials on the local network, with session management and role-based access control identified as future work. 
 
 #figure(
   table(
@@ -810,7 +827,7 @@ Real-time updates are delivered over a single WebSocket connection opened on app
 [ `event:orphaned` ],[ Scans orphaned by sweeper        ],[ Processed Events ],
   ),
   caption: [WebSocket message types and their consumer pages],
-) <tbl-ws-messages>
+) <tbl_ws_messages>
 
 === Pages <dashboard-pages>
 
@@ -878,8 +895,8 @@ Per-unit detection range was measured with each unit in isolation. A passive UHF
     [Yellow],  [IPEX/U.FL],    [3.0], [N/A],
     [Blue],           [Direct-solder],   [3.0], [N/A],
   ),
-  caption: [Table 3.6.1-1 - Detection range per unit],
-)
+  caption: [Detection range per unit],
+) <unit_ranges>
 
 Yellow and Blue produce identical 3.0 m maximum reliable ranges despite using different antenna connection methods, demonstrating that an IPEX/U.FL receptacle carries no measurable range penalty relative to a direct-solder pigtail when joint quality is consistent. Detection range at this power level is bounded by the YPD-R300 module's transmit power ceiling and antenna gain, not by the connection type itself. Red's pre-drop range of 2.5 m was already 0.5 m below the other two units, attributable to assembly-level variance in the IPEX cable and connector as discussed in #ref(<antenna_and_rf_considerations>). 
 
@@ -894,10 +911,10 @@ Controlled traversals were performed through the portal at normal walking pace. 
     [Temporal Centroid ($C_1$)], [78], [0], [0], [100.0],
     [RSSI-Weighted ($C_2$)],     [78], [0], [0], [100.0],
   ),
-  caption: [Table 3.6.1-2 - Direction detection accuracy per algorithm (combined dataset, n = 78 detected traversals)],
+  caption: [Direction detection accuracy per algorithm (combined dataset, n = 78 detected traversals)],
 )
 
-Direction accuracy across the full test campaign was 100% on both algorithms over 78 detected traversals. The detection rate, however, varied substantially with tag carry method. Under unobstructed hand-held conditions, 41 of 42 attempted traversals were detected (97.6%; 95% CI: 87.7--99.6%). With the tag carried in a near-side front trouser pocket at close range, 20 of 23 traversals were detected (87.0%; 95% CI: 67.9--95.5%). At longer range in the same pocket position, detection rate fell further (5 of 7; 71.4%; small sample). Tag carry on a lanyard presenting the tag edge-on to the antennas, and carry in a cross-body trouser pocket, produced effectively zero detection in both cases; these failure modes are a consequence of UHF tag polarisation physics interacting with the chosen portal geometry rather than a system limitation. The system's failure mode is exclusively non-detection: the `insufficient_data` orphan logic in the event sweeper guarantees that no direction call is produced from a one-sided cluster, so any event that reaches the database reflects bilateral evidence of traversal. 
+Direction accuracy across the full test campaign was 100% on both algorithms over 78 detected traversals. The detection rate, however, varied substantially with tag carry method. Under unobstructed hand-held conditions, 41 of 42 attempted traversals were detected (97.6%; 95% CI: 87.7-99.6%). With the tag carried in a near-side front trouser pocket at close range, 20 of 23 traversals were detected (87.0%; 95% CI: 67.9-95.5%). At longer range in the same pocket position, detection rate fell further (5 of 7; 71.4%; small sample). Tag carry on a lanyard presenting the tag edge-on to the antennas, and carry in a cross-body trouser pocket, produced effectively zero detection in both cases; these failure modes are a consequence of UHF tag polarisation physics interacting with the chosen portal geometry rather than a system limitation. The system's failure mode is exclusively non-detection: the `insufficient_data` orphan logic in the event sweeper guarantees that no direction call is produced from a one-sided cluster, so any event that reaches the database reflects bilateral evidence of traversal. 
 
 The bilateral coverage factor (BCF, defined in #ref(<direction_detection_and_event_processing>)) quantifies the balance of scan counts between the two units per cluster. Its mean shifted from 0.59 under unobstructed hand-held conditions to 0.42 in the close-range pocket session and 0.32 at longer range, reflecting the signal attenuation introduced by body absorption. Despite this degradation, every detected cluster produced a correct direction call, confirming that the temporal centroid approach is robust to scan asymmetry provided at least one scan is received from each unit.
 
@@ -905,7 +922,7 @@ Mean $C_1$ confidence across all sessions was 0.327 ± 0.155; mean $C_2$ confide
 
 === End-to-end processing time
 
-End-to-end latency was measured as the interval between `cluster_started_at` - the timestamp of the first RFID scan in a cluster - and the Navigo3 audit log database commit time for the resulting attendance record. This interval captures the full server-side pipeline: scan accumulation, `activityTimeoutMs` expiry, sweeper polling delay, direction detection, HTTP POST to Navigo3, and database write. The `cluster_started_at` timestamp lags the physical IR trigger by approximately 400 ms (200 ms YPD-R300 power-on delay plus 200 ms stabilisation period); true end-to-end latency from IR trigger is therefore approximately 400 ms greater than the values in Table 3.6.1-3. The dataset covers 15 events from 8 attendance records (8 IN and 7 OUT events). 
+End-to-end latency was measured as the interval between `cluster_started_at` - the timestamp of the first RFID scan in a cluster - and the Navigo3 audit log database commit time for the resulting attendance record. This interval captures the full server-side pipeline: scan accumulation, `activityTimeoutMs` expiry, sweeper polling delay, direction detection, HTTP POST to Navigo3, and database write. The `cluster_started_at` timestamp lags the physical IR trigger by approximately 400 ms (200 ms YPD-R300 power-on delay plus 200 ms stabilisation period); true end-to-end latency from IR trigger is therefore approximately 400 ms greater than the values in #ref(<e2e_processing_time>). The dataset covers 15 events from 8 attendance records (8 IN and 7 OUT events). 
 
 #figure(
   table(
@@ -917,14 +934,14 @@ End-to-end latency was measured as the interval between `cluster_started_at` - t
     [Min measured],        [7.46],
     [Max measured],        [11.69],
   ),
-  caption: [Table 3.6.1-3 - End-to-end processing time (IR trigger → Navigo3 record)],
-)
+  caption: [End-to-end processing time (IR trigger → Navigo3 record)],
+) <e2e_processing_time>
 
 All 15 events fell within the theoretical pipeline budget of approximately 11 seconds. The single event that marginally exceeded the budget (11.69 s) is attributable to a worst-case combination of cluster scan distribution and sweeper polling alignment. OUT events completed approximately 1.3 s faster than IN events on average. The standard deviation of 1.16 s across all events is consistent with the 0–2 s uniform jitter introduced by the sweeper's fixed polling interval, which is the dominant source of latency variance in this pipeline.
 
 === Offline replay verification
 
-Between the testing sessions the Red unit was dropped and subsequently repaired; a post-repair range measurement confirmed the reduction from 2.5 m to 1.5 m recorded in Table 3.6.1-1, which resulted in a scan count asymmetry favouring the Yellow unit during the offline replay session that follows. 
+Between the testing sessions the Red unit was dropped and subsequently repaired; a post-repair range measurement confirmed the reduction from 2.5 m to 1.5 m recorded in #ref(<unit_ranges>), which resulted in a scan count asymmetry favouring the Yellow unit during the offline replay session that follows. 
 
 Twelve alternating traversals were performed during a deliberate offline window of approximately four minutes and twenty-five seconds. The server was then restarted and replay was observed to completion. 
 
@@ -934,7 +951,7 @@ Twelve alternating traversals were performed during a deliberate offline window 
     table.header[Scans buffered][Scans replayed][Scans lost][Processed events][Navigo3 records],
     [606], [606], [0], [12 / 12], [12],
   ),
-  caption: [Table 3.6.1-4 - Offline replay verification results],
+  caption: [Offline replay verification results],
 )
 
 All 606 replayed scans carried `timeBasis = synced`, confirming that SNTP wall-clock timestamps were preserved correctly through the LittleFS ring buffer. The sweeper successfully clustered every traversal's scans bilaterally despite the replay rate of approximately ten entries per second, producing 12 processed events in perfect alternating OUT/IN sequence. No stale entries from prior sessions were re-delivered. Confidence and BCF distributions were consistent with the hand-held benchmark session, confirming that no degradation in clustering quality results from the replay path relative to live operation. 
@@ -955,7 +972,7 @@ The combined dataset of 78 detected traversals, spanning the hand-held benchmark
     [Confidence ratio ($C_1 : C_2$)],   [1.86 : 1],       [-],
     [Inter-algorithm agreement \[%\]],   [100.0],          [-],
   ),
-  caption: [Table 3.6.3-1 - Algorithm comparison summary (combined dataset, n = 78)],
+  caption: [Algorithm comparison summary (combined dataset, n = 78)],
 )
 
 Both algorithms classified direction correctly in every detected case under all tested conditions. The directional outputs of the two algorithms are perfectly correlated across the entire campaign. $C_2$'s lower confidence reflects the additional gating effect of the RSSI Trend Consistency Factor: when RSSI is noisy over the cluster window - which is the common case during a normal walking traversal - the composite $C_2$ confidence is penalised even though the directional inference is correct. $C_1$'s score, computed from centroid separation, cluster size, and bilateral coverage alone, is less susceptible to this penalty and produces confidence values that more directly reflect the geometric quality of the cluster. 
@@ -970,9 +987,9 @@ $C_1$ is the recommended algorithm for production deployment. It produces identi
 
 A passive, zero-interaction UHF RFID attendance system was designed and implemented in full. The system architecture, hardware design, firmware, server pipeline, and enterprise integration layer are documented in Chapter 3. Tags carried passively by employees are detected at normal walking pace without any deliberate action from the carrier, satisfying the zero-interaction requirement that motivated the project. The Navigo3 integration layer is isolated behind a connector interface, leaving the core detection pipeline independent of any particular enterprise platform. 
 
-The identification technology landscape was surveyed in @research, establishing UHF RFID operating at 860--960 MHz as the only commercially mature technology capable of passive, hands-free detection at 2--3 m range. Building on this finding, the system was architected as a portal model in which two Lighthouse units mounted on opposite sides of a doorway jointly supply raw RFID readings to a server-side direction detection pipeline, as documented in Chapter 3. Three Board v2 prototype units were fabricated, assembled, and brought to fully operational status, with the complete firmware and server pipeline implemented. End-to-end functionality was subsequently verified in a model office environment, addressing all four goals specified in the thesis assignment. 
+The identification technology landscape was surveyed in @research, establishing UHF RFID operating at 860-960 MHz as the only commercially mature technology capable of passive, hands-free detection at 2-3 m range. Building on this finding, the system was architected as a portal model in which two Lighthouse units mounted on opposite sides of a doorway jointly supply raw RFID readings to a server-side direction detection pipeline, as documented in Chapter 3. Three Board v2 prototype units were fabricated, assembled, and brought to fully operational status, with the complete firmware and server pipeline implemented. End-to-end functionality was subsequently verified in a model office environment, addressing all four goals specified in the thesis assignment. 
 
-Laboratory validation confirmed that a passive tag traversal through the portal produces a correctly directed attendance record in Navigo3. Detection range was measured at up to 3.0 m for the intact units under controlled conditions. Both direction detection algorithms -- the Temporal Centroid ($C_1$, #ref(<algorithm_1_temporal_centroid>)) and the RSSI-Weighted Centroid ($C_2$, #ref(<algorithm_2_rssi-weighted_centroid>)) -- achieved 100% directional accuracy across a combined dataset of 78 detected traversals, with full inter-algorithm agreement on every event. $C_1$ is recommended for production deployment on the basis of its consistently higher and more interpretable confidence scores; the comparison and recommendation are detailed in Section 3.6. The offline resilience mechanism was verified during a deliberate network outage session in which all 606 buffered scan records were replayed without loss and correctly processed into attendance events. End-to-end latency from IR trigger to Navigo3 record averaged approximately 9.94 s across the test campaign, within the theoretical pipeline budget. 
+Laboratory validation confirmed that a passive tag traversal through the portal produces a correctly directed attendance record in Navigo3. Detection range was measured at up to 3.0 m for the intact units under controlled conditions. Both direction detection algorithms - the Temporal Centroid ($C_1$, #ref(<algorithm_1_temporal_centroid>)) and the RSSI-Weighted Centroid ($C_2$, #ref(<algorithm_2_rssi-weighted_centroid>)) - achieved 100% directional accuracy across a combined dataset of 78 detected traversals, with full inter-algorithm agreement on every event. $C_1$ is recommended for production deployment on the basis of its consistently higher and more interpretable confidence scores; the comparison and recommendation are detailed in Section 3.6. The offline resilience mechanism was verified during a deliberate network outage session in which all 606 buffered scan records were replayed without loss and correctly processed into attendance events. End-to-end latency from IR trigger to Navigo3 record averaged approximately 9.94 s across the test campaign, within the theoretical pipeline budget. 
 
 Testing in the model entrance corridor identified conditions under which the system does not operate reliably enough for practical deployment. The current prototype is not considered ready for production use and is best characterised as a laboratory-validated proof of concept establishing the technical feasibility of the approach. 
 
@@ -981,3 +998,5 @@ Two structural limitations of the current hardware design are noted. The ESP32-W
 Several directions for future development are identified. A hardware real-time clock should be incorporated in a future board revision to eliminate timestamp degradation during offline periods. The IPEX/U.FL receptacle should be repositioned adjacent to the YPD-R300 RF output pad on the same revision to eliminate the intervening PCB trace and its associated impedance mismatch. Extended field testing over a full working day under real employee traffic is required before any deployment decision can be made. Better fail-safes and handling of edge-cases identified during development and testing represent the primary software and firmware development priority, alongside improved API security and session management in the operator dashboard. 
 
 #bibliography("references.bib", style: "ieee")
+
+= Attachments <attachments>
