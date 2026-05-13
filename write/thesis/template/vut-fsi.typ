@@ -139,6 +139,15 @@
     ]
   }
 
+  set table(
+    fill: (x, y) =>
+      if y == 0 {
+        luma(215)
+      }
+  )
+
+  show table.cell.where(y: 0): strong
+
   show bibliography: set heading(numbering: "1.")
 
   // ── Cover page ───────────────────────────────────────────────────────────

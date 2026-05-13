@@ -137,12 +137,12 @@ UHF RFID readers are available across a wide cost and integration spectrum, from
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto, auto, auto),
-    table.header[Module][RF output][Supply][Interface][Antenna][Price (approx.)],
-    [Impinj R420],       [+30 dBm], [PoE],  [LLRP/Ethernet], [External], [\$800+],
-    [ThingMagic M6e],    [+27 dBm], [5 V],  [UART/USB],      [External], [\$200+],
-    [SparkFun M6E Nano], [+27 dBm], [3.3 V],[UART],          [External], [\$60+],
-    [*YPD-R300*],        [*+25 dBm*],[*5 V*],[*UART*],       [*External*],[*~\$15*],
+    columns: (auto, auto, auto, auto, auto),
+    table.header[Module][RF output][Supply][Interface][Price (approx.)],
+    [Impinj R420],       [+30 dBm], [PoE],  [LLRP/Ethernet], [\$800+],
+    [ThingMagic M6e],    [+27 dBm], [5 V],  [UART/USB],      [\$200+],
+    [SparkFun M6E Nano], [+27 dBm], [3.3 V],[UART],          [\$60+],
+    [*YPD-R300*],        [*+25 dBm*],[*5 V*],[*UART*],       [*~\$15*],
   ),
   caption: [UHF RFID reader module candidates],
 ) <uhf_rfid_candidates>
@@ -236,12 +236,32 @@ The server is a single BunJS process that hosts an embedded Aedes MQTT broker, a
 
 #figure(
   table(
-    columns: (auto, auto, auto),
+    columns: (auto, auto, 1fr),
+    align: (center, left, left),
     table.header[Component][Technology][Responsibility],
-    [Lighthouse unit (×2)],  [ESP32-WROOM-32 + YPD-R300],         [Passive UHF RFID detection; raw scan publish via MQTT],
-    [Server],                [BunJS, Hono, Aedes, PostgreSQL],     [Scan ingestion, direction detection, user management, API; embedded MQTT broker and chrony NTP server],
-    [Dashboard],             [SolidJS SPA],                        [Operator interface: device management, event monitoring, user setup],
-    [Navigo3 integration],   [REST connector + background poller], [Translates processed events into attendance records in Navigo3],
+    [Lighthouse units],
+    [- ESP32-WROOM-32
+     - YPD-R300],
+    [- Passive UHF RFID detection
+     - Raw scan publish via MQTT],
+    [Server],
+    [- BunJS + Hono
+     - Aedes MQTT broker
+     - PostgreSQL
+     - Chrony NTP server],
+    [- Scan ingestion and direction detection
+     - User management and API
+     - Embedded MQTT broker
+     - NTP time reference],
+    [Dashboard],
+    [- SolidJS SPA],
+    [- Device management
+     - Event monitoring
+     - User and tag setup],
+    [Navigo3 integration],
+    [- REST connector
+     - Background retry poller],
+    [- Translates processed events into attendance records in Navigo3],
   ),
   caption: [System components and their responsibilities],
 )
@@ -294,18 +314,19 @@ The Board v2 schematic defines all GPIO connections between the ESP32-WROOM-32 m
 #figure(
   table(
     columns: (auto, auto, auto),
+    align: (center, left, left),
     table.header[GPIO][Peripheral][Function],
-    [GPIO4],  [LED1 (green)],      [WiFi + MQTT combined status indicator],
-    [GPIO21], [LED2 (green)],      [IR mode / AP provisioning indicator],
-    [GPIO26], [LED3 (red)],        [Active RFID scan indicator],
-    [GPIO25], [LED4 (yellow)],     [Tag detection flash / battery status],
-    [GPIO22], [BUTTON1],           [Scan mode control (with external pull-up)],
-    [GPIO23], [BUTTON2],           [Status message / WiFi setup trigger (with external pull-up)],
-    [GPIO19], [IR_SENSOR],         [AM312 PIR motion sensor input],
-    [GPIO16], [R300 UART RX],      [UART receive from YPD-R300],
-    [GPIO17], [R300 UART TX],      [UART transmit to YPD-R300],
-    [GPIO5],  [RFID_POWER_SWITCH], [BC337 base drive for R300 power control],
-    [GPIO33], [BATTERY_SENSE],     [ADC1_CH5 for battery voltage monitoring],
+    [4],  [LED1 (green)],      [WiFi + MQTT combined status indicator],
+    [21], [LED2 (green)],      [IR mode / AP provisioning indicator],
+    [26], [LED3 (red)],        [Active RFID scan indicator],
+    [25], [LED4 (yellow)],     [Tag detection flash / battery status],
+    [22], [BUTTON1],           [Scan mode control],
+    [23], [BUTTON2],           [Status message / WiFi setup trigger],
+    [19], [IR_SENSOR],         [AM312 PIR motion sensor input],
+    [16], [R300 UART RX],      [UART receive from YPD-R300],
+    [17], [R300 UART TX],      [UART transmit to YPD-R300],
+    [5],  [RFID_POWER_SWITCH], [BC337 base drive for R300 power control],
+    [33], [BATTERY_SENSE],     [ADC1_CH5 for battery voltage monitoring],
   ),
   caption: [ESP32 GPIO assignments on Board v2],
 )
@@ -407,7 +428,7 @@ Credentials are encrypted before being written to NVS. The firmware uses AES-128
 
 #figure(
   image("./images/3.3.1-2_page.png", height: 8cm),
-  caption: [Screenshot of the provisioning web form as rendered on a mobile device - showing WiFi SSID/password fields, MQTT broker IP/port fields, test buttons, and status display area]
+  caption: [Screenshot of the provisioning web form as rendered on a mobile device]
 )
 
 === UHF RFID Scan Control <uhf_rfid_scan_control>
@@ -459,14 +480,14 @@ The firmware connects to the MQTT broker using the `esp_mqtt_client` component i
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto),
+    columns: (auto, auto, auto, 1fr),
     table.header[Topic][Direction][QoS][Content],
-    [`lighthouse/{id}/scans`],  [Publish (live)],   [1], [Batched JSON array of tag detections],
-    [`lighthouse/{id}/scans`],  [Publish (replay)], [2], [Replayed offline-cached events],
-    [`lighthouse/{id}/health`], [Publish],          [1], [Periodic health telemetry (system, RFID, battery)],
-    [`lighthouse/{id}/config`], [Subscribe],        [1], [Runtime configuration updates from server],
+    [`scans`],  [Publish (live)],   [1], [Batched JSON array of tag detections],
+    [`scans`],  [Publish (replay)], [2], [Replayed offline-cached events],
+    [`health`], [Publish],          [1], [Periodic health telemetry (system, RFID, battery)],
+    [`config`], [Subscribe],        [1], [Runtime configuration updates from server],
   ),
-  caption: [MQTT topics and QoS levels],
+  caption: [MQTT topics (prefixed `lighthouse/{id}/`) and QoS levels],
 )
 
 ==== Offline Event Caching <offline_event_caching>
@@ -505,21 +526,11 @@ GPIO22 and GPIO23 (button inputs) use external pull-up resistors on the PCB; the
 
 The firmware operates in one of two scan modes, selectable via a 3-second hold of BUTTON1. The mode determines whether RFID scan bursts are triggered automatically by IR motion detection or manually by button press. The two modes are mutually exclusive and do not persist across soft resets (the mode state is re-initialized to IR Mode on every boot).
 
-#figure(
-  table(
-    columns: (auto, auto, auto, auto, auto),
-    table.header[Mode][LED2 state][IR sensor][BUTTON1 short press][Entry condition],
-    [IR Mode (default)], [Solid on], [Active - triggers 5 s scan bursts], [No-op],              [3 s hold from Manual / Boot],
-    [Manual Mode],       [Off],      [Ignored],                           [Toggle RFID on/off], [3 s hold from IR Mode],
-  ),
-  caption: [Scan mode behavior],
-)
-
 Before any mode transition executes, the firmware unconditionally stops any active RFID inventory operation by sending the `0x28` stop command to the R300 module and powers off the reader via the BC337 transistor to ensure a clean state. This prevents mode transitions from leaving the RFID reader in an undefined operational state or consuming power unnecessarily.
 
 #figure(
   image("./images/3.3.5-1_scan_mode_fsm.svg", width: 80%),
-  caption: [Scan mode state machine - two states (IR Mode, Manual Mode); transitions: 3-second BUTTON1 hold in either direction; entry actions listed for each state (stop RFID, set LED2, enable/disable IR)]
+  caption: [Scan mode state machine]
 )
 
 ==== Button Gestures <button_gestures>
@@ -533,8 +544,8 @@ The firmware recognizes both short-press (momentary tap) and long-hold gestures 
     [BUTTON1], [Short press], [Toggle RFID scan (Manual Mode only; no-op in IR Mode)],
     [BUTTON1], [3 s hold],    [Switch between IR Mode and Manual Mode],
     [BUTTON2], [Short press], [Publish status/statistics message via MQTT],
-    [BUTTON2], [5 s hold],    [Enter WiFi AP provisioning (triggers reboot into setup mode)],
-    [Both],    [10 s hold],   [Cache purge: clear offline event cache, confirmation LED sequence, restart],
+    [BUTTON2], [5 s hold],    [Enter WiFi AP provisioning],
+    [Both],    [10 s hold],   [Cache purge: clear offline event cache],
   ),
   caption: [Complete button gesture reference],
 )
@@ -601,19 +612,34 @@ The technology choices for each subsystem, with per-component selection rational
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto),
-    table.header[Component][Technology][Role][Selection rationale],
-    [HTTP API],          [Hono],            [REST endpoints, JWT auth],                        [Lightweight, TypeScript-native; type-safe routing without legacy framework overhead],
-    [MQTT Broker],       [Aedes],           [Receives firmware scan/health messages],           [In-process embedding removes external service dependency; sufficient throughput for target scale],
-    [Database],          [PSQL + Drizzle],  [Persistent event and user storage],               [Relational model suits grouped lighthouse and tag-assignment schema; Drizzle provides compile-time type-safe queries],
-    [WebSocket Gateway], [Bun WebSocket],   [Real-time push to dashboard clients],             [Native Bun implementation; no additional dependency],
-    [Navigo3 Poller],    [Custom interval], [Periodic retry of unsynced events],               [Simple polling loop sufficient; avoids queue infrastructure],
-    [Event Sweeper],     [Custom interval], [Cluster detection and direction processing],      [Fixed 2 s poll decouples ingestion rate from processing; bounded per-cycle cluster cap prevents starvation],
+    columns: (auto, auto, 1fr),
+    align: left,
+    inset: (x: 8pt, y: 6pt),
+    table.header(
+      table.cell(fill: luma(215), align: center)[*Component*],
+      table.cell(fill: luma(215), align: center)[*Technology*],
+      table.cell(fill: luma(215), align: center)[*Role*],
+    ),
+    [*HTTP API*], [Hono], [REST endpoints],
+    table.cell(colspan: 3)[Lightweight, TypeScript-native; type-safe routing without legacy framework overhead; co-located with the MQTT broker in a single process, eliminating inter-service communication.],
+    table.hline(stroke: 0.8pt),
+    [*MQTT Broker*], [Aedes], [Receives firmware scan/health messages],
+    table.cell(colspan: 3)[In-process embedding removes the external service dependency of a standalone broker; a single portal generates at most a few scan events per second, well within single-process throughput.],
+    table.hline(stroke: 0.8pt),
+    [*Database*], [PSQL, Drizzle ORM], [Persistent event and user storage],
+    table.cell(colspan: 3)[Relational model suits the grouped lighthouse and tag-assignment schema; Drizzle provides compile-time type-safe queries and manages schema migrations via Drizzle Kit.],
+    table.hline(stroke: 0.8pt),
+    [*WebSocket*], [Bun WebSocket], [Real-time push to dashboard clients],
+    table.cell(colspan: 3)[Native Bun implementation requires no additional dependency; push-based delivery means dashboard clients receive events immediately without polling the REST API.],
+    table.hline(stroke: 0.8pt),
+    [*Navigo3 Poller*], [Custom interval], [Periodic retry of unsynced events],
+    table.cell(colspan: 3)[Simple polling loop is sufficient given the low event frequency; avoids message queue infrastructure; 60 s retry interval balances delivery promptness against Navigo3 API load.],
+    table.hline(stroke: 0.8pt),
+    [*Event Sweeper*], [Custom interval], [Cluster detection & direction processing],
+    table.cell(colspan: 3)[Fixed 2 s poll decouples ingestion rate from processing; bounded per-cycle cluster cap of 50 prevents a backlog from starving other subsystems during high traversal density.],
   ),
   caption: [Server component responsibilities and selection rationale],
 ) <tbl-server-components>
-
-#fig-placeholder[Server internal component diagram - showing message flow from MQTT broker through scan handler to DB, and from event sweeper through algorithm layer to processed_events and WebSocket broadcast]
 
 === Event Ingestion and Raw Scan Storage <event_ingestion_and_raw_scan_storage>
 
@@ -649,7 +675,7 @@ The ingestion architecture is designed for append-only, high-throughput write pa
 
 #figure(
   image("./images/3.4.2-1_mqtt_ingestion.svg", width: 80%),
-  caption: [MQTT ingestion sequence - firmware batch publish -> broker -> scan handler -> per-element validation -> DB insert -> WebSocket broadcast of raw scan event]
+  caption: [MQTT ingestion sequence]
 )
 
 === Direction Detection and Event Processing <direction_detection_and_event_processing>
@@ -706,7 +732,7 @@ $ C_1 = "CSF" times "CSzF" times "BCF" $
 
 #figure(
   image("./images/3.4.3-2_dashboard.png", width: 80%),
-  caption: [Cluster timeline diagram - horizontal time axis; two event types (Blue Lighthouse = inside, Orange Lighthouse = outside); scan detections shown as vertical ticks; cluster start/end markers],
+  caption: [Cluster timeline screenshot],
 )
 
 ==== Algorithm 2 - RSSI-Weighted Centroid (C₂) <algorithm_2_rssi-weighted_centroid>
@@ -817,7 +843,7 @@ Real-time updates are delivered over a single WebSocket connection opened on app
 #figure(
   table(
     columns: (auto, auto, auto),
-    table.header[ Message type     ],[ Trigger                          ],[ Consumer page(s) ],
+    table.header[ Message type     ][ Trigger                          ][ Consumer page(s) ],
 [ `scan`           ],[ New raw scan ingested            ],[ Events           ],
 [ `device:online`  ],[ Lighthouse MQTT connect          ],[ Lighthouses      ],
 [ `device:offline` ],[ Lighthouse MQTT disconnect / LWT ],[ Lighthouses      ],
