@@ -329,7 +329,7 @@ The Board v2 schematic defines all GPIO connections between the ESP32-WROOM-32 m
     [33], [BATTERY_SENSE],     [ADC1_CH5 for battery voltage monitoring],
   ),
   caption: [ESP32 GPIO assignments on Board v2],
-)
+) <tbl_gpio_assignments>
 
 GPIO5 is a strapping pin on the ESP32 (per ESP32 Datasheet Section 2.3) and must be held high during boot to select SPI boot mode. The Board v2 schematic includes a 10 kΩ pull-up resistor on GPIO5 to ensure reliable boot behaviour while still allowing it to function as a general-purpose output for the BC337 base drive after boot completes. GPIO33 was selected for battery voltage monitoring because it is connected to ADC1_CH5, which remains available for use during active WiFi operation; ADC2 channels share hardware with the WiFi RF subsystem and cannot be sampled reliably while WiFi is active (per ESP32 TRM Section 31.4.2).
 
@@ -373,15 +373,11 @@ The 470 µF electrolytic capacitor on the R300 5 V rail was sized to limit volta
 
 === Antenna and RF Considerations <antenna_and_rf_considerations>
 
-UHF RFID operates in the 860–960 MHz range (ETSI band 865–868 MHz in Europe, FCC 902–928 MHz in North America). At these frequencies, signal integrity of the connection between the R300 module's RF output and the antenna is critical to maintaining detection range. The YPD-R300 module's RF output is specified for 50 Ω impedance (per YPD-R300 datasheet Section 3.1; see also @uhf_rfid_reader_modules); any mismatch in the feed path causes reflected power, reducing effective radiated power and read range. Board v2 was designed with an IPEX/U.FL surface-mount coaxial receptacle footprint on the PCB edge, connected to the R300 module's RF output pad via a 2 cm microstrip trace. However, the first fabricated unit was assembled with this footprint unpopulated due to parts availability constraints at the time of assembly, and the antenna connection was instead made by hand-soldering a coaxial pigtail cable directly to the R300 RF output pad, bypassing the PCB trace entirely.
+UHF RFID operates in the 860–960 MHz range (ETSI band 865–868 MHz in Europe, FCC 902–928 MHz in North America). At these frequencies the integrity of the feed path between the YPD-R300 RF output and the antenna directly governs detection range; the R300 RF output is specified for 50 Ω impedance (per YPD-R300 datasheet Section 3.1; see also @uhf_rfid_reader_modules), and any mismatch reflects power away from the antenna. Board v2 routes the R300 RF output to a board-edge IPEX/U.FL surface-mount coaxial receptacle via a 2 cm microstrip trace. 
 
-This first unit achieved consistent 3 m detection range with a 4 dBi circularly polarised panel antenna. When the second unit was assembled, the same hand-solder approach was attempted but yielded only 0.5 m range despite using an identical R300 module, identical firmware, and the same antenna model. Multiple attempts were made to rework the solder joint on the second unit in an effort to recover range, but performance never improved beyond the initial 0.5 m baseline and in some cases worsened during rework. These repeated failures demonstrated that hand-soldered RF joints at 900 MHz are unreliable and sensitive to mechanical inconsistencies that are difficult to control or reproduce. The hand-solder approach was abandoned in favour of proper coaxial connectors.
+The trace width on Board v2 was not impedance-controlled during layout. Achieving 50 Ω characteristic impedance on a microstrip requires the trace width to be matched to the PCB substrate thickness, dielectric constant, and copper weight, none of which were explicitly calculated or verified for the chosen stack-up. The empirical consequence is visible in #ref(<unit_ranges>). The Blue unit, fitted with a 4 dBi antenna soldered directly to the R300 RF output pad, and the Yellow unit, fitted with a 5.5 dBi antenna routed through the IPEX receptacle and the 2 cm trace, both achieve the same 3.0 m maximum reliable range. Vendor-stated ideal free-space ranges for the two antennas are 3.5 m and 4.8 m respectively @antenna-4dbi @antenna-5dbi; the Blue unit therefore achieves approximately 86% of its antenna's stated ideal, while Yellow achieves only 62%. Were Yellow's feed path as efficient as Blue's, the larger antenna's expected range would be approximately 4.1 m. The recoverable range loss attributable to the unmatched feed path is therefore estimated at 1 to 1.5 m, the lower bound coming from the proportional argument above and the upper bound allowing for additional loss in connector transitions not present on the direct-solder unit. 
 
-The second unit was rebuilt with the IPEX receptacle properly populated and a snap-on coaxial cable connecting to the antenna. However, even with the proper connector, this unit did not match the 3 m range of the first unit when using the same 4 dBi antenna. Both the second and third units were subsequently upgraded to 5.5 dBi antennas, and in combination with a firmware change to real-time inventory mode (command `0x89` per YPD-R300 Protocol Section 2.4, increasing scan density from ~4 tags per 250 ms polling window to ~60 tags per 5 s scan burst), both units now achieve 5 m unobstructed detection range. The fact that the second unit with a proper IPEX connector and 2 cm PCB trace initially underperformed the first unit with a direct hand-solder bypass suggests that the PCB trace introduces a meaningful impedance discontinuity at 900 MHz.
-
-Board v2's 2 cm microstrip trace between the R300 RF pad and the IPEX footprint was not impedance-controlled during layout. Achieving 50 Ω characteristic impedance on a microstrip trace requires specific trace width relative to the PCB substrate thickness, dielectric constant, and copper weight - constraints that were not explicitly calculated or verified during the Board v2 design process. This is identified as a known limitation discovered post-fabrication. While the current units with 5.5 dBi antennas perform adequately at 5 m range, they are likely still subject to some degree of impedance mismatch loss and would probably achieve better range if the trace were eliminated or properly impedance-controlled. A future board revision should reposition the IPEX/U.FL receptacle immediately adjacent to the R300 RF output pad to eliminate the trace entirely, removing the impedance discontinuity and the associated RF loss.
-
-#fig-placeholder[Annotated photograph or diagram comparing the two antenna connection methods - (a) coaxial pigtail soldered directly to R300 RF pad bypassing PCB trace (Unit 1), (b) signal routed through 2 cm PCB trace to board-edge IPEX connector (Units 2 and 3); impedance discontinuity at the trace highlighted as suspected loss source]
+A future board revision should reposition the IPEX/U.FL receptacle immediately adjacent to the R300 RF output pad to eliminate the trace entirely. Should a non-trivial trace remain unavoidable in a later layout, its geometry must be calculated for 50 Ω characteristic impedance against the chosen PCB stack-up before fabrication. 
 
 === Enclosure <enclosure>
 
@@ -441,11 +437,11 @@ The AM312 PIR (passive infrared) motion sensor mounted on GPIO19 detects movemen
 
 ==== MQTT Batch Accumulator <mqtt_batch_accumulator>
 
-The firmware initially published one MQTT message per tag detection packet received from the R300, producing approximately 60 individual MQTT publishes during a 5-second scan window. This high-frequency publish pattern saturated the ESP-MQTT client's internal outbox queue and triggered TCP connection resets (errno 104 "Connection reset by peer") from the Aedes MQTT broker running on the server. To resolve this, tag detections are now accumulated in a time-windowed batch buffer on the firmware side before transmission. The accumulator collects tag detection events for up to `scan_batch_ms` milliseconds (default 150 ms, configurable) or until the buffer reaches its capacity of `MQTT_SCAN_BATCH_MAX_ENTRIES` (64 entries), whichever occurs first. When either condition is met, the firmware flushes the batch as a single JSON array to the MQTT topic `lighthouse/{id}/scans`. The live scan publish path uses QoS 1 to reduce the overhead of the four-way handshake required by QoS 2; the reduction in MQTT protocol overhead combined with the batching allows the firmware to sustain high scan rates without overwhelming the broker. The offline replay path, which delivers historically cached events after network restoration, retains QoS 2 to guarantee exactly-once delivery and prevent duplicate attendance records.
+Tag detections from the R300 are accumulated in a time-windowed buffer on the firmware side rather than published one MQTT message per detection. The buffer flushes whenever either of two conditions is met: elapsed time since the first buffered detection reaches `scan_batch_ms` (default 150 ms, configurable via NVS, range 50–2000 ms), or the buffer fills to its capacity of `MQTT_SCAN_BATCH_MAX_ENTRIES` (64 entries). On flush, the firmware publishes the accumulated detections as a single JSON array to topic `lighthouse/{id}/scans`. The live scan path uses QoS 1; QoS 2's four-way handshake is reserved for the offline replay path (see #ref(<offline_event_caching>)), where exactly-once delivery prevents duplicate attendance records from re-delivered cached batches. 
 
-==== Power Cap Discovery <power_cap_discovery>
+==== Transmit Power Configuration <transmit_power_configuration>
 
-During initial range testing, firmware configured the R300 transmit power to 33 dBm using the `set_power` command (`0x76` per R300 Protocol Section 2.1.7, page 12) under the assumption that the module supported the full range specified in the datasheet (20–33 dBm). However, the YPD-R300 hardware variant used in this project has a power amplifier cap at 25 dBm (noted in @uhf_rfid_reader_modules); attempts to set power above this threshold return error code `0x48` ("output_power_out_of_range" per R300 Protocol Section 3, page 39). This error was silently ignored for an extended period because the firmware did not initially read or validate R300 command responses - it assumed that all commands succeeded. The firmware now reads the response packet following every `set_power` command and validates that the response contains success code `0x10`. Transmit power is clamped to the range 20–25 dBm in firmware to prevent rejected commands, and the validated power level is logged on successful configuration to confirm that the R300 accepted the requested setting.
+The YPD-R300 variant used in this project caps the power amplifier at 25 dBm (cf. @uhf_rfid_reader_modules). The firmware clamps the configured transmit power to the 20–25 dBm range before issuing the `set_power` command (`0x76`, per R300 Protocol §2.1.7, p. 12), reads the response packet, and validates the module's success code `0x10`; values outside the supported range are rejected by the module with error code `0x48` ("output_power_out_of_range", per R300 Protocol §3, p. 39). The validated power level is logged on every successful configuration. 
 
 === Timekeeping and Timestamp Quality <timekeeping_and_timestamp_quality>
 
@@ -503,30 +499,13 @@ On MQTT reconnection, a background replay task (`offline_replay_task`) is spawne
 
 === User Interaction: Buttons, LEDs, and Gestures <user_interaction>
 
-The IO subsystem manages four status LEDs, two tactile buttons, and one passive infrared motion sensor. All GPIO configuration, button debouncing, LED state management, and scan mode logic are encapsulated in a dedicated `io_controller` module (`io_controller.c` and `io_controller.h`), keeping the main application file (`lighthouse.c`) limited to orchestration responsibilities and MQTT/offline event routing. This separation improves maintainability and allows the IO logic to be tested and modified independently of the higher-level application state machine.
+The IO subsystem manages four status LEDs, two tactile buttons, and one passive infrared motion sensor. All GPIO configuration, button debouncing, LED state management, and scan mode logic are encapsulated in a dedicated `io_controller` module, keeping the main application file (`lighthouse.c`) limited to orchestration responsibilities and MQTT/offline event routing. This separation improves maintainability and allows the IO logic to be tested and modified independently of the higher-level application state machine.
 
-#figure(
-  table(
-    columns: (auto, auto, auto),
-    table.header[Constant][GPIO][Function],
-    [LED1_PIN],      [4],  [WiFi + MQTT combined status (green)],
-    [LED2_PIN],      [21], [IR mode / AP provisioning indicator (green)],
-    [SCANNING_LED],  [26], [Active RFID scan indicator (red)],
-    [ACTIVITY_LED],  [25], [Tag detection flash / battery status (yellow)],
-    [BUTTON1_PIN],   [22], [Scan mode control],
-    [BUTTON2_PIN],   [23], [Status message / WiFi setup trigger],
-    [IR_SENSOR_PIN], [19], [AM312 PIR motion sensor],
-  ),
-  caption: [GPIO pin assignments],
-)
-
-GPIO22 and GPIO23 (button inputs) use external pull-up resistors on the PCB; the ESP32's internal pull-ups are disabled in firmware configuration. Debounce filtering is applied in software using a simple time-threshold approach: a button state change is only registered if the GPIO level remains stable for at least 50 ms after the initial transition. This 50 ms debounce threshold effectively suppresses mechanical contact bounce without introducing perceptible delay in the user experience.
+Debounce filtering is applied in software using a simple time-threshold approach: a button state change is only registered if the GPIO level remains stable for at least 50 ms after the initial transition. This 50 ms debounce threshold effectively suppresses mechanical contact bounce without introducing perceptible delay in the user experience.
 
 ==== Scan Modes <scan_modes>
 
-The firmware operates in one of two scan modes, selectable via a 3-second hold of BUTTON1. The mode determines whether RFID scan bursts are triggered automatically by IR motion detection or manually by button press. The two modes are mutually exclusive and do not persist across soft resets (the mode state is re-initialized to IR Mode on every boot).
-
-Before any mode transition executes, the firmware unconditionally stops any active RFID inventory operation by sending the `0x28` stop command to the R300 module and powers off the reader via the BC337 transistor to ensure a clean state. This prevents mode transitions from leaving the RFID reader in an undefined operational state or consuming power unnecessarily.
+The firmware operates in one of two scan modes, togglable via a 3-second hold of BUTTON1. The mode determines whether RFID scan bursts are triggered automatically by IR motion detection or manually by button press. Before any mode transition executes, the firmware unconditionally stops any active RFID inventory operation. This prevents mode transitions from leaving the RFID reader in an undefined operational state or consuming power unnecessarily.
 
 #figure(
   image("./images/3.3.5-1_scan_mode_fsm.svg", width: 80%),
@@ -535,7 +514,7 @@ Before any mode transition executes, the firmware unconditionally stops any acti
 
 ==== Button Gestures <button_gestures>
 
-The firmware recognizes both short-press (momentary tap) and long-hold gestures on each button, as well as a dual-button combo gesture for developer-level cache purge operations. Long-hold thresholds are detected by tracking the elapsed time since the initial button press and firing the associated action only once when the threshold is crossed.
+The firmware recognizes both short-press and long-hold gestures on each button, as well as a dual-button combo gesture for developer-level cache purge operations.
 
 #figure(
   table(
@@ -550,13 +529,7 @@ The firmware recognizes both short-press (momentary tap) and long-hold gestures 
   caption: [Complete button gesture reference],
 )
 
-==== Cache Purge Combo Gesture <cache_purge_combo_gesture>
-
-Holding both BUTTON1 and BUTTON2 simultaneously for 10 seconds triggers a developer cache purge gesture that clears the offline event ring buffer. During the 10-second hold period, LEDs illuminate sequentially as a visual countdown: LED1 at 2.5 seconds, LED2 at 5 seconds, ACTIVITY_LED at 7.5 seconds, and SCANNING_LED at 10 seconds (all LEDs then illuminated). At the 10-second threshold, the firmware calls `offline_logger_clear_all()` to reset the LittleFS ring buffer read and write pointers to zero, plays a confirmation flash sequence (each LED flashed in order at 200 ms intervals), and calls `esp_restart()` to reboot the device. Releasing either button before the 10-second threshold is reached cancels the gesture immediately and restores all LEDs to their normal operational states. While the combo gesture is active, RFID scanning is stopped if in progress, and IR trigger events are suppressed to prevent interference with the gesture countdown.
-
 ==== LED Indicator Behavior <led_indicator_behavior>
-
-LED1 (green) provides combined status indication for WiFi and MQTT connectivity. When the WiFi connection is not established, LED1 remains off. When WiFi is connected but the MQTT client has not yet successfully connected to the broker, LED1 blinks at a 1-second period (500 ms on, 500 ms off). When both WiFi and MQTT are connected, LED1 is solid on. LED2 (green) indicates the current scan mode: solid on when IR Mode is active, off when Manual Mode is active. During WiFi provisioning, LED2 is controlled by the provisioning subsystem and blinks until the MQTT connectivity test passes, at which point it turns solid on as a final confirmation before reboot. SCANNING_LED (red) is on whenever an RFID inventory operation is in progress and off otherwise. ACTIVITY_LED (yellow) flashes briefly (100 ms pulse) each time a tag detection event is logged; this flash is superimposed on the battery status pattern when running on battery power.
 
 #figure(
   table(
@@ -588,7 +561,7 @@ LED1 (green) provides combined status indication for WiFi and MQTT connectivity.
 
 ==== Battery Status LED Patterns (ACTIVITY_LED, Battery Power Only) <battery_status_led_patterns>
 
-When the device is running on battery power (USB not connected), ACTIVITY_LED provides continuous battery level indication via repeating pulse patterns with different cadences corresponding to charge percentage thresholds. When USB power is connected, the battery status pattern is suppressed and ACTIVITY_LED is used exclusively for tag detection flashes. The battery LED patterns are generated in a dedicated FreeRTOS task (`battery_led_task`) running at low priority; this task yields between pattern iterations to avoid interfering with the brief 100 ms tag detection flashes that are triggered synchronously from the RFID event handler.
+When the device is running on battery power, ACTIVITY_LED provides continuous battery level indication via repeating pulse patterns with different cadences corresponding to charge percentage thresholds. See #ref(<battery_level_indication>)
 
 #figure(
   table(
@@ -600,7 +573,7 @@ When the device is running on battery power (USB not connected), ACTIVITY_LED pr
     [Battery < 5%],   [Rapid pulsing 200 ms on/off],
   ),
   caption: [Battery level indication],
-)
+) <battery_level_indication>
 
 == Server <server>
 
@@ -700,35 +673,35 @@ Scans from ungrouped Lighthouse units-those with `groupId IS NULL`-are handled s
 
 ==== Algorithm 1 - Temporal Centroid (C₁) <algorithm_1_temporal_centroid>
 
-Algorithm 1 implements the temporal centroid approach of Oikawa @oikawa-2009, surveyed in @direction_detection_methods, determining traversal direction by comparing the arithmetic mean detection timestamps of the outside and inside scan groups. The temporal centroid of each group is computed as the simple average of all scan timestamps from that Lighthouse:
+Algorithm 1 implements the temporal centroid approach of Oikawa @oikawa-2009, surveyed in @direction_detection_methods. For each Lighthouse group, the centroid is the arithmetic mean of its scan timestamps: 
 
 $ overline(t)_"out" = 1 / N_"out" sum_(i=1)^(N_"out") t_i^"out", quad overline(t)_"in" = 1 / N_"in" sum_(i=1)^(N_"in") t_i^"in" $
 
-Direction is inferred from the ordering of these centroids. If the outside centroid precedes the inside centroid ($overline(t)_"out" < overline(t)_"in"$), the tag entered the portal from outside, and the event is classified as an entry (IN). Conversely, if the inside centroid precedes the outside centroid ($overline(t)_"in" < overline(t)_"out"$), the tag exited, and the event is classified as an exit (OUT). If the absolute difference between the centroids is less than or equal to 1 millisecond-within the margin of timestamp quantization-the direction is marked as unknown.
+The earlier centroid identifies the side the tag passed first: $overline(t)_"out" < overline(t)_"in"$ classifies the event as entry (IN), the reverse as exit (OUT). If the absolute difference is at most 1 ms - within timestamp quantisation - direction is marked unknown. 
 
-The confidence score for Algorithm 1 is the product of three independent dimensionless factors, each quantifying a distinct aspect of cluster quality. All factors are clamped to the range [FLOOR, 1.0], where FLOOR is a tunable constant (currently 0.1) that prevents any single degenerate factor from reducing the confidence to zero.
+The confidence score for Algorithm 1 is the product of three dimensionless factors: 
 
-The *centroid separation factor* (CSF) measures the temporal distinctness of the two scan groups relative to the overall cluster duration:
+$ C_1 = "CSF" times "CSzF" times "BCF" $
 
-$ "CSF" = (|overline(t)_"out" - overline(t)_"in"|) / (t_"cluster\_end" - t_"cluster\_start") $
+Each factor is clamped to the range $["FLOOR", 1.0]$ with $"FLOOR" = 0.1$; the clamp prevents any single degenerate factor from collapsing $C_1$ to zero. 
 
-A traversal where the outside and inside detections are well-separated in time produces a CSF approaching 1.0, indicating clear temporal sequencing. Overlapping scan groups-common when a person moves slowly or pauses within the detection zone-yield lower CSF values. If the cluster duration is zero (all scans occurred at the same timestamp, an edge case that can arise from firmware clock issues or extremely brief transits), CSF is clamped to FLOOR to prevent division by zero.
+*Centroid separation factor (CSF):*
 
-The *cluster size factor* (CSzF) rewards clusters with a larger total number of scans, up to a saturation threshold of 10 scans:
+$ "CSF" = (|overline(t)_"out" - overline(t)_"in"|) / (t_e - t_s) $
+
+where $t_s$ and $t_e$ are the earliest and latest scan timestamps in the cluster. CSF approaches 1.0 when the two scan groups are well-separated in time and falls toward zero when they overlap, which is common when a person moves slowly or pauses within the detection zone. If $t_e = t_s$ (all scans at the same timestamp), CSF is clamped to FLOOR. 
+
+*Cluster size factor (CSzF):*
 
 $ "CSzF" = min(1.0, (n_"total" - 2) / 8) $
 
-This factor is predicated on the observation that a traversal with many detections provides more statistical evidence for direction than a cluster with only two or three scans. The saturation at 10 scans prevents the factor from indefinitely increasing with scan density, which would bias the confidence metric toward slower-moving individuals or tags with higher RFID responsiveness.
+CSzF rewards clusters with more total scans as stronger statistical evidence, saturating at 10 scans. The saturation prevents the score from biasing toward slow carriers or unusually responsive tags. 
 
-The *bilateral coverage factor* (BCF) quantifies the balance of scan distribution between the two Lighthouses:
+*Bilateral coverage factor (BCF):*
 
-$ "BCF" = (min(n_"in", n_"out")) / (max(n_"in", n_"out")) $
+$ "BCF" = min(n_"in", n_"out") / max(n_"in", n_"out") $
 
-A perfectly balanced cluster-equal scan counts on both sides-yields BCF = 1.0. Asymmetric clusters, where one Lighthouse detects the tag many times while the other detects it only once or twice, produce lower BCF values, reflecting the reduced reliability of direction inference when one side of the portal contributes minimal data. This factor penalizes edge cases where a tag is detected primarily by one unit, which can occur if the tag is carried along the extreme edge of the portal or if one unit's antenna has degraded range.
-
-The final confidence for Algorithm 1 is the product of these three factors:
-
-$ C_1 = "CSF" times "CSzF" times "BCF" $
+BCF measures the balance of scan counts between the two Lighthouses; it is 1.0 when both contribute equally and falls when one dominates, which can occur if the tag is carried along the extreme edge of the portal or if one unit's antenna has degraded range. Clusters with zero scans on one side are orphaned upstream as `insufficient_data` (#ref(<orphan_handling>)) and never reach BCF. 
 
 #figure(
   image("./images/3.4.3-2_dashboard.png", width: 80%),
@@ -737,29 +710,22 @@ $ C_1 = "CSF" times "CSzF" times "BCF" $
 
 ==== Algorithm 2 - RSSI-Weighted Centroid (C₂) <algorithm_2_rssi-weighted_centroid>
 
-Algorithm 2 extends the temporal centroid approach with RSSI-based weighting, drawing on the signal-strength direction cue principle of Jie et al. @jie-2022-rf-access surveyed in @direction_detection_methods. The underlying hypothesis is that scans with stronger signal strength are more indicative of the tag's true position relative to the reader at that instant, and therefore should be weighted more heavily in the temporal centroid. A tag held close to a reader antenna produces a high RSSI value and should shift the effective centroid toward that scan's timestamp; distant detections with weak signals contribute less to the centroid's position.
-
-Each scan's RSSI value is transformed into a weight via a monotonically increasing function $w_i = f("RSSI"_i)$. The specific form of this function is implementation-defined but must satisfy the constraint that stronger signals yield higher weights. The weighted centroid for one Lighthouse group is then computed as:
-
+Algorithm 2 follows the same temporal centroid structure as Algorithm 1 but weights each scan by a monotonically increasing function of its RSSI, $w_i = f("RSSI"_i)$, drawing on the signal-strength direction cue of Jie et al. @jie-2022-rf-access surveyed in @direction_detection_methods. The specific form of $f$ is implementation-defined; the algorithm requires only that stronger signals yield higher weights. The weighted centroid for one Lighthouse group is: 
 $ overline(t)_w = (sum_i w_i dot t_i) / (sum_i w_i) $
 
-This weighted mean replaces the arithmetic mean from Algorithm 1. Direction inference proceeds identically: $overline(t)_("w,out") < overline(t)_("w,in")$ implies entry; $overline(t)_("w,in") < overline(t)_("w,out")$ implies exit. The key advantage of RSSI weighting is that it can resolve direction even in cases where the arithmetic temporal centroids are nearly equal or where scan distributions overlap heavily in time-scenarios where Algorithm 1 would produce an unknown result or a low CSF confidence.
+Stronger signals - produced when the tag is closest to a reader's antenna - pull the effective centroid toward their timestamps, disambiguating cases where the arithmetic means of the two groups are nearly equal. Direction inference is otherwise identical to Algorithm 1, and CSzF and BCF are reused unchanged. CSF is reused with the weighted centroids $overline(t)_("w,out")$ and $overline(t)_("w,in")$ substituted for the arithmetic means in its numerator; this weighted variant is denoted $"CSF"_w$ below. 
 
-In addition to the weighted centroids, Algorithm 2 performs an independent linear regression analysis of RSSI versus time for each Lighthouse group. For the outside group, the regression computes the slope $m_"out"$ of the best-fit line through the points $(t_i^"out", "RSSI"_i^"out")$; similarly, the inside group yields slope $m_"in"$. The sign of these slopes encodes information about the tag's movement pattern. For an entry traversal (IN), the expected behavior is that the tag's signal weakens over time at the outside reader (negative slope, as the person moves away from the outside antenna) and strengthens at the inside reader (positive slope, as the person approaches the inside antenna). For an exit traversal (OUT), the trend reverses: inside slope negative, outside slope positive.
+Algorithm 2 additionally fits a least-squares regression line to RSSI versus time for each Lighthouse group. The outside group yields the slope $m_"out"$ of the best-fit line through the points $(t_i^"out", "RSSI"_i^"out")$, and similarly the inside group yields $m_"in"$. The agreement between these observed slopes and those expected for the inferred direction forms a fourth confidence factor: 
 
-The RSSI trend consistency factor (RTCF) quantifies the agreement between the observed regression slopes and the slopes expected for the direction call produced by the weighted centroids:
+*RSSI trend consistency factor (RTCF):*
 
-- RTCF = 1.0 when both trends agree with the expected direction (both slopes have the correct sign).
-- RTCF = FLOOR when both trends contradict the expected direction (both slopes have the wrong sign).
-- RTCF = 0.5 when the regression is inconclusive-this occurs if either Lighthouse group has fewer than 3 scans (insufficient data for meaningful regression), if the coefficient of determination $R^2$ is below 0.1 (indicating a poor linear fit), or if one trend agrees while the other is inconclusive.
+RTCF is categorical: 1.0 when both slope signs match expectation (a falling slope at the outside reader and a rising slope at the inside reader for an entry; reversed for an exit), FLOOR when both contradict, and 0.5 when inconclusive - either side has fewer than 3 scans, the coefficient of determination $R^2$ is below 0.1, or one side agrees while the other is inconclusive. The neutral 0.5 (rather than FLOOR) for inconclusive cases accommodates noisy but otherwise valid detections, where multipath or orientation-dependent variation degrades the linearity of the RSSI-versus-time relationship. 
 
-The use of a neutral 0.5 penalty rather than full contradiction (FLOOR) for inconclusive cases reflects the fact that real-world RFID data often contains noise, multipath interference, and orientation-dependent signal variation that degrade the linearity of the RSSI-time relationship. The RTCF factor rewards traversals where the physical movement pattern is clearly reflected in the signal trend while avoiding overpenalization of noisy but otherwise valid detections.
-
-The confidence for Algorithm 2 incorporates RTCF as a fourth multiplicative factor:
+The composite confidence is:
 
 $ C_2 = "CSF"_w times "CSzF" times "BCF" times "RTCF" $
 
-The CSF, CSzF, and BCF factors are computed identically to Algorithm 1, except that the centroid separation factor uses the RSSI-weighted centroids rather than the arithmetic means. Algorithm 2 thus retains all the statistical rigor of the temporal centroid method while augmenting it with signal strength information that can disambiguate difficult cases.
+where $"CSF"_w$ denotes CSF computed from the weighted centroids.
 
 ==== Orphan handling <orphan_handling>
 
@@ -783,54 +749,52 @@ A database constraint enforces that at most one active assignment exists per tag
 
 === Navigo3 Integration <navigo3_integration>
 
-The Navigo3 integration layer, consuming the REST path established in @communication_protocols_and_enterprise_integration via the `dry-api` framework @dry-api @navigo3-api, is implemented as an isolated service module that consumes processed events from the direction detection pipeline and forwards them to the Navigo3 REST API. Integration is enabled or disabled entirely via the presence of environment variables: if `NAVIGO3_BASE_URL`, `NAVIGO3_USERNAME`, and `NAVIGO3_PASSWORD` are absent from the environment at server startup, the integration service initializes in a disabled state and imposes zero runtime overhead on the event processing pipeline-no eligibility checks are performed, no HTTP connections are established, and no polling threads are spawned.
+The Navigo3 integration layer consumes the REST path established in @communication_protocols_and_enterprise_integration via the `dry-api` framework @dry-api @navigo3-api. It is implemented as an isolated service module that consumes processed events from the direction detection pipeline. The service is gated entirely on the presence of the `NAVIGO3_BASE_URL`, `NAVIGO3_USERNAME`, and `NAVIGO3_PASSWORD` environment variables at server startup; if any are absent the service initialises in a disabled state and imposes no runtime overhead on the event processing pipeline. 
 
-When enabled, the integration service establishes an authenticated session with the Navigo3 API during server startup. The Navigo3 API uses a proprietary session-based authentication mechanism where a username and password are exchanged for a session token via a `POST /api/login` request, and this token is included as a bearer token in all subsequent requests. The session remains valid until the server process terminates or the Navigo3 instance invalidates it. Upon successful authentication, the service queries Navigo3 for the numeric `typeId` corresponding to the `atWork` attendance type-this identifier is required for all attendance record creation calls and is cached in-process for the lifetime of the server.
+When enabled, the service authenticates against the Navigo3 API at startup via `POST /api/login`, exchanging username and password for a session token used as the bearer credential in all subsequent requests. The token remains valid until the server process terminates or Navigo3 invalidates the session. The numeric `typeId` for the `atWork` attendance type is queried once after authentication and cached in-process for the lifetime of the server. 
 
-Every processed event-whether from Algorithm 1 or Algorithm 2-undergoes an eligibility check before any integration attempt. An event is eligible if and only if: (1) its `algorithmId` matches the value specified in the `NAVIGO3_ALGORITHM_ID` environment variable (either `temporal_centroid` or `rssi_weighted_centroid`), (2) its `direction` is either `in` or `out` (events with `direction: unknown` are never pushed), and (3) the associated user has a non-null `syncId`. This configuration-based algorithm filtering allows the system operator to select which detection method feeds the enterprise system while retaining both algorithms' outputs in the database for empirical comparison.
-
-==== Immediate push <immediate_push>
-
-Upon completion of the event processing transaction-after both algorithm result rows are written to the `processed_events` table and all constituent raw scans are marked with `processedAt`-the event processor invokes the integration service's `pushEvent()` function asynchronously. This call is wrapped in a non-blocking `setImmediate()` block to ensure that integration failures do not propagate exceptions back into the core event processing logic or delay the event sweeper's next cycle.
-
-The `pushEvent()` function maps the event to one of two Navigo3 API endpoints based on direction. Entry events (`direction: in`) are sent to `POST /api/attendance/embedded/start`, which registers the person's arrival at the workplace. The request payload includes the user's numeric `userId` (parsed from `syncId`), the event timestamp formatted in Navigo3's required ISO 8601 variant, the cached `atWork` type identifier, and an empty comment field. Exit events (`direction: out`) are sent to `POST /api/attendance/embedded/stop`, which registers departure. The `stop` endpoint requires the same fields except for `typeId`, which is omitted as it is inferred from the most recent open attendance interval for that user.
-
-On successful API response (HTTP 200), the `syncedToIntegration` flag on the `processed_events` row is set to `true`, marking the event as synchronized and excluding it from future retry attempts. If the HTTP request fails-due to network errors, authentication expiration, or Navigo3-side validation failures-the flag remains `false`, and the event is left in the unsynced state for the retry sweep to handle. No exceptions are thrown from the `setImmediate` block, ensuring that transient integration failures do not disrupt the core attendance detection pipeline.
-
-==== Paired upsert <paired_upsert>
-
-If a counterpart event already exists in the database-defined as an event for the same user (`userId`), opposite direction, and same calendar day-the integration service invokes `pushPair()` instead of `pushEvent()`. The counterpart check is performed via a database query that looks for an event matching these criteria with `syncedToIntegration: false`, indicating that both sides of the attendance interval are now available but neither has been pushed individually.
-
-Paired events are sent to the `POST /api/attendance/embedded/upsert` endpoint, which creates or updates a closed attendance interval in Navigo3. This endpoint is semantically idempotent: if an interval for the given user and day already exists, the API updates the timestamps; otherwise, it creates a new record. The request payload includes `userId`, `day` (calendar date extracted from the entry event's timestamp), `timeFrom` (entry timestamp formatted as `HH:mm:ss`), `timeTo` (exit timestamp formatted as `HH:mm:ss`), `createdFrom` and `createdTo` (full ISO 8601 timestamps for audit purposes), the `atWork` type identifier, an empty comment, and a `changedBy` field.
-
-The `changedBy` field nominally identifies the user who modified the attendance record, but Navigo3's API implementation overwrites this value server-side with the authenticated session user's ID regardless of the value sent in the request. The field is included in the payload with a placeholder value of `0` solely to satisfy Navigo3's schema validation-omitting the field causes the request to be rejected as malformed. This design constraint reflects the fact that the Navigo3 API was originally designed for interactive user-driven record editing rather than automated system-to-system synchronization, and certain fields carry legacy requirements that are irrelevant in the embedded context.
-
-The `upsert` endpoint returns a JSON response containing a single `id` field, which is the numeric primary key of the attendance record in Navigo3's database. This value is stored in the `navigo3RecordId` column of both the entry and exit event rows, creating a bidirectional link between the Lighthouse system's event records and Navigo3's attendance intervals. Upon successful upsert, both events' `syncedToIntegration` flags are atomically updated to `true` in a single database transaction, ensuring that the pair is never reprocessed even if the server restarts between the API call and the database update.
-
-==== Retry sweep <retry_sweep>
-
-A background polling service, the Navigo3 poller, runs at a configurable interval (default 60 seconds, adjustable via `NAVIGO3_RETRY_INTERVAL_MS`) to re-attempt synchronization of events that failed initial push. The poller queries the database for up to 100 eligible events where `syncedToIntegration: false`, ordered by timestamp ascending to prioritize older unsynchronized records. The query respects the same eligibility criteria as the immediate push path: matching `algorithmId`, non-unknown direction, and valid `syncId`.
-
-For each retrieved event, the retry logic first checks whether a counterpart now exists. If a matching opposite-direction event for the same user and day is found and is also unsynced, the poller invokes `pushPair()` to send the closed interval to Navigo3. If no counterpart exists or the counterpart has already been synced individually, the poller falls back to invoking `pushEvent()` to push the isolated entry or exit. This two-tier retry strategy maximizes the likelihood of sending complete intervals to Navigo3 rather than isolated transitions, improving the semantic quality of the attendance data in the enterprise system.
-
-Errors encountered during retry are logged with the event ID and exception details but do not abort the sweep-the poller continues processing the remaining events in the batch. Failed events remain in the unsynced state and are retried on subsequent polling cycles until they either succeed or are manually marked as synced by an administrator. The poller is non-blocking: if a retry sweep is still in progress when the next polling interval elapses, the new cycle is skipped rather than running concurrently, preventing runaway thread accumulation in pathological failure scenarios where the Navigo3 API is unreachable for extended periods.
+A processed event is eligible for push when (1) its `algorithmId` matches `NAVIGO3_ALGORITHM_ID` (`temporal_centroid` or `rssi_weighted_centroid`), (2) its `direction` is `in` or `out` (`unknown` events are never pushed), and (3) the associated user has a non-null `syncId`. The `algorithmId` filter allows the operator to select which detection algorithm feeds the enterprise system while retaining both algorithms' outputs in the database for comparison (#ref(<direction_detection_and_event_processing>)). Three Navigo3 endpoints are used, described in @tbl-navigo3-endpoints.
 
 #figure(
   table(
-    columns: (auto, auto, auto),
-    table.header[Endpoint][Direction][Description],
-    [`attendance/embedded/start`], [in], [Register arrival],
-    [`attendance/embedded/stop`], [out], [Register departure],
-    [`attendance/embedded/upsert`], [in+out pair], [Create/update closed attendance interval],
+    columns: (auto, auto, 1fr),
+    align: left,
+    inset: (x: 8pt, y: 6pt),
+    table.header(
+      table.cell(fill: luma(215), align: center)[*Endpoint*],
+      table.cell(fill: luma(215), align: center)[*Direction*],
+      table.cell(fill: luma(215), align: center)[*Purpose*],
+    ),
+    [`/api/attendance/embedded/start`], [`in`], [Register arrival],
+    table.cell(colspan: 3)[Invoked when an event with `direction = in` is pushed individually (no eligible counterpart present). Payload: `userId` (parsed from `syncId`), entry timestamp (ISO 8601), cached `typeId` for `atWork`, empty comment.],
+    table.hline(stroke: 0.8pt),
+    [`/api/attendance/embedded/stop`], [`out`], [Register departure],
+    table.cell(colspan: 3)[Invoked when an event with `direction = out` is pushed individually. Payload: `userId`, exit timestamp (ISO 8601), empty comment. `typeId` is omitted; Navigo3 infers it server-side from the most recent open attendance interval for the user.],
+    table.hline(stroke: 0.8pt),
+    [`/api/attendance/embedded/upsert`], [`in + out`], [Create or update closed interval],
+    table.cell(colspan: 3)[Invoked when a counterpart event (opposite direction, same `userId`, same calendar day, also unsynced) is found at push time; both events are sent together. Payload: `userId`, `day`, `timeFrom` and `timeTo` (HH:mm:ss), `createdFrom` and `createdTo` (ISO 8601), `typeId`, empty comment, `changedBy = 0`. Idempotent — creates the interval if absent, updates timestamps if present. Returns the record's primary `id`, written to `navigo3RecordId` on both event rows. `changedBy` is a placeholder required by Navigo3's schema validation; the server overwrites it with the authenticated session user.],
   ),
-  caption: [Navigo3 API endpoints used],
-)
+  caption: [Navigo3 endpoints used by the integration layer.],
+) <tbl-navigo3-endpoints>
+
+==== Immediate push <immediate_push>
+
+After the event processing transaction commits — both algorithm result rows written to `processed_events`, all constituent raw scans marked with `processedAt` — the event processor invokes `pushEvent()` asynchronously via `setImmediate()`, decoupling the integration call from the event sweeper's next cycle. `pushEvent()` selects between `start` and `stop` based on the event's direction (see @tbl-navigo3-endpoints). On HTTP 200 the `syncedToIntegration` flag on the `processed_events` row is set to `true`; on any failure (network, expired session, validation rejection) the flag remains `false` and the event is left to the retry sweep. Exceptions are not propagated out of the `setImmediate` block, isolating integration failures from the core attendance pipeline. 
+
+==== Paired upsert <paired_upsert>
+
+Before invoking `pushEvent()`, the integration service checks `processed_events` for a counterpart — same `userId`, opposite direction, same calendar day, `syncedToIntegration = false`. If one is found, `pushPair()` is invoked instead, sending both events to the `upsert` endpoint (see @tbl-navigo3-endpoints) as a single closed attendance interval. On success the returned record `id` is written to `navigo3RecordId` on both event rows and both `syncedToIntegration` flags flip to `true` in a single database transaction, ensuring the pair is never reprocessed even if the server restarts between the API call and the database update. 
+
+==== Retry sweep <retry_sweep>
+
+The Navigo3 poller runs at a configurable interval (default 60 s, adjustable via `NAVIGO3_RETRY_INTERVAL_MS`) and re-attempts events that failed initial push. Each cycle the poller selects up to 100 events where `syncedToIntegration = false`, ordered by timestamp ascending, applying the same eligibility criteria as the immediate push path. For each event the poller first checks for a counterpart; if one is found and is also unsynced it invokes `pushPair()`, otherwise it falls back to `pushEvent()`. This two-tier strategy prefers sending complete intervals over isolated transitions. 
+
+Errors during retry are logged per event and do not abort the sweep. Failed events remain unsynced and are retried on subsequent cycles until they succeed or are manually resolved by an administrator. If a sweep is still in progress when the next interval elapses, the new cycle is skipped rather than running concurrently. 
 
 #figure(
   image("./images/3.4.5-1_navigo3_sequence.svg", width: 80%),
-  caption: [Navigo3 integration sequence diagram - new processed event → eligibility check → immediate pushEvent/pushPair → on success: syncedToIntegration = true; on failure: left false → retry poller picks up on next cycle],
+  caption: [Navigo3 integration sequence — new processed event → eligibility check → immediate `pushEvent` or `pushPair` → on success `syncedToIntegration = true`; on failure the event is left unsynced for the retry poller's next cycle.],
 )
-
 
 == Dashboard <dashboard>
 
@@ -914,17 +878,17 @@ Per-unit detection range was measured with each unit in isolation. A passive UHF
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto),
-    table.header[Unit][Antenna connection][Max reliable range \[m\]][Condition],
-    [Red],    [IPEX/U.FL],    [2.5], [Pre-drop],
-    [Red],    [IPEX/U.FL],    [1.5], [Post-repair],
-    [Yellow],  [IPEX/U.FL],    [3.0], [N/A],
-    [Blue],           [Direct-solder],   [3.0], [N/A],
+    columns: (auto, auto, auto, auto, auto),
+    table.header[Unit][Antenna][Antenna connection][Max reliable range \[m\]][Condition],
+    [Red],    [5.5 dBi], [IPEX/U.FL],     [2.5], [Pre-drop],
+    [Red],    [5.5 dBi], [IPEX/U.FL],     [1.5], [Post-repair],
+    [Yellow], [5.5 dBi], [IPEX/U.FL],     [3.0], [N/A],
+    [Blue],   [4 dBi],   [Direct-solder], [3.0], [N/A],
   ),
   caption: [Detection range per unit],
 ) <unit_ranges>
 
-Yellow and Blue produce identical 3.0 m maximum reliable ranges despite using different antenna connection methods, demonstrating that an IPEX/U.FL receptacle carries no measurable range penalty relative to a direct-solder pigtail when joint quality is consistent. Detection range at this power level is bounded by the YPD-R300 module's transmit power ceiling and antenna gain, not by the connection type itself. Red's pre-drop range of 2.5 m was already 0.5 m below the other two units, attributable to assembly-level variance in the IPEX cable and connector as discussed in #ref(<antenna_and_rf_considerations>). 
+Yellow and Blue achieve the same 3.0 m maximum reliable range despite Yellow carrying a higher-gain 5.5 dBi antenna. Under vendor-stated ideal conditions the 5.5 dBi antenna reaches approximately 1.3 m further than the 4 dBi antenna @antenna-4dbi @antenna-5dbi; the absence of any such advantage in the measured ranges is consistent with non-trivial forward-path loss on Yellow's feed, attributed in #ref(<antenna_and_rf_considerations>) to the non-impedance-controlled 2 cm microstrip trace. Red's pre-drop range of 2.5 m was already 0.5 m below Yellow's despite identical antenna and connection type, attributable to assembly-level variance in the IPEX cable and connector. 
 
 === Direction detection accuracy
 
@@ -973,9 +937,9 @@ Twelve alternating traversals were performed during a deliberate offline window 
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto, auto),
-    table.header[Scans buffered][Scans replayed][Scans lost][Processed events][Navigo3 records],
-    [606], [606], [0], [12 / 12], [12],
+    columns: (auto, auto, auto, auto),
+    table.header[Scans buffered][Scans replayed][Processed events][Navigo3 records],
+    [606], [606], [12 / 12], [12],
   ),
   caption: [Offline replay verification results],
 )
