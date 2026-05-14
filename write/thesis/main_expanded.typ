@@ -43,7 +43,13 @@ Laboratory validation confirmed that every detected traversal was correctly clas
 UHF RFID, passive RFID, ESP32, FreeRTOS, KiCad, attendance system, attendance tracking, portal model, direction detection, temporal centroid, embedded system, MQTT, FreeCAD, Navigo3
   ],
   declaration: [Declaration text goes here.],
-  acknowledgements: [Acknowledgements go here.],
+  acknowledgements: [
+
+    *Generative AI tools*
+
+    Anthropic's Claude and Claude Code - were used during the preparation of this thesis. The full declaration of the scope, purpose, and verification of their use is given in #ref(<use_of_ai>).
+
+  ],
 )
 
 // =============================================================================
@@ -772,18 +778,18 @@ A processed event is eligible for push when (1) its `algorithmId` matches `NAVIG
     table.cell(colspan: 3)[Invoked when an event with `direction = out` is pushed individually. Payload: `userId`, exit timestamp (ISO 8601), empty comment. `typeId` is omitted; Navigo3 infers it server-side from the most recent open attendance interval for the user.],
     table.hline(stroke: 0.8pt),
     [`/api/attendance/embedded/upsert`], [`in + out`], [Create or update closed interval],
-    table.cell(colspan: 3)[Invoked when a counterpart event (opposite direction, same `userId`, same calendar day, also unsynced) is found at push time; both events are sent together. Payload: `userId`, `day`, `timeFrom` and `timeTo` (HH:mm:ss), `createdFrom` and `createdTo` (ISO 8601), `typeId`, empty comment, `changedBy = 0`. Idempotent — creates the interval if absent, updates timestamps if present. Returns the record's primary `id`, written to `navigo3RecordId` on both event rows. `changedBy` is a placeholder required by Navigo3's schema validation; the server overwrites it with the authenticated session user.],
+    table.cell(colspan: 3)[Invoked when a counterpart event (opposite direction, same `userId`, same calendar day, also unsynced) is found at push time; both events are sent together. Payload: `userId`, `day`, `timeFrom` and `timeTo` (HH:mm:ss), `createdFrom` and `createdTo` (ISO 8601), `typeId`, empty comment, `changedBy = 0`. Idempotent - creates the interval if absent, updates timestamps if present. Returns the record's primary `id`, written to `navigo3RecordId` on both event rows. `changedBy` is a placeholder required by Navigo3's schema validation; the server overwrites it with the authenticated session user.],
   ),
   caption: [Navigo3 endpoints used by the integration layer.],
 ) <tbl-navigo3-endpoints>
 
 ==== Immediate push <immediate_push>
 
-After the event processing transaction commits — both algorithm result rows written to `processed_events`, all constituent raw scans marked with `processedAt` — the event processor invokes `pushEvent()` asynchronously via `setImmediate()`, decoupling the integration call from the event sweeper's next cycle. `pushEvent()` selects between `start` and `stop` based on the event's direction (see @tbl-navigo3-endpoints). On HTTP 200 the `syncedToIntegration` flag on the `processed_events` row is set to `true`; on any failure (network, expired session, validation rejection) the flag remains `false` and the event is left to the retry sweep. Exceptions are not propagated out of the `setImmediate` block, isolating integration failures from the core attendance pipeline. 
+After the event processing transaction commits - both algorithm result rows written to `processed_events`, all constituent raw scans marked with `processedAt` - the event processor invokes `pushEvent()` asynchronously via `setImmediate()`, decoupling the integration call from the event sweeper's next cycle. `pushEvent()` selects between `start` and `stop` based on the event's direction (see @tbl-navigo3-endpoints). On HTTP 200 the `syncedToIntegration` flag on the `processed_events` row is set to `true`; on any failure (network, expired session, validation rejection) the flag remains `false` and the event is left to the retry sweep. Exceptions are not propagated out of the `setImmediate` block, isolating integration failures from the core attendance pipeline. 
 
 ==== Paired upsert <paired_upsert>
 
-Before invoking `pushEvent()`, the integration service checks `processed_events` for a counterpart — same `userId`, opposite direction, same calendar day, `syncedToIntegration = false`. If one is found, `pushPair()` is invoked instead, sending both events to the `upsert` endpoint (see @tbl-navigo3-endpoints) as a single closed attendance interval. On success the returned record `id` is written to `navigo3RecordId` on both event rows and both `syncedToIntegration` flags flip to `true` in a single database transaction, ensuring the pair is never reprocessed even if the server restarts between the API call and the database update. 
+Before invoking `pushEvent()`, the integration service checks `processed_events` for a counterpart - same `userId`, opposite direction, same calendar day, `syncedToIntegration = false`. If one is found, `pushPair()` is invoked instead, sending both events to the `upsert` endpoint (see @tbl-navigo3-endpoints) as a single closed attendance interval. On success the returned record `id` is written to `navigo3RecordId` on both event rows and both `syncedToIntegration` flags flip to `true` in a single database transaction, ensuring the pair is never reprocessed even if the server restarts between the API call and the database update. 
 
 ==== Retry sweep <retry_sweep>
 
@@ -793,7 +799,7 @@ Errors during retry are logged per event and do not abort the sweep. Failed even
 
 #figure(
   image("./images/3.4.5-1_navigo3_sequence.svg", width: 80%),
-  caption: [Navigo3 integration sequence — new processed event → eligibility check → immediate `pushEvent` or `pushPair` → on success `syncedToIntegration = true`; on failure the event is left unsynced for the retry poller's next cycle.],
+  caption: [Navigo3 integration sequence - new processed event → eligibility check → immediate `pushEvent` or `pushPair` → on success `syncedToIntegration = true`; on failure the event is left unsynced for the retry poller's next cycle.],
 )
 
 == Dashboard <dashboard>
@@ -990,3 +996,140 @@ Several directions for future development are identified. A hardware real-time c
 #bibliography("references.bib", style: "ieee")
 
 = Attachments <attachments>
+
+#show heading.where(level: 2): set heading(supplement: "Appendix")
+
+#set heading(numbering: (..nums) => {
+  let levels = nums.pos()
+  if levels.len() == 1 { numbering("1.", ..levels) }
+  else if levels.len() == 2 { numbering("A", levels.last()) }
+})
+
+== Use of generative AI <use_of_ai>
+
+In accordance with the guidelines of Brno University of Technology, this appendix declares the use of generative AI in the preparation of this thesis.
+
+*Tools and period*
+
+Two tools from Anthropic were used between December 2025 and May 2026:
+
+- *Claude* (claude.ai) - used as a conversational assistant for brainstorming, planning, drafting, and revision.
+- *Claude Code* - used as an agentic coding tool, executing structured task documents I authored against the project codebase.
+
+*Scope and purpose*
+
+The tools were used in three distinct areas.
+
+*Architecture brainstorming and task authoring.* Claude served as a discussion partner during the architectural design of the system. Conversations were used to test ideas, surface design alternatives, and pressure-test interface boundaries. The architectural decisions presented in this work are my own; the AI was used to challenge and refine them, not to originate them. The output of these sessions was a set of structured task documents preserved in the `tasks/` directory of the project repository, which served as the executable specifications for the subsequent implementation work.
+
+*Code implementation.* Claude Code was used to implement parts of the codebase, following the task documents described above. For the firmware (ESP-IDF / C), implementations were produced from my task documents and the relevant protocol specifications and datasheets; the generated code was compiled and exercised on the physical Lighthouse units, and I made manual contributions to the redesign of selected internal subsystems and to the consolidation of redundant subsystems under shared abstractions. For the server (TypeScript / Bun), the public interfaces between subsystems were written by me, and the agent produced the implementations against those interfaces; the generated code was tested via the project's test suite and reviewed before being accepted into the codebase.
+
+*Thesis prose.* Claude was used to draft and revise sections of the thesis text. All prose was read and edited by me. Where I identified inaccuracies or weak claims, I revised the text directly and used the chat to retrieve the relevant project context against which the claim could be verified.
+
+*Areas in which no AI tools were used*
+
+No generative AI tools were used for the electronics design, PCB layout, CAD work, or hardware manufacture of the Lighthouse units.
+
+*Verification and responsibility*
+
+All generated source code was tested - on the physical hardware for firmware, and through the server's automated test suite for server code - and refactored where required before being accepted into the codebase. All thesis prose was read and edited by me, with technical claims anchored against primary sources cited throughout this work. I retain full responsibility for the content, correctness, and originality of this thesis.
+
+*Evidence in the project repository*
+
+The project repository is made publicly available on GitHub and is cited throughout this thesis. The artefacts of the AI-assisted work are preserved in the following directories:
+
+- `tasks/` - structured task documents created as the output from the brainstorming sessions. These were used as input to Claude Code, containing the scope, file boundaries, protocol references, and acceptance criteria for each implementation task.
+- `logbook/DEVLOG_*` - development logs documenting the progress, decisions, and outcomes of individual development sessions. These logs were generated by Claude Code after each session by letting the tool look through the changes in the Git repository with references to the implemented tasks. They were produced to create a knowledge base for the tools to then work from and source from when it came to writing the thesis.
+
+These directories serve as the working log of the project and constitute the evidence trail for the AI-assisted portions of the work.
+
+
+== Navigo3 Attendance API Reference
+
+The Lighthouse integration layer communicates with Navigo3 through several API methods in the `attendance/embedded` endpoint group of the service's API. This appendix documents the four endpoints consumed by the integration layer. All endpoints require a valid authenticated Navigo3 session as an API type user with the mentioned methods whitelisted. The base URL is configured via the `NAVIGO3_BASE_URL` environment variable; all paths are relative to `/api/`. 
+
+Field types follow the Navigo3 schema convention: `string` maps to a JSON string, `number` to a JSON number, `datetime` to a string in the format `yyyy-MM-dd HH:mm:ss` (UTC), `date` to `yyyy-MM-dd`, and `time` to `HH:mm:ss`. Fields marked as optional may be omitted from the request payload entirely. 
+
+=== `attendance/embedded/start`
+
+Registers the start of a work interval for a user. Called by `pushEvent()` when an eligible processed event with `direction = in` is pushed individually. 
+
+#figure(
+  table(
+    columns: (auto, auto, auto, 1fr),
+    align: left,
+    table.header[*Field*][*Type*][*Required*][*Description*],
+    [`userId`],  [`number`],   [Yes], [Navigo3 user identifier. Parsed from the user's `syncId` field in the Lighthouse database.],
+    [`time`],    [`datetime`], [No],  [Event timestamp. If omitted, Navigo3 records the server-side receipt time. The Lighthouse connector always supplies this field from the processed event's timestamp.],
+    [`typeId`],  [`number`],   [Yes], [Attendance type identifier. Resolved at service initialisation via `attendance/embedded/types` by matching `systemName === "atWork"` and cached for the lifetime of the process.],
+    [`comment`], [`string`],   [Yes], [Free-text comment. The connector sends an empty string.],
+  ),
+  caption: [`attendance/embedded/start` input fields],
+)
+
+Output: no payload (`VoidParam`).
+
+A successful response indicates the interval was opened in Navigo3. The connector sets `syncedToIntegration = true` on the corresponding `processed_events` row. 
+
+=== `attendance/embedded/stop`
+
+Registers the end of a work interval for a user. Called by `pushEvent()` when an eligible processed event with `direction = out` is pushed individually. 
+
+#figure(
+  table(
+    columns: (auto, auto, auto, 1fr),
+    align: left,
+    table.header[*Field*][*Type*][*Required*][*Description*],
+    [`userId`],  [`number`],   [No],  [Navigo3 user identifier. The connector always supplies this field.],
+    [`time`],    [`datetime`], [No],  [Event timestamp. The connector always supplies this field.],
+    [`comment`], [`string`],   [Yes], [Free-text comment. The connector sends an empty string.],
+  ),
+  caption: [`attendance/embedded/stop` input fields],
+)
+
+Output: no payload (`VoidParam`).
+
+The `typeId` field is intentionally omitted; Navigo3 infers the attendance type from the most recently opened interval for the user. The connector sets `syncedToIntegration = true` on the corresponding `processed_events` row. 
+
+=== `attendance/embedded/upsert`
+
+Creates or updates a closed attendance interval. Called by `pushPair()` when a counterpart event - opposite direction, same `userId`, same calendar day, also unsynced - is found at push time. The endpoint is idempotent: if a record for the given user and day already exists, Navigo3 updates its timestamps; otherwise it creates a new record. 
+
+#figure(
+  table(
+    columns: (auto, auto, auto, 1fr),
+    align: left,
+    table.header[*Field*][*Type*][*Required*][*Description*],
+    [`userId`],      [`number`],   [Yes], [Navigo3 user identifier.],
+    [`day`],         [`date`],     [Yes], [Calendar date of the interval, derived from the entry event timestamp.],
+    [`timeFrom`],    [`time`],     [Yes], [Interval start time (UTC), derived from the entry event timestamp.],
+    [`timeTo`],      [`time`],     [Yes], [Interval end time (UTC), derived from the exit event timestamp.],
+    [`createdFrom`], [`datetime`], [Yes], [Full entry timestamp (UTC). Retained for audit purposes.],
+    [`createdTo`],   [`datetime`], [Yes], [Full exit timestamp (UTC). Retained for audit purposes.],
+    [`typeId`],      [`number`],   [Yes], [Attendance type identifier, resolved as described under `start`.],
+    [`comment`],     [`string`],   [Yes], [Free-text comment. The connector sends an empty string.],
+    [`changedBy`],   [`number`],   [Yes], [Nominally the ID of the user making the change. The connector sends `0`; Navigo3 overwrites this server-side with the authenticated session user. The field is required by Navigo3 schema validation and cannot be omitted.],
+    [`id`],          [`number`],   [Yes], [Record identifier for update operations. The connector sends `0` for new records; Navigo3 treats `0` as a creation request.],
+  ),
+  caption: [`attendance/embedded/upsert` input fields],
+)
+
+Output: `{ id: number }` - the primary key of the created or updated attendance record. The connector writes this value to the `navigo3RecordId` column on both the entry and exit `processed_events` rows, then sets `syncedToIntegration = true` on both in a single database transaction. 
+
+=== `attendance/embedded/types`
+
+Lists all attendance types configured in the Navigo3 instance. Called once at service initialisation; not called again during normal operation. 
+
+Input: no payload (`VoidParam`).
+
+#figure(
+  table(
+    columns: (auto, auto, 1fr),
+    align: left,
+    table.header[*Field*][*Type*][*Description*],
+    [`id`],         [`number`], [Numeric identifier used as `typeId` in `start` and `upsert` requests.],
+    [`name`],       [`string`], [Human-readable display name of the attendance type.],
+    [`systemName`], [`string`], [Machine-readable identifier. The connector searches for the entry where `systemName == "atWork"`; if not found, the integration layer is disabled.],
+  ),
+  caption: [`attendance/embedded/types` output fields (per array entry)],
+)

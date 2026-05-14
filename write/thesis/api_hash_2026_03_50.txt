@@ -1,0 +1,85 @@
+---------------------------------------------------------------------------
+attendance/embedded/start
+
+
+	description: Mark start of work
+
+	input:
+		OBJECT com.navigo3.api.defs.attendance.StartAttendanceEndpoint$AttendanceStartData
+			STRING comment
+			(?) time
+				DATETIME
+			NUMBER typeId
+			(?) userId
+				NUMBER
+
+	output:
+		OBJECT com.navigo3.api.defs.structures.VoidParam
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/stop
+
+
+	description: Mark stop of work
+
+	input:
+		OBJECT com.navigo3.api.defs.attendance.StopAttendanceEndpoint$AttendanceStopData
+			STRING comment
+			(?) time
+				DATETIME
+			(?) userId
+				NUMBER
+
+	output:
+		OBJECT com.navigo3.api.defs.structures.VoidParam
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/types
+
+
+	description: List attendance types
+
+	input:
+		OBJECT com.navigo3.api.defs.structures.VoidParam
+
+	output:
+		[]
+			OBJECT com.navigo3.api.defs.attendance.ListSimpleAttendanceTypesEndpoint$AttendanceTypeEntry
+				NUMBER id
+				STRING name
+				STRING systemName
+
+	authorization:
+		everyone
+
+---------------------------------------------------------------------------
+attendance/embedded/upsert
+
+
+	description: Upsert attendance entry
+
+	input:
+		OBJECT com.navigo3.db.generated.public_.tables.pojos.Attendance
+			NUMBER changedBy
+			STRING comment
+			DATETIME createdFrom
+			DATETIME createdTo
+			DATE day
+			NUMBER id
+			TIME timeFrom
+			TIME timeTo
+			NUMBER typeId
+			NUMBER userId
+
+	output:
+		OBJECT com.navigo3.api.defs.structures.IdParam
+			NUMBER id
+
+	authorization:
+		everyone
