@@ -255,7 +255,7 @@ The server is a single BunJS process that hosts an embedded Aedes MQTT broker, a
      - Aedes MQTT broker
      - PostgreSQL
      - Chrony NTP server],
-    [- Scan ingestion and direction detection
+    [- Scan intake, direction detection
      - User management and API
      - Embedded MQTT broker
      - NTP time reference],
@@ -272,50 +272,68 @@ The server is a single BunJS process that hosts an embedded Aedes MQTT broker, a
   caption: [System components and their responsibilities],
 )
 
-The end-to-end event lifecycle from tag detection to attendance record creation proceeds as follows. An IR motion sensor detects movement near the portal, triggering the firmware to open a 5-second RFID scan window. The YPD-R300 reader runs continuous real-time inventory (command `0x89` per YPD-R300 Protocol Section 2.4) during this window, with detections batched on the firmware side and published to the MQTT topic `lighthouse/{id}/scans` as timestamped RSSI arrays. The server's scan handler ingests each batch, validates individual elements, and persists valid scans to the `raw_scans` table while preserving the `timeBasis` field (`synced` / `estimated` / `relative`) that indicates timestamp quality. The EventSweeper background poller runs every 2 seconds, clustering unprocessed scans by (EPC, group). Once a cluster is considered closed (no new scans for `activityTimeoutMs`), both direction detection algorithms execute and each produces an independent row in the `processed_events` table. The processed event is immediately pushed to Navigo3 via its `attendance/embedded/start` or `stop` endpoint depending on the detected direction. If the push fails, a separate background retry sweep picks it up within the configured `NAVIGO3_RETRY_INTERVAL_MS`. If connectivity is lost before the firmware can publish to MQTT, scans are cached to a LittleFS ring buffer on the ESP32's flash and replayed in order on reconnection with QoS 2 for delivery guarantees.
+The end-to-end event lifecycle from tag detection to attendance record creation proceeds as follows. An IR motion sensor detects movement near the portal, triggering the firmware to open a 5-second RFID scan window. The YPD-R300 reader runs continuous real-time inventory during this window, with detections batched on the firmware side and published to the MQTT topic `lighthouse/{id}/scans` as timestamped RSSI arrays. The server's scan handler ingests each batch, validates individual elements, and persists valid scans to the `raw_scans` table while preserving the `timeBasis` field that indicates timestamp quality. The EventSweeper background poller runs every 2 seconds, clustering unprocessed scans by (EPC, group). Once a cluster is considered closed (no new scans for `activityTimeoutMs`), both direction detection algorithms execute and each produces an independent row in the `processed_events` table. The processed event is immediately pushed to Navigo3 via its `start` or `stop` endpoint depending on the detected direction. If the push fails, a separate background retry sweep picks it up within the configured `NAVIGO3_RETRY_INTERVAL_MS`. If connectivity is lost before the firmware can publish to MQTT, scans are cached to a LittleFS ring buffer on the ESP32's flash and replayed in order on reconnection with QoS 2 for delivery guarantees.
 
 #figure(
   image("./images/3.1-1_system_architecture.png", width: 80%),
-  caption: [System architecture block diagram - Lighthouse A and B communicating via MQTT to Server; Server connected bidirectionally to Web Client via REST + WebSocket; Server connected to Navigo3 via REST API]
+  caption: [System architecture block diagram]
 )
 
 == Hardware Design <hardware_design>
 
 === Board v1 - Breadboard Prototype <board_v1_-_breadboard_prototype>
 
-The first functional prototype was assembled on a breadboard using four off-the-shelf breakout modules: an ESP32-WROOM-32 development board (38-pin variant), a YPD-R300 UHF RFID reader module on its carrier board, an SX1308 step-up DC-DC converter module, and a TP4056 lithium battery charger module with integrated DW01HA protection IC and FS8205A dual MOSFET. None of these modules shipped with complete engineering documentation beyond basic pinout labels, so each was reverse-engineered prior to integration. This reverse-engineering process involved hands-on measurements with a multimeter, selective desoldering of components to trace internal routing, and cross-referencing against datasheets for identifiable ICs where available. The resulting schematics captured component values, internal connections, and undocumented design decisions, and became the baseline for the Board v2 custom PCB design. The goal was to reproduce and then improve upon the combined functionality of these four modules on a single integrated board.
+The first functional prototype was assembled on a breadboard using four off-the-shelf breakout modules: an ESP32-WROOM-32 development board (38-pin variant), a YPD-R300 UHF RFID reader module on its carrier board, an SX1308 step-up DC-DC converter module, and a TP4056 lithium battery charger module with integrated DW01HA protection IC and FS8205A dual MOSFET. None of these modules shipped with complete engineering documentation beyond basic pinout labels; each was therefore reverse-engineered into a schematic capturing component values, internal connections, and undocumented design decisions. These schematics became the baseline for the Board v2 custom PCB, whose goal was to reproduce and improve upon the combined functionality of the four modules on a single integrated board. 
 
 #figure(
   image("./images/IMG_20260305_011321.jpg", width: 80%),
   caption: [Photograph of the two Board v1 breadboard prototypes]
 )
 
-Component selection and concurrency architecture were validated on the breadboard. The ESP32-WROOM-32 proved capable of running the WiFi network stack, MQTT client, and UART-driven RFID operations concurrently using the dual-core Xtensa LX6 architecture, with the WiFi stack pinned to Core 0 and application logic running on Core 1 (per ESP32 TRM Section 1.1). The YPD-R300 reader communicates with the ESP32 via UART at 115 200 baud (per YPD-R300 Protocol Section 1.2). GPIO assignments for UART TX/RX, status LEDs, buttons, PIR motion sensor input, and the BC337 NPN transistor-based RFID power switch were established during breadboard testing and carried forward unchanged to Board v2. Power delivery on the breadboard used point-to-point wiring between the four modules, which introduced uncontrolled trace impedance and measurable voltage drops under pulsed RFID load, motivating the decision to move to a purpose-designed PCB with calculated trace widths and dedicated decoupling capacitance positioned close to load switching points.
+Component selection and concurrency architecture were validated on the breadboard. The ESP32-WROOM-32 proved capable of running the WiFi network stack, MQTT client, and UART-driven RFID operations concurrently using the dual-core Xtensa LX6 architecture, with the WiFi stack pinned to Core 0 and application logic running on Core 1 (per ESP32 TRM Section 1.1). The YPD-R300 reader communicates with the ESP32 via UART at 115200 baud (per YPD-R300 Protocol Section 1.2). GPIO assignments for UART TX/RX, status LEDs, buttons, PIR motion sensor input, and the BC337 NPN transistor-based RFID power switch were established during breadboard testing and carried forward unchanged to Board v2. Power delivery on the breadboard used point-to-point wiring between the four modules, which introduced uncontrolled trace impedance and measurable voltage drops under pulsed RFID load, motivating the decision to move to a purpose-designed PCB with dedicated decoupling capacitance positioned close to load switching points.
 
 #figure(
   table(
-    columns: (auto, auto, auto),
+    columns: (auto, auto, 1fr),
+    align: (left, left, left),
     table.header[Module][Key components identified][Disposition in Board v2],
-    [ESP32 dev board (38-pin)], [AMS1117-3.3 LDO, CP2102 USB-UART, EN/BOOT buttons],            [ESP32-WROOM-32 module placed directly; AMS1117 retained; CP2102 removed],
-    [YPD-R300 carrier board],   [R300 module, SMA connector, decoupling capacitors],            [R300 module placed directly; SMA replaced with IPEX/U.FL footprint],
-    [SX1308 boost module],      [SX1308 IC, 4.7 µH inductor, Schottky diode, feedback divider], [Circuit reproduced with confirmed component values],
-    [TP4056 charger module],    [TP4056 IC, DW01HA protection, FS8205A dual MOSFET],            [Circuit reproduced; charge current set via programming resistor],
+    [ESP32],
+    [- AMS1117-3.3 LDO
+     - CP2102 USB-UART
+     - EN/BOOT buttons],
+    [- TS1117B substituted for AMS1117
+     - CP2102 removed],
+    [YPD-R300],
+    [- R300 module
+     - SMA connector
+     - Decoupling capacitors],
+    [- Circuit reproduced accurately],
+    [SX1308 boost],
+    [- SX1308 IC
+     - Schottky diode
+     - Feedback divider],
+    [- Circuit reproduced accurately],
+    [TP4056 charger],
+    [- TP4056 IC
+     - DW01HA protection
+     - FS8205A dual MOSFET],
+    [- Circuit reproduced accurately],
   ),
   caption: [Reverse-engineered modules and their Board v2 disposition],
 )
 
 === Board v2 - Custom PCB <board_v2_-_custom_pcb>
 
-Board v2 is a single two-layer PCB integrating all functionality of the four breadboard modules plus additional circuitry for power switching, fuse protection, battery voltage monitoring, and consolidated USB-C connectivity. The board was designed in KiCad with the schematic split into four hierarchical sheets (see Appendix A): a top-level Lighthouse sheet, a Charger submodule sheet, a Step-up DC/DC converter sheet, and a UHF RFID reader sheet. This hierarchical structure mirrors the modular nature of the breadboard prototype and keeps each functional block's schematic content manageable and self-contained. The CP2102 USB-UART bridge present on the original ESP32 development board was intentionally omitted from Board v2 to reduce component cost and simplify SMD assembly. In its place, UART TX, RX, and GND are broken out to a 3-pin header, allowing firmware debugging and flashing via an external USB-UART adapter. The reader is assumed to have the complete schematic sheets from Appendix A available for side-by-side reference; the following subsections describe key design decisions and deviations from the baseline breadboard design rather than replicating full schematic content.
+Board v2 is a single two-layer PCB integrating all functionality of the four breadboard modules plus additional circuitry for power switching, fuse protection, battery voltage monitoring, and consolidated USB-C connectivity. The board was designed in KiCad with the schematic split into four hierarchical sheets (see #ref(<board_schematics>)): a top-level Lighthouse sheet, a Charger submodule sheet, a Step-up DC/DC converter sheet, and a UHF RFID reader sheet. This hierarchical structure mirrors the modular nature of the breadboard prototype and keeps each functional block's schematic content manageable and self-contained. The CP2102 USB-UART bridge present on the original ESP32 development board was intentionally omitted from Board v2 to reduce component cost and simplify SMD assembly. In its place, UART TX, RX, and GND are broken out to a 3-pin header, allowing firmware debugging and flashing via an external USB-UART adapter. The reader is assumed to have the complete schematic sheets from #ref(<board_schematics>) available for side-by-side reference; the following subsections describe key design decisions and deviations from the baseline breadboard design rather than replicating full schematic content.
 
 #figure(
-  image("./images/kicad_render.png", width: 80%),
-  caption: [KiCad 3D render of the assembled Board v2 PCB - top view showing component placement]
+  image("./images/kicad_render_vs_assembly.png", width: 80%),
+  caption: [Comparison between the KiCad 3D render and the assembled Board v2 PCB; top view showing component placement]
 )
 
 ==== GPIO Assignments <gpio_assignments>
 
-The Board v2 schematic defines all GPIO connections between the ESP32-WROOM-32 module and peripherals. These assignments were validated during breadboard testing and are documented in the top-level Lighthouse schematic sheet (Appendix A, Sheet 1).
+The Board v2 schematic defines all GPIO connections between the ESP32-WROOM-32 module and peripherals. These assignments were validated during breadboard testing and are documented in the top-level Lighthouse schematic sheet (#ref(<board_schematics>), Sheet 1).
 
 #figure(
   table(
@@ -341,22 +359,17 @@ GPIO5 is a strapping pin on the ESP32 (per ESP32 Datasheet Section 2.3) and must
 
 ==== USB-C Connector <usb-c_connector>
 
-The breadboard prototype used two separate USB connectors: one for power input and one for the CP2102 UART bridge used for firmware flashing and debug serial output. Board v2 consolidates power input into a single USB-C connector carrying only VBUS and GND. The UART debug interface is separated to the dedicated 3-pin header mentioned above, accessed via an external USB-UART adapter during development. USB-C UFP (Upstream Facing Port) identification requires 5.1 kΩ pull-down resistors on both CC1 and CC2 pins to signal to the USB power source that the device is drawing power rather than supplying it (per USB Type-C Cable and Connector Specification Section 4.5.1). Without these resistors, only certain USB chargers will supply VBUS - an issue that was observed during breadboard testing where some phone chargers and USB power banks refused to provide power until the CC termination was added.
+The breadboard prototype used two USB connectors: one for power and one for the CP2102 UART bridge. Board v2 consolidates power input into a single USB-C connector carrying VBUS and GND only; the UART debug interface moves to the dedicated 3-pin header described above. USB-C requires 5.1 kΩ pull-down resistors on both CC1 and CC2 to declare the device as a power sink (per USB Type-C Cable and Connector Specification Section 4.5.1); Board v2 includes both. Without them the sink role is undeclared and a specification-compliant source will not supply VBUS. 
 
 ==== Power Delivery Architecture <power_delivery_architecture>
 
-Board v2 implements a dual-input power architecture with automatic source selection. The primary power source is USB 5 V from the USB-C connector. The backup source is a single-cell lithium-ion battery (nominal 3.7 V, operating range 3.2 V to 4.2 V) stepped up to 5 V by an SX1308 boost converter. Two SS24A Schottky diodes (DO-214AC package, 2 A / 40 V rating, typical forward drop ~0.3–0.4 V) are arranged in an OR configuration to prevent backfeed between the two sources (see Step-up DC/DC Converter sheet, Appendix A). SF-1206SP100-2 slow-blow fuses (1 A, 63 VDC, 1206 package) are placed on each input path upstream of the diodes. The slow-blow type was selected to tolerate the YPD-R300 reader's power-on inrush current without spurious tripping. A DPDT slide switch (SLW-1678105-6A-N-D, 1 A / 12 VDC, through-hole) is positioned after the fuses and before the diode junction, switching both input paths simultaneously to provide complete power isolation while keeping the fuses always in-circuit for protection.
+Board v2 implements a dual-input power architecture with automatic source selection (see #ref(<board_schematics>)). The primary source is USB 5 V from the USB-C connector; the backup is a single-cell lithium-ion battery (nominal 3.7 V, operating range 3.2–4.2 V) stepped up to 5 V by an SX1308 boost converter. Each input path carries an SF-1206SP100-2 slow-blow fuse (1 A, 63 VDC, 1206 package), selected to tolerate the YPD-R300's power-on inrush without spurious tripping. Downstream of the fuses, a DPDT slide switch (SLW-1678105-6A-N-D, 1 A / 12 VDC) switches both paths simultaneously for complete power isolation while keeping the fuses always in-circuit. Two SS24A Schottky diodes (DO-214AC, 2 A / 40 V, forward drop ~0.3–0.4 V) then form an OR junction that prevents backfeed between the two sources. 
 
-The 5 V rail downstream of the diode OR junction feeds an AMS1117-3.3 LDO regulator (per AMS1117 datasheet) which produces the 3.3 V rail for the ESP32-WROOM-32 module and peripheral logic. The YPD-R300 RFID reader operates directly from the 5 V rail and is switched on and off via a BC337-25 NPN transistor used as a low-side switch (see RFID Reader Power Switching subsection below). When USB power is present, the TP4056 charger IC draws current from VBUS to charge the lithium-ion cell; the DW01HA protection IC and FS8205A dual MOSFET provide overcharge, overdischarge, and overcurrent protection (per TP4056 and DW01HA datasheets). When USB power is removed, the system switches seamlessly to battery power via the SX1308 boost converter with no interruption to operation.
-
-#figure(
-  image("./images/3.2.2-2_power_delivery.svg", width: 80%),
-  caption: [Power delivery block diagram - USB-C VBUS and battery cell as inputs -> fuses -> DPDT switch -> SS24A diode OR -> 5 V rail -> AMS1117-3.3 LDO -> 3.3 V rail; battery path includes SX1308 boost (3.2-4.2 V -> 5 V); TP4056/DW01HA charges battery from VBUS when present]
-)
+The 5 V rail downstream of the OR junction feeds a TS1117B-3.3 LDO (per TS1117B datasheet) producing the 3.3 V rail for the ESP32-WROOM-32 and peripheral logic. The YPD-R300 operates directly from the 5 V rail, switched via a BC337-25 low-side transistor (#ref(<rfid_reader_power_switching>)). When USB power is present, the TP4056 charger draws from VBUS to charge the cell, with the DW01HA protection IC and FS8205A dual MOSFET providing overcharge, overdischarge, and overcurrent protection (per TP4056 and DW01HA datasheets). On USB removal the system switches to battery power via the SX1308 boost converter without interruption. 
 
 ==== RFID Reader Power Switching <rfid_reader_power_switching>
 
-The YPD-R300 reader draws approximately 380 mA at 5 V during active RFID inventory operations (per YPD-R300 datasheet). To conserve power when the reader is idle, Board v2 includes a BC337-25 NPN transistor (TO-92 package) configured as a low-side switch in the reader's ground return path, controlled by ESP32 GPIO5. The BC337-25 was selected for its low saturation voltage (V_CE(sat) ~300 mV at 380 mA collector current per BC337 datasheet) and 800 mA maximum collector current rating, providing comfortable headroom over the reader's nominal draw. A 150 Ω base resistor provides approximately 17 mA of base drive current when GPIO5 is high (3.3 V), forcing the transistor into hard saturation with a forced beta of approximately 22 at 380 mA collector current. This ensures V_CE(sat) remains low, keeping the ground offset introduced by the switch small enough to not affect the YPD-R300's operation.
+The YPD-R300 draws approximately 380 mA at 5 V during active inventory (per YPD-R300 datasheet). To conserve power when the reader is idle, Board v2 switches its ground return through a BC337-25 NPN transistor (TO-92) configured as a low-side switch, controlled by ESP32 GPIO5. The BC337-25 was selected for its low saturation voltage ($V_("CE(sat)")$ ~300 mV at 380 mA per BC337 datasheet) and 800 mA collector current rating. A 150 Ω base resistor supplies approximately 17 mA of base drive at GPIO5 high (3.3 V), forcing hard saturation — a forced beta of roughly 22 at the 380 mA operating point — which keeps $V_("CE(sat)")$, and therefore the switch's ground offset, small enough not to affect YPD-R300 operation. 
 
 ==== Supply Stabilisation and Decoupling <supply_stabilisation_and_decoupling>
 
@@ -369,37 +382,42 @@ The YPD-R300 reader draws current in sustained 18.8 ms RF transmission pulses oc
     [R300 5 V rail],        [470 µF + 100 nF], [Electrolytic bulk + ceramic bypass],
     [ESP32 3.3 V rail],     [100 µF + 100 nF], [Electrolytic bulk + ceramic bypass],
     [SX1308 output (5 V)],  [100 µF],          [Electrolytic; per SX1308 reference design],
-    [AMS1117 input (5 V)],  [10 µF],           [Electrolytic; per AMS1117 datasheet],
-    [AMS1117 output (3.3 V)], [22 µF],         [Electrolytic; per AMS1117 datasheet],
+    [TS1117B input (5 V)],  [10 µF],           [Electrolytic; per TS1117B datasheet],
+    [TS1117B output (3.3 V)], [22 µF],         [Electrolytic; per TS1117B datasheet],
   ),
   caption: [Decoupling capacitance placement],
 )
 
-The 470 µF electrolytic capacitor on the R300 5 V rail was sized to limit voltage droop during the reader's 18.8 ms RF pulses to less than 200 mV, based on the measured current draw and acceptable ripple tolerance. Ceramic 100 nF bypass capacitors are placed immediately adjacent to the power pins of the R300 module and the ESP32-WROOM-32 module to suppress high-frequency switching noise. The SX1308 boost converter and AMS1117 LDO capacitor values follow the respective datasheets' recommended application circuits.
+The 470 µF electrolytic capacitor on the R300 5 V rail was sized to limit voltage droop during the reader's 18.8 ms RF pulses to less than 200 mV, based on the measured current draw and acceptable ripple tolerance. Ceramic 100 nF bypass capacitors are placed immediately adjacent to the power pins of the R300 module and the ESP32-WROOM-32 module to suppress high-frequency switching noise. The SX1308 boost converter and TS1117B LDO capacitor values follow the respective datasheets' recommended application circuits.
 
 === Antenna and RF Considerations <antenna_and_rf_considerations>
 
-UHF RFID operates in the 860–960 MHz range (ETSI band 865–868 MHz in Europe, FCC 902–928 MHz in North America). At these frequencies the integrity of the feed path between the YPD-R300 RF output and the antenna directly governs detection range; the R300 RF output is specified for 50 Ω impedance (per YPD-R300 datasheet Section 3.1; see also @uhf_rfid_reader_modules), and any mismatch reflects power away from the antenna. Board v2 routes the R300 RF output to a board-edge IPEX/U.FL surface-mount coaxial receptacle via a 2 cm microstrip trace. 
+UHF RFID operates in the 860–960 MHz range (ETSI band 865–868 MHz in Europe, FCC 902–928 MHz in North America). At these frequencies the integrity of the feed path between the YPD-R300 RF output and the antenna directly governs detection range; the R300 RF output is specified for 50 Ω impedance (per YPD-R300 datasheet Section 3.1; see also @uhf_rfid_reader_modules), and any mismatch reflects power away from the antenna. Board v2 routes the R300 RF output to a board-edge SMA coaxial receptacle via a 2 cm microstrip trace. 
 
-The trace width on Board v2 was not impedance-controlled during layout. Achieving 50 Ω characteristic impedance on a microstrip requires the trace width to be matched to the PCB substrate thickness, dielectric constant, and copper weight, none of which were explicitly calculated or verified for the chosen stack-up. The empirical consequence is visible in #ref(<unit_ranges>). The Blue unit, fitted with a 4 dBi antenna soldered directly to the R300 RF output pad, and the Yellow unit, fitted with a 5.5 dBi antenna routed through the IPEX receptacle and the 2 cm trace, both achieve the same 3.0 m maximum reliable range. Vendor-stated ideal free-space ranges for the two antennas are 3.5 m and 4.8 m respectively @antenna-4dbi @antenna-5dbi; the Blue unit therefore achieves approximately 86% of its antenna's stated ideal, while Yellow achieves only 62%. Were Yellow's feed path as efficient as Blue's, the larger antenna's expected range would be approximately 4.1 m. The recoverable range loss attributable to the unmatched feed path is therefore estimated at 1 to 1.5 m, the lower bound coming from the proportional argument above and the upper bound allowing for additional loss in connector transitions not present on the direct-solder unit. 
+The trace width on Board v2 was not impedance-controlled during layout. Achieving 50 Ω characteristic impedance on a microstrip requires the trace width to be matched to the PCB substrate thickness, dielectric constant, and copper weight, none of which were explicitly calculated or verified for the chosen stack-up. The empirical consequence is visible in #ref(<unit_ranges>). The Blue unit, fitted with a 4 dBi antenna soldered directly to the R300 RF output pad, and the Yellow unit, fitted with a 5.5 dBi antenna routed through the SMA receptacle and the 2 cm trace, both achieve the same 3.0 m maximum reliable range. Vendor-stated ideal free-space ranges for the two antennas are 3.5 m and 4.8 m respectively @antenna-4dbi @antenna-5dbi; the Blue unit therefore achieves approximately 86% of its antenna's stated ideal, while Yellow achieves only 62%. Were Yellow's feed path as efficient as Blue's, the larger antenna's expected range would be approximately 4.1 m. The recoverable range loss attributable to the unmatched feed path is therefore estimated at 1 to 1.5 m, the lower bound coming from the proportional argument above and the upper bound allowing for additional loss in connector transitions not present on the direct-solder unit. 
 
-A future board revision should reposition the IPEX/U.FL receptacle immediately adjacent to the R300 RF output pad to eliminate the trace entirely. Should a non-trivial trace remain unavoidable in a later layout, its geometry must be calculated for 50 Ω characteristic impedance against the chosen PCB stack-up before fabrication. 
+#figure(
+  image("./images/antenna_joint_comparison.png", width: 80%),
+  caption: [Antenna conenction comparison]
+)
+
+A future board revision should reposition the SMA receptacle immediately adjacent to the R300 RF output pad to eliminate the trace entirely. Should a non-trivial trace remain unavoidable in a later layout, its geometry must be calculated for 50 Ω characteristic impedance against the chosen PCB stack-up before fabrication. 
 
 === Enclosure <enclosure>
 
 A prototype enclosure was designed in FreeCAD to house the Board v2 PCB, battery, PIR sensor, and antenna in a wall-mountable form factor suitable for doorway deployment. The design addresses several constraints imposed by the operational requirements of a passive detection system. The PIR sensor window must face the detection zone to trigger RFID scan windows when personnel approach the portal. The antenna must be oriented toward the doorway with minimal physical obstruction to maintain the detection range validated during board testing. The USB-C port must remain accessible for charging and firmware updates without disassembling the enclosure. The four status LEDs must be visible to operators for diagnostic purposes, implemented via light pipes from the PCB-mounted LEDs to the enclosure front face. The two push buttons must remain accessible for manual scan mode control and WiFi provisioning entry.
 
 #figure(
-  image("./images/3.2.4-1_case.png", width: 80%),
+  image("./images/3.2.4-1_case.png", width: 70%),
   caption: [CAD model screenshot - front/side view of the enclosure showing PIR window, antenna position, LED light pipes, and USB-C port access]
 )
 
 #figure(
-  image("./images/3.2.4-2_case.png", width: 80%),
+  image("./images/3.2.4-2_case.png", width: 70%),
   caption: [CAD model screenshot - exploded or open view showing internal component placement: PCB, battery, antenna mounting]
 )
 
-Three enclosures were manufactured via 3D printing and assembled, one for each fabricated Board v2 unit currently in operation. Full technical drawings of the enclosure including dimensioned orthographic projections and section views are provided in Appendix B.
+Three enclosures were manufactured via 3D printing and assembled, one for each fabricated Board v2 unit currently in operation. Full technical drawings of the enclosure including dimensioned orthographic projections and section views are provided in #ref(<enclosure_drawing>).
 
 == Firmware <firmware>
 
@@ -409,27 +427,27 @@ The firmware binary is identical across all Lighthouse units deployed in the fie
 
 === System Initialization and WiFi Provisioning <system_initialization_and_wifi_provisioning>
 
-On boot, the firmware executes a sequential initialization across multiple subsystems. The boot sequence begins with GPIO configuration to set up pin modes and initial states for LEDs, buttons, and the BC337 RFID power switch. Next, the battery monitor initializes to enable voltage sensing on GPIO33 (ADC1_CH5). The WiFi provisioning subsystem then loads credentials from NVS if present and attempts to connect in Station (STA) mode; if no credentials are stored, the boot sequence blocks after GPIO initialization and waits for the user to manually trigger the provisioning flow. Once WiFi is connected, SNTP (Simple Network Time Protocol) synchronizes the system clock against the MQTT broker's IP address, which also runs a chrony NTP server for timekeeping. With time synchronized, the MQTT client initializes and connects to the broker, followed by the offline event logger which mounts the LittleFS partition and prepares the ring buffer for caching scans during network outages. Finally, the RFID reader initializes and the main task loop begins.
+On boot the firmware initialises its subsystems in a fixed sequence, shown in #ref(<boot_sequence>). Two branch points alter this path. If a provisioning flag is set in RTC-backed memory, the device enters AP-mode provisioning instead of connecting (#ref(<provisioning_flow>)); if WiFi cannot be reached, the device proceeds in offline mode, caching scans locally until connectivity is restored (#ref(<offline_event_caching>)). On the very first boot, with no credentials in NVS, the firmware halts after GPIO setup and waits for the user to trigger provisioning. 
 
-If the device has never been configured - indicated by the absence of a "configured" flag in the NVS partition - the boot sequence blocks after GPIO initialization and the firmware logs a message instructing the user to press and hold BUTTON2 for 5 seconds to enter setup mode. The device will not proceed to initialize the RFID reader or attempt any network operations until valid WiFi credentials have been provisioned and the device has successfully connected to the network.
+#figure(
+  image("./images/3.3.1-1_boot_sequence.svg", height: 45%),
+  caption: [Provisioning state machine diagram]
+) <boot_sequence>
 
 ==== Provisioning Flow <provisioning_flow>
 
-Provisioning is triggered by a 5-second continuous hold of BUTTON2, at which point it sets a flag in RTC-backed memory and calls `esp_restart()` to reboot the ESP32. On the subsequent boot, the firmware detects the presence of this RTC flag during early initialization and transitions into Access Point (AP) mode instead of attempting STA mode connection. This reboot-based transition ensures a clean state with no residual tasks or network connections from the previous operational mode.
+Provisioning is triggered by a 5-second hold of BUTTON2, which sets a flag in RTC-backed memory and calls `esp_restart()`; the reboot guarantees AP mode starts from a clean state with no residual tasks or connections from normal operation. On the subsequent boot the firmware detects the flag during early initialisation and enters Access Point 
 
+mode.
 In AP mode, the ESP32 broadcasts an open WiFi network with the SSID "Lighthouse-Setup" and starts an HTTP server listening on port 80. The server serves a minimal HTML configuration form stored in the firmware's SPIFFS virtual filesystem partition. Concurrently, a lightweight DNS server is started that responds to all DNS queries. This captive-portal approach was adopted in preference to the ESP-IDF BLE-based `wifi_provisioning` component evaluated in @embedded_software_frameworks. The DNS hijacking enables captive portal detection on iOS, Android, Windows, and macOS; when a user's device connects to the "Lighthouse-Setup" network, the operating system automatically detects the captive portal and opens a system browser window to the provisioning page without requiring the user to manually navigate to an IP address.
 
 The provisioning form collects four fields: WiFi SSID, WiFi password, MQTT broker IP address, and MQTT broker port. Client-side JavaScript validates the input format before allowing submission. When the user submits the form, the device attempts to connect to the specified WiFi network in STA mode while keeping the AP active. If the connection succeeds, the firmware then attempts to connect to the MQTT broker at the provided IP and port to verify end-to-end connectivity. The results of both tests are reported back to the browser. The device then reboots when the user clicks the restart button on the page letting the device to begin normal operation.
 
 Credentials are encrypted before being written to NVS. The firmware uses AES-128 in ECB mode via the mbedTLS library utilizing ESP32's hardware AES accelerator to perform encryption and decryption (per ESP32 TRM Section 14). The encryption key is a device-specific 16-byte constant defined at compile time in a configuration header; in a production deployment, this key would be unique per device and generated during the firmware build process. The SSID is zero-padded to 32 bytes (two AES blocks) and the password is zero-padded to 64 bytes (four AES blocks) before encryption. The encrypted blobs are stored in a dedicated NVS namespace within the `nvs_settings` partition, separate from other configuration data to reduce the risk of corruption during writes. On subsequent boots, the credentials are loaded from NVS, decrypted in memory, and used to automatically connect to the provisioned WiFi network without user intervention.
 
-#figure(
-  image("./images/3.3.1-1_boot_sequence.svg", width: 80%),
-  caption: [Provisioning state machine diagram]
-)
 
 #figure(
-  image("./images/3.3.1-2_page.png", height: 8cm),
+  image("./images/3.3.1-2_page.png", height: 45%),
   caption: [Screenshot of the provisioning web form as rendered on a mobile device]
 )
 
@@ -876,7 +894,7 @@ The Users page manages user records comprising a display name, email address, an
 
 == System verification
 
-All validation was conducted using three Board v2 Lighthouse units running production firmware, each assembled in its final 3D-printed enclosure. The detection portal for all multi-unit tests was formed by the Red unit (designated OUTSIDE) and the Yellow unit (designated INSIDE); both portal units are equipped with IPEX/U.FL receptacle antenna connections. The Blue unit participated only in the standalone detection range measurement. The server ran on a local area network with an embedded Aedes MQTT broker, PostgreSQL storage, and a Navigo3 test instance connected via the integration layer described in #ref(<navigo3_integration>). The event sweeper was configured with `activityTimeoutMs = 4000 ms` and a polling interval of 2 seconds throughout all sessions. 
+All validation was conducted using three Board v2 Lighthouse units running production firmware, each assembled in its final 3D-printed enclosure. The detection portal for all multi-unit tests was formed by the Red unit (designated OUTSIDE) and the Yellow unit (designated INSIDE); both portal units are equipped with SMA receptacle antenna connections. The Blue unit participated only in the standalone detection range measurement. The server ran on a local area network with an embedded Aedes MQTT broker, PostgreSQL storage, and a Navigo3 test instance connected via the integration layer described in #ref(<navigo3_integration>). The event sweeper was configured with `activityTimeoutMs = 4000 ms` and a polling interval of 2 seconds throughout all sessions. 
 
 === Detection range
 
@@ -886,15 +904,15 @@ Per-unit detection range was measured with each unit in isolation. A passive UHF
   table(
     columns: (auto, auto, auto, auto, auto),
     table.header[Unit][Antenna][Antenna connection][Max reliable range \[m\]][Condition],
-    [Red],    [5.5 dBi], [IPEX/U.FL],     [2.5], [Pre-drop],
-    [Red],    [5.5 dBi], [IPEX/U.FL],     [1.5], [Post-repair],
-    [Yellow], [5.5 dBi], [IPEX/U.FL],     [3.0], [N/A],
+    [Red],    [5.5 dBi], [SMA],     [2.5], [Pre-drop],
+    [Red],    [5.5 dBi], [SMA],     [1.5], [Post-repair],
+    [Yellow], [5.5 dBi], [SMA],     [3.0], [N/A],
     [Blue],   [4 dBi],   [Direct-solder], [3.0], [N/A],
   ),
   caption: [Detection range per unit],
 ) <unit_ranges>
 
-Yellow and Blue achieve the same 3.0 m maximum reliable range despite Yellow carrying a higher-gain 5.5 dBi antenna. Under vendor-stated ideal conditions the 5.5 dBi antenna reaches approximately 1.3 m further than the 4 dBi antenna @antenna-4dbi @antenna-5dbi; the absence of any such advantage in the measured ranges is consistent with non-trivial forward-path loss on Yellow's feed, attributed in #ref(<antenna_and_rf_considerations>) to the non-impedance-controlled 2 cm microstrip trace. Red's pre-drop range of 2.5 m was already 0.5 m below Yellow's despite identical antenna and connection type, attributable to assembly-level variance in the IPEX cable and connector. 
+Yellow and Blue achieve the same 3.0 m maximum reliable range despite Yellow carrying a higher-gain 5.5 dBi antenna. Under vendor-stated ideal conditions the 5.5 dBi antenna reaches approximately 1.3 m further than the 4 dBi antenna @antenna-4dbi @antenna-5dbi; the absence of any such advantage in the measured ranges is consistent with non-trivial forward-path loss on Yellow's feed, attributed in #ref(<antenna_and_rf_considerations>) to the non-impedance-controlled 2 cm microstrip trace. Red's pre-drop range of 2.5 m was already 0.5 m below Yellow's despite identical antenna and connection type, attributable to assembly-level variance in the SMA cable and connector. 
 
 === Direction detection accuracy
 
@@ -991,7 +1009,7 @@ Testing in the model entrance corridor identified conditions under which the sys
 
 Two structural limitations of the current hardware design are noted. The ESP32-WROOM-32 does not incorporate a hardware real-time clock; timekeeping relies on SNTP synchronisation, and timestamp quality degrades during prolonged network outages. This is mitigated in the current firmware by the `timeBasis` metadata field and NVS-persisted last-known time, but it remains a fundamental platform constraint. Each unit also carries a single antenna with no spatial diversity, making detection reliability sensitive to antenna placement and the integrity of the RF feed path; the coaxial joint between the YPD-R300 RF output pad and the antenna connector is a demonstrated failure point. 
 
-Several directions for future development are identified. A hardware real-time clock should be incorporated in a future board revision to eliminate timestamp degradation during offline periods. The IPEX/U.FL receptacle should be repositioned adjacent to the YPD-R300 RF output pad on the same revision to eliminate the intervening PCB trace and its associated impedance mismatch. Extended field testing over a full working day under real employee traffic is required before any deployment decision can be made. Better fail-safes and handling of edge-cases identified during development and testing represent the primary software and firmware development priority, alongside improved API security and session management in the operator dashboard. 
+Several directions for future development are identified. A hardware real-time clock should be incorporated in a future board revision to eliminate timestamp degradation during offline periods. The SMA receptacle should be repositioned adjacent to the YPD-R300 RF output pad on the same revision to eliminate the intervening PCB trace and its associated impedance mismatch. Extended field testing over a full working day under real employee traffic is required before any deployment decision can be made. Better fail-safes and handling of edge-cases identified during development and testing represent the primary software and firmware development priority, alongside improved API security and session management in the operator dashboard. 
 
 #bibliography("references.bib", style: "ieee")
 
@@ -1133,3 +1151,44 @@ Input: no payload (`VoidParam`).
   ),
   caption: [`attendance/embedded/types` output fields (per array entry)],
 )
+
+== Board Schematics <board_schematics>
+
+The schematic is organised as four hierarchical sheets produced in KiCad E.D.A. 9.0.9. Each sheet is self-contained and carries the full title block; cross-sheet connections are made via named net labels. See at #link("./pcb/lighthouse.pdf")
+
+#figure(
+  table(
+    columns: (auto, auto, 1fr),
+    align: left,
+    table.header[*Sheet*][*Source file*][*Contents*],
+    [1/4], [`lighthouse.kicad_sch`],    [Top-level sheet. ESP32-WROOM-32, TS1117B 3.3 V regulator, USB-C power input, DPDT power switch, fuse protection, status LEDs, push-buttons, BC337 low-side switch, battery monitoring, and all inter-sheet port connections.],
+    [2/4], [`charger.kicad_sch`],       [Charger submodule. TP4056 lithium-ion charge controller, DW01A protection IC, and FS8205A dual MOSFET.],
+    [3/4], [`setp_up_dc_dc.kicad_sch`], [Step-up DC/DC converter submodule. SX1308 boost converter, SS24A Schottky diode, and adjustable feedback divider.],
+    [4/4], [`r300.kicad_sch`],          [UHF RFID reader submodule. YPD-R300 module connections, decoupling capacitance, EN line, and on-board buzzer circuit.],
+  ),
+  caption: [Schematic sheet index],
+)
+
+Four test jumpers are present on the board and are referenced in the schematics but are not visible in the PCB assembly drawing (#ref(<pcb_assembly_drawing>)), as they are located on the bottom side of the board. They were used during board bring-up to isolate and independently power each subsystem. Their default states and functions are as follows.
+
+#figure(
+  table(
+    columns: (auto, auto, 1fr),
+    align: left,
+    table.header[*Ref*][*Default*][*Function*],
+    [`JP1`], [Closed], [5 V rail to R300 subsystem; open to supply externally via TP7.],
+    [`JP2`], [Closed], [3.3 V rail to ESP32; open to supply externally via TP4.],
+    [`JP3`], [Closed], [Emitter return path of Q1 (BC337 low-side switch); open de-energises R300 regardless of GPIO5 state.],
+    [`JP4`], [Open],   [Direct GND bypass for R300, circumventing Q1 entirely. Mutually exclusive with JP3.],
+  ),
+  caption: [Test jumper reference - bottom side of PCB],
+)
+
+=== PCB Assembly Drawing <pcb_assembly_drawing>
+
+The assembly drawing shows the top-side component placement for Board v2, produced from the KiCad PCB file. The drawing includes component courtyard outlines, reference designators, board outline with overall dimensions (83 × 80 mm), mounting hole positions, antenna keep-out zone, and board thickness (1.57 mm). Bottom-side features are limited to the four test jumpers documented in #ref(<board_schematics>).
+
+See at #link("./pcb/pdb_schematic.pdf")
+
+
+== Enclosure drawing <enclosure_drawing>
