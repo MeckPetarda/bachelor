@@ -4,14 +4,6 @@
 
 #import "template/vut-fsi.typ": thesis
 
-// Figure placeholder helper - used where actual image files do not exist yet
-#let fig-placeholder(caption-text) = figure(
-  rect(width: 100%, height: 5cm, fill: luma(220), stroke: luma(160),
-    align(center + horizon, text(fill: luma(100), size: 10pt, style: "italic",
-      [TODO: ] + caption-text + []))),
-  caption: caption-text,
-)
-
 #show: thesis.with(
   title-cs: "Embedded řešení docházkového systému pro integraci do podnikové aplikace",
   title-en: "Embedded Implementation of an Attendance System for Integration into an Enterprise Application",
@@ -68,7 +60,10 @@ Two technical requirements follow from the zero-interaction goal. The first is r
 
 Of the candidate technologies surveyed in @research, only passive UHF RFID at 860-960 MHz combines a read range of several metres with the absence of any required user action. The approach adopted on top of this technology is a portal model: two autonomous embedded units, jointly named Lighthouse, are mounted on opposite sides of the doorway. Each unit independently publishes raw timestamped RFID readings to a central server over MQTT; the server clusters readings from the pair and infers traversal direction from their joint temporal and signal-strength structure. Direction inference is therefore an entirely server-side responsibility, leaving each Lighthouse stateless with respect to its counterpart and free to operate, cache locally, and recover from network loss on its own terms. Successful direction-detected events are forwarded to Navigo3 through a connector layer isolated behind a single integration interface, so the same core pipeline may be extended to other enterprise platforms without modification.
 
-#fig-placeholder[System concept diagram - two Lighthouse units flanking a doorway, person walking through, MQTT to server, server to Navigo3]
+#figure(
+  image("./images/system_schematic.png", width: 80%),
+  caption: [System architecture block diagram]
+)
 
 The objectives of this thesis, as set out in the formal assignment, are:
 - a review of existing hardware and software approaches to attendance recording, with attention to their integration into enterprise software environments;
