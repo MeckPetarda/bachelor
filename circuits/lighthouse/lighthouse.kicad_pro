@@ -500,14 +500,14 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "./",
+      "plot": "./pcb",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "lighthouse.stl",
       "svg": "",
       "vrml": ""
     },
-    "page_layout_descr_file": ""
+    "page_layout_descr_file": "kicad-embed://vut_fsi4.kicad_wks"
   },
   "schematic": {
     "annotate_start_num": 0,
