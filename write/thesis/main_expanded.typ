@@ -61,7 +61,7 @@ Two technical requirements follow from the zero-interaction goal. The first is r
 Of the candidate technologies surveyed in @research, only passive UHF RFID at 860-960 MHz combines a read range of several metres with the absence of any required user action. The approach adopted on top of this technology is a portal model: two autonomous embedded units, jointly named Lighthouse, are mounted on opposite sides of the doorway. Each unit independently publishes raw timestamped RFID readings to a central server over MQTT; the server clusters readings from the pair and infers traversal direction from their joint temporal and signal-strength structure. Direction inference is therefore an entirely server-side responsibility, leaving each Lighthouse stateless with respect to its counterpart and free to operate, cache locally, and recover from network loss on its own terms. Successful direction-detected events are forwarded to Navigo3 through a connector layer isolated behind a single integration interface, so the same core pipeline may be extended to other enterprise platforms without modification.
 
 #figure(
-  image("./images/system_schematic.png", width: 80%),
+  image("./images/system_schematic.png", width: 100%),
   caption: [System architecture block diagram]
 )
 
@@ -364,7 +364,7 @@ The 5 V rail downstream of the OR junction feeds a TS1117B-3.3 LDO (per TS1117B 
 
 ==== RFID Reader Power Switching <rfid_reader_power_switching>
 
-The YPD-R300 draws approximately 380 mA at 5 V during active inventory (per YPD-R300 datasheet). To conserve power when the reader is idle, Board v2 switches its ground return through a BC337-25 NPN transistor (TO-92) configured as a low-side switch, controlled by ESP32 GPIO5. The BC337-25 was selected for its low saturation voltage ($V_("CE(sat)")$ ~300 mV at 380 mA per BC337 datasheet) and 800 mA collector current rating. A 150 Ω base resistor supplies approximately 17 mA of base drive at GPIO5 high (3.3 V), forcing hard saturation — a forced beta of roughly 22 at the 380 mA operating point — which keeps $V_("CE(sat)")$, and therefore the switch's ground offset, small enough not to affect YPD-R300 operation. 
+The YPD-R300 draws approximately 380 mA at 5 V during active inventory (per YPD-R300 datasheet). To conserve power when the reader is idle, Board v2 switches its ground return through a BC337-25 NPN transistor (TO-92) configured as a low-side switch, controlled by ESP32 GPIO5. The BC337-25 was selected for its low saturation voltage ($V_("CE(sat)")$ ~300 mV at 380 mA per BC337 datasheet) and 800 mA collector current rating. A 150 Ω base resistor supplies approximately 17 mA of base drive at GPIO5 high (3.3 V), forcing hard saturation - a forced beta of roughly 22 at the 380 mA operating point - which keeps $V_("CE(sat)")$, and therefore the switch's ground offset, small enough not to affect YPD-R300 operation. 
 
 ==== Supply Stabilisation and Decoupling <supply_stabilisation_and_decoupling>
 
@@ -512,7 +512,7 @@ When the MQTT connection is unavailable - either because the broker is unreachab
 On MQTT reconnection, a background replay task (`offline_replay_task`) is spawned with lower priority than the main event logging task to ensure that real-time tag detections are not delayed by replay activity. The replay task reads cached events from the LittleFS ring buffer and publishes them to the same MQTT topic (`lighthouse/{id}/scans`) at a throttled rate of at most 10 events per second, with each replayed event carrying QoS 2 for exactly-once delivery guarantees. The firmware adds an `offline: true` boolean flag and a `replayTime` field containing the Unix timestamp at the moment of replay to each replayed event payload, allowing the server to distinguish replayed historical events from live real-time detections and to reconstruct the timeline accounting for the period during which the device was offline.
 
 #figure(
-  image("./images/3.3.4-1_offline_replay.svg", width: 80%),
+  image("./images/3.3.4-1_offline_replay.svg", width: 100%),
   caption: [Offline caching and replay sequence diagram]
 )
 
@@ -527,7 +527,7 @@ Debounce filtering is applied in software using a simple time-threshold approach
 The firmware operates in one of two scan modes, togglable via a 3-second hold of BUTTON1. The mode determines whether RFID scan bursts are triggered automatically by IR motion detection or manually by button press. Before any mode transition executes, the firmware unconditionally stops any active RFID inventory operation. This prevents mode transitions from leaving the RFID reader in an undefined operational state or consuming power unnecessarily.
 
 #figure(
-  image("./images/3.3.5-1_scan_mode_fsm.svg", width: 80%),
+  image("./images/3.3.5-1_scan_mode_fsm.svg", width: 100%),
   caption: [Scan mode state machine]
 )
 
@@ -666,7 +666,7 @@ Health telemetry-system uptime, free heap memory, WiFi signal strength, and RFID
 The ingestion architecture is designed for append-only, high-throughput write patterns. Database writes occur synchronously in the MQTT message handler callback, leveraging PostgreSQL's write-ahead logging to ensure durability without blocking the broker's event loop. Upon successful insertion, the server broadcasts a real-time scan event to all connected WebSocket clients, enabling live tag detection visualization in the dashboard without requiring client polling.
 
 #figure(
-  image("./images/3.4.2-1_mqtt_ingestion.svg", width: 80%),
+  image("./images/3.4.2-1_mqtt_ingestion.svg", width: 100%),
   caption: [MQTT ingestion sequence]
 )
 
@@ -723,7 +723,7 @@ $ "BCF" = min(n_"in", n_"out") / max(n_"in", n_"out") $
 BCF measures the balance of scan counts between the two Lighthouses; it is 1.0 when both contribute equally and falls when one dominates, which can occur if the tag is carried along the extreme edge of the portal or if one unit's antenna has degraded range. Clusters with zero scans on one side are orphaned upstream as `insufficient_data` (#ref(<orphan_handling>)) and never reach BCF. 
 
 #figure(
-  image("./images/3.4.3-2_dashboard.png", width: 80%),
+  image("./images/3.4.3-2_dashboard.png", width: 100%),
   caption: [Cluster timeline screenshot],
 )
 
@@ -811,8 +811,8 @@ The Navigo3 poller runs at a configurable interval (default 60 s, adjustable via
 Errors during retry are logged per event and do not abort the sweep. Failed events remain unsynced and are retried on subsequent cycles until they succeed or are manually resolved by an administrator. If a sweep is still in progress when the next interval elapses, the new cycle is skipped rather than running concurrently. 
 
 #figure(
-  image("./images/3.4.5-1_navigo3_sequence.svg", width: 80%),
-  caption: [Navigo3 integration sequence - new processed event → eligibility check → immediate `pushEvent` or `pushPair` → on success `syncedToIntegration = true`; on failure the event is left unsynced for the retry poller's next cycle.],
+  image("./images/3.4.5-1_navigo3_sequence.svg", width: 100%),
+  caption: [Navigo3 integration sequence],
 )
 
 == Dashboard <dashboard>
@@ -1187,3 +1187,25 @@ See at #link("./pcb/pdb_schematic.pdf")
 
 
 == Enclosure drawing <enclosure_drawing>
+
+The enclosure drawing package consists of six sheets produced in FreeCAD 1.1.0. All parts are designed for additive manufacture (FDM); the general dimensional tolerance is ±0.3 mm unless otherwise specified on the individual drawing. Holes and mating features are noted for reaming or drilling to final size. 
+
+#figure(
+  table(
+    columns: (1fr, auto, auto),
+    align: left,
+    inset: (x: 8pt, y: 6pt),
+    table.header(
+      table.cell(fill: luma(215), align: center)[*Sheet*],
+      table.cell(fill: luma(215), align: center)[*Drawing number*],
+      table.cell(fill: luma(215), align: center)[*File*],
+    ),
+    [Lighthouse - Assembly], [LH-ASM-10], [#link("./attachments/LH-ASM-10_assembly.pdf", "LH-ASM-10_assembly.pdf")],
+    [Lighthouse - Exploded view], [LH-ASM-20], [#link("./attachments/LH-ASM-20_exploded.pdf", "LH-ASM-20_exploded.pdf")],
+    [Lighthouse - Front face], [LH-MEC-10], [#link("./attachments/LH-MEC-10_front_face.pdf", "LH-MEC-10_front_face.pdf")],
+    [Lighthouse - Back cover], [LH-MEC-20], [#link("./attachments/LH-MEC-20_back_cover.pdf", "LH-MEC-20_back_cover.pdf")],
+    [Lighthouse - PCB mount], [LH-MEC-30], [#link("./attachments/LH-MEC-30_pcb_mount.pdf", "LH-MEC-30_pcb_mount.pdf")],
+    [Lighthouse - Switch shim], [LH-MEC-40], [#link("./attachments/LH-MEC-40_switch_shim.pdf", "LH-MEC-40_switch_shim.pdf")],
+  ),
+  caption: [Enclosure drawing sheet index],
+) <enclosure-drawing-index>

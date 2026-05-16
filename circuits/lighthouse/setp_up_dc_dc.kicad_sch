@@ -13,6 +13,7 @@
 		(comment 2 "into an Enterprise Application")
 		(comment 3 "Author: Jakub Hloušek")
 		(comment 4 "Supervisor: Ing. Michal Bastl, Ph.D")
+		(comment 5 "LH-ELE-12")
 	)
 	(lib_symbols
 		(symbol "Device:C"
@@ -1605,7 +1606,7 @@
 			(uuid "c1b74108-ce03-4235-aef8-9e65c5962ab8")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/976e17dd-c379-42b8-98f3-965206833e2e"
 					(reference "IC1")
 					(unit 1)
@@ -1675,7 +1676,7 @@
 			(uuid "54385866-0df3-43c6-accb-cddfcd745592")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/976e17dd-c379-42b8-98f3-965206833e2e"
 					(reference "R14")
 					(unit 1)
@@ -1745,7 +1746,7 @@
 			(uuid "78ccb2ed-446a-482a-bf4c-3c3dca9187fa")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/976e17dd-c379-42b8-98f3-965206833e2e"
 					(reference "C5")
 					(unit 1)
@@ -1817,7 +1818,7 @@
 			(uuid "1df0096f-bd60-4b83-89ad-e8838e4e14cd")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/976e17dd-c379-42b8-98f3-965206833e2e"
 					(reference "RV1")
 					(unit 1)
@@ -1885,7 +1886,7 @@
 			(uuid "301b52fe-4da3-4b5d-a3f7-838327a2a0a9")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/976e17dd-c379-42b8-98f3-965206833e2e"
 					(reference "L1")
 					(unit 1)
@@ -1955,7 +1956,7 @@
 			(uuid "78ccb2ed-446a-482a-bf4c-3c3dca9187fb")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/976e17dd-c379-42b8-98f3-965206833e2e"
 					(reference "C4")
 					(unit 1)

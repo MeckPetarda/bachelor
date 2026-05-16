@@ -13,6 +13,7 @@
 		(comment 2 "into an Enterprise Application")
 		(comment 3 "Author: Jakub Hloušek")
 		(comment 4 "Supervisor: Ing. Michal Bastl, Ph.D")
+		(comment 5 "LH-ELE-11")
 	)
 	(lib_symbols
 		(symbol "Battery_Management:DW01A"
@@ -2215,7 +2216,7 @@
 			(uuid "64c446f5-eaea-4ea9-abbe-9e72cbb1edf7")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "D5")
 					(unit 1)
@@ -2736,7 +2737,7 @@
 			(uuid "64c446f5-eaea-4ea9-abbe-9e72cbb1edf8")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/adf63908-e234-4fc5-b1bf-4049b839acc1"
 					(reference "D6")
 					(unit 1)

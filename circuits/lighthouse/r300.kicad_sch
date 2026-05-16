@@ -13,6 +13,7 @@
 		(comment 2 "into an Enterprise Application")
 		(comment 3 "Author: Jakub Hloušek")
 		(comment 4 "Supervisor: Ing. Michal Bastl, Ph.D")
+		(comment 5 "LH-ELE-13")
 	)
 	(lib_symbols
 		(symbol "Device:Antenna_Shield"
@@ -2810,7 +2811,7 @@
 			(uuid "416d14dd-f866-45ce-bfa2-7e8978dd0a25")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/b8f7ab96-114b-4177-9af0-0e115f506aa3"
 					(reference "D8")
 					(unit 1)
@@ -3021,7 +3022,7 @@
 			(uuid "7c8bc878-7c11-488b-a8b2-404c9e0424ef")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/b8f7ab96-114b-4177-9af0-0e115f506aa3"
 					(reference "R15")
 					(unit 1)
@@ -3156,7 +3157,7 @@
 			(uuid "074ea6ba-dd2b-4bcd-8b72-f5f86ddc4e8f")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/b8f7ab96-114b-4177-9af0-0e115f506aa3"
 					(reference "BZ1")
 					(unit 1)
@@ -3226,7 +3227,7 @@
 			(uuid "842873da-4d35-4aa9-9f3b-38aa64678087")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/b8f7ab96-114b-4177-9af0-0e115f506aa3"
 					(reference "AE1")
 					(unit 1)
@@ -3293,7 +3294,7 @@
 			(uuid "d99a7b00-c7c7-4a36-bd31-9a1a617bd6cb")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/b8f7ab96-114b-4177-9af0-0e115f506aa3"
 					(reference "C6")
 					(unit 1)
@@ -3430,7 +3431,7 @@
 			(uuid "57729581-53e8-4182-a5d9-bc94b47791cc")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/b8f7ab96-114b-4177-9af0-0e115f506aa3"
 					(reference "C15")
 					(unit 1)
@@ -3504,7 +3505,7 @@
 			(uuid "155ba0bc-0ba1-4912-b7eb-56227d483f27")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/b8f7ab96-114b-4177-9af0-0e115f506aa3"
 					(reference "Q3")
 					(unit 1)
@@ -3822,7 +3823,7 @@
 			(uuid "df24c24f-2ce6-40ea-9595-7b435aa7f4b0")
 		)
 		(instances
-			(project ""
+			(project "lighthouse"
 				(path "/7210d03b-7565-45ff-aaca-ad566f37cd67/b8f7ab96-114b-4177-9af0-0e115f506aa3"
 					(reference "U1")
 					(unit 1)
