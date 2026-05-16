@@ -25,6 +25,18 @@
   else                  { ("neznámý typ",        "unknown type")      }
 }
 
+// Front-matter section title. Reproduces the level-1 chapter visual
+// (see the `show heading.where(level: 1)` rule below: 16.8pt above,
+// 24.88pt small-caps, 10pt below) but is NOT a heading element, so it
+// neither receives a chapter number nor appears in the table of
+// contents. Page breaks for front matter are handled by the explicit
+// pagebreak() calls already present in the front-matter region.
+#let _frontmatter-title(body) = {
+  v(16.8pt, weak: true)
+  block(width: 100%, align(left, text(size: 24.88pt, smallcaps(body))))
+  v(10pt, weak: true)
+}
+
 #let thesis(
   // Cover page metadata
   title-cs: "",
@@ -47,6 +59,13 @@
   keywords-en: [],
   declaration: [],
   acknowledgements: none,
+
+  // Official assignment (zadání). The printed two-page assignment is the
+  // mandated first content after the title page. Supply it as a PDF
+  // paste-in from the caller (e.g. muchpdf(...) or image() of each page).
+  // Leave as `none` if the assignment is merged into the final PDF
+  // externally — the template then changes nothing.
+  assignment: none,
 
   // Document body
   body,
@@ -251,6 +270,29 @@
 
   pagebreak()
 
+  // ── Official assignment (zadání) ──────────────────────────────────────────
+  // Mandated as the first content after the title page. Inserted verbatim
+  // from the caller-supplied paste-in; sits in the unnumbered front-matter
+  // region. No-op when `assignment` is none.
+  if assignment != none {
+  set page(
+    paper: "a4",
+    binding: left,
+    margin: (left: 0mm, right: 0mm, top: 0mm, bottom: 0mm),
+    numbering: none
+  )
+
+    assignment
+    pagebreak()
+
+  set page(
+    paper: "a4",
+    binding: left,
+    margin: (left: 30mm, right: 20mm, top: 22mm, bottom: 20mm),
+    numbering: none
+  )
+  }
+
   // ── Abstract page ────────────────────────────────────────────────────────
   [
     *Abstrakt*
@@ -273,22 +315,22 @@
   pagebreak()
 
   // ── Declaration ──────────────────────────────────────────────────────────
-  [
-    *Declaration placeholder*
+  {
+    v(22cm)
+    declaration
 
-    #declaration
-  ]
+    block(width: 100%, align(right, [*#author*]))
+  }
 
   pagebreak()
 
   // ── Acknowledgements (optional) ──────────────────────────────────────────
-  if acknowledgements != none [
-    *Acknowledgements placeholder*
+  if acknowledgements != none {
+    acknowledgements
 
-    #acknowledgements
-
-    #pagebreak()
-  ]
+    block(width: 100%, align(right, [*#author*]))
+    pagebreak()
+  }
 
   // ── Table of contents ────────────────────────────────────────────────────
   set page(numbering: "1")
@@ -296,8 +338,19 @@
 
   outline(depth: 3, indent: auto)
 
+  v(2cm)
+
+  title("List of Figures")
+  outline(title: none, target: figure.where(kind: image))
+
+  pagebreak()
+  
+  title("List of Tables")
+  outline(title: none,  target: figure.where(kind: table))
+
   pagebreak()
 
   // ── Body ─────────────────────────────────────────────────────────────────
   body
 }
+

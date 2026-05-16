@@ -34,12 +34,24 @@ Laboratory validation confirmed that every detected traversal was correctly clas
   keywords-en: [
 UHF RFID, passive RFID, ESP32, FreeRTOS, KiCad, attendance system, attendance tracking, portal model, direction detection, temporal centroid, embedded system, MQTT, FreeCAD, Navigo3
   ],
-  declaration: [Declaration text goes here.],
+  assignment: [
+    #image("assignment.pdf", page: 1, height: 100%)
+    #pagebreak()
+    #image("assignment.pdf", page: 2, height: 100%)
+  ],
+  declaration: [
+I would like to thank my supervisor, Ing. Michal Bastl, Ph.D., for his guidance and patience throughout this work, and for the freedom he gave me to pursue the directions that turned out to matter.],
   acknowledgements: [
+
+    #v(19cm)
 
     *Generative AI tools*
 
     Anthropic's Claude and Claude Code - were used during the preparation of this thesis. The full declaration of the scope, purpose, and verification of their use is given in #ref(<use_of_ai>).
+
+    *Acknowledgement*
+
+I affirm that the presented master’s thesis is my genuine work and that it was created with the support of the stated literature, under the supervision of my tutor. 
 
   ],
 )
@@ -403,12 +415,12 @@ A future board revision should reposition the SMA receptacle immediately adjacen
 A prototype enclosure was designed in FreeCAD to house the Board v2 PCB, battery, PIR sensor, and antenna in a wall-mountable form factor suitable for doorway deployment. The design addresses several constraints imposed by the operational requirements of a passive detection system. The PIR sensor window must face the detection zone to trigger RFID scan windows when personnel approach the portal. The antenna must be oriented toward the doorway with minimal physical obstruction to maintain the detection range validated during board testing. The USB-C port must remain accessible for charging and firmware updates without disassembling the enclosure. The four status LEDs must be visible to operators for diagnostic purposes, implemented via light pipes from the PCB-mounted LEDs to the enclosure front face. The two push buttons must remain accessible for manual scan mode control and WiFi provisioning entry.
 
 #figure(
-  image("./images/3.2.4-1_case.png", width: 70%),
-  caption: [CAD model screenshot - front/side view of the enclosure showing PIR window, antenna position, LED light pipes, and USB-C port access]
+  image("./images/lighthouses.jpg", width: 100%),
+  caption: [Manufactured units - PIR sensor, antenna position, LED light pipes, and USB-C port access]
 )
 
 #figure(
-  image("./images/3.2.4-2_case.png", width: 70%),
+  image("./images/3.2.4-2_case.png", width: 100%),
   caption: [CAD model screenshot - exploded or open view showing internal component placement: PCB, battery, antenna mounting]
 )
 
@@ -425,7 +437,7 @@ The firmware binary is identical across all Lighthouse units deployed in the fie
 On boot the firmware initialises its subsystems in a fixed sequence, shown in #ref(<boot_sequence>). Two branch points alter this path. If a provisioning flag is set in RTC-backed memory, the device enters AP-mode provisioning instead of connecting (#ref(<provisioning_flow>)); if WiFi cannot be reached, the device proceeds in offline mode, caching scans locally until connectivity is restored (#ref(<offline_event_caching>)). On the very first boot, with no credentials in NVS, the firmware halts after GPIO setup and waits for the user to trigger provisioning. 
 
 #figure(
-  image("./images/3.3.1-1_boot_sequence.svg", height: 45%),
+  image("./images/3.3.1-1_boot_sequence.svg", height: 50%),
   caption: [Provisioning state machine diagram]
 ) <boot_sequence>
 
@@ -791,7 +803,7 @@ A processed event is eligible for push when (1) its `algorithmId` matches `NAVIG
     table.cell(colspan: 3)[Invoked when an event with `direction = out` is pushed individually. Payload: `userId`, exit timestamp (ISO 8601), empty comment. `typeId` is omitted; Navigo3 infers it server-side from the most recent open attendance interval for the user.],
     table.hline(stroke: 0.8pt),
     [`/api/attendance/embedded/upsert`], [`in + out`], [Create or update closed interval],
-    table.cell(colspan: 3)[Invoked when a counterpart event (opposite direction, same `userId`, same calendar day, also unsynced) is found at push time; both events are sent together. Payload: `userId`, `day`, `timeFrom` and `timeTo` (HH:mm:ss), `createdFrom` and `createdTo` (ISO 8601), `typeId`, empty comment, `changedBy = 0`. Idempotent - creates the interval if absent, updates timestamps if present. Returns the record's primary `id`, written to `navigo3RecordId` on both event rows. `changedBy` is a placeholder required by Navigo3's schema validation; the server overwrites it with the authenticated session user.],
+    table.cell(colspan: 3)[Invoked when a counterpart event (opposite direction, same `userId`, same calendar day, also unsynced) is found at push time; both events are sent together. Payload: `userId`, `day`, `timeFrom` and `timeTo`, `createdFrom` and `createdTo` (ISO 8601), `typeId`, empty comment, `changedBy = 0`. Idempotent - creates the interval if absent, updates timestamps if present. Returns the record's primary `id`, written to `navigo3RecordId` on both event rows. `changedBy` is a placeholder required by Navigo3's schema validation; the server overwrites it with the authenticated session user.],
   ),
   caption: [Navigo3 endpoints used by the integration layer.],
 ) <tbl-navigo3-endpoints>
@@ -915,12 +927,12 @@ Controlled traversals were performed through the portal at normal walking pace. 
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto, auto),
-    table.header[Algorithm][Correct \[n\]][Incorrect \[n\]][Unknown \[n\]][Accuracy \[%\]],
-    [Temporal Centroid ($C_1$)], [78], [0], [0], [100.0],
-    [RSSI-Weighted ($C_2$)],     [78], [0], [0], [100.0],
+    columns: (auto, auto, auto, auto),
+    table.header[Algorithm][Correct \[n\]][Incorrect \[n\]][Accuracy \[%\]],
+    [Temporal Centroid ($C_1$)], [78], [0],  [100.0],
+    [RSSI-Weighted ($C_2$)],     [78], [0],  [100.0],
   ),
-  caption: [Direction detection accuracy per algorithm (combined dataset, n = 78 detected traversals)],
+  caption: [Direction detection accuracy per algorithm],
 )
 
 Direction accuracy across the full test campaign was 100% on both algorithms over 78 detected traversals. The detection rate, however, varied substantially with tag carry method. Under unobstructed hand-held conditions, 41 of 42 attempted traversals were detected (97.6%; 95% CI: 87.7-99.6%). With the tag carried in a near-side front trouser pocket at close range, 20 of 23 traversals were detected (87.0%; 95% CI: 67.9-95.5%). At longer range in the same pocket position, detection rate fell further (5 of 7; 71.4%; small sample). Tag carry on a lanyard presenting the tag edge-on to the antennas, and carry in a cross-body trouser pocket, produced effectively zero detection in both cases; these failure modes are a consequence of UHF tag polarisation physics interacting with the chosen portal geometry rather than a system limitation. The system's failure mode is exclusively non-detection: the `insufficient_data` orphan logic in the event sweeper guarantees that no direction call is produced from a one-sided cluster, so any event that reaches the database reflects bilateral evidence of traversal. 
@@ -931,7 +943,7 @@ Mean $C_1$ confidence across all sessions was 0.327 ± 0.155; mean $C_2$ confide
 
 === End-to-end processing time
 
-End-to-end latency was measured as the interval between `cluster_started_at` - the timestamp of the first RFID scan in a cluster - and the Navigo3 audit log database commit time for the resulting attendance record. This interval captures the full server-side pipeline: scan accumulation, `activityTimeoutMs` expiry, sweeper polling delay, direction detection, HTTP POST to Navigo3, and database write. The `cluster_started_at` timestamp lags the physical IR trigger by approximately 400 ms (200 ms YPD-R300 power-on delay plus 200 ms stabilisation period); true end-to-end latency from IR trigger is therefore approximately 400 ms greater than the values in #ref(<e2e_processing_time>). The dataset covers 15 events from 8 attendance records (8 IN and 7 OUT events). 
+End-to-end latency was measured as the interval between `cluster_started_at` - the timestamp of the first RFID scan in a cluster - and the Navigo3 audit log database commit time for the resulting attendance record. This interval captures the full server-side pipeline: scan accumulation, `activityTimeoutMs` expiry, sweeper polling delay, direction detection, HTTP POST to Navigo3, and database write. The `cluster_started_at` timestamp lags the physical IR trigger by approximately 400 ms; true end-to-end latency from IR trigger is therefore approximately 400 ms greater than the values in #ref(<e2e_processing_time>). The dataset covers 15 events from 8 attendance records (8 IN and 7 OUT events). 
 
 #figure(
   table(
@@ -954,15 +966,6 @@ Between the testing sessions the Red unit was dropped and subsequently repaired;
 
 Twelve alternating traversals were performed during a deliberate offline window of approximately four minutes and twenty-five seconds. The server was then restarted and replay was observed to completion. 
 
-#figure(
-  table(
-    columns: (auto, auto, auto, auto),
-    table.header[Scans buffered][Scans replayed][Processed events][Navigo3 records],
-    [606], [606], [12 / 12], [12],
-  ),
-  caption: [Offline replay verification results],
-)
-
 All 606 replayed scans carried `timeBasis = synced`, confirming that SNTP wall-clock timestamps were preserved correctly through the LittleFS ring buffer. The sweeper successfully clustered every traversal's scans bilaterally despite the replay rate of approximately ten entries per second, producing 12 processed events in perfect alternating OUT/IN sequence. No stale entries from prior sessions were re-delivered. Confidence and BCF distributions were consistent with the hand-held benchmark session, confirming that no degradation in clustering quality results from the replay path relative to live operation. 
 
 === Algorithm comparison
@@ -972,14 +975,11 @@ The combined dataset of 78 detected traversals, spanning the hand-held benchmark
 #figure(
   table(
     columns: (auto, auto, auto),
-    table.header[Metric][$C_1$ - Temporal Centroid][$C_2$ - RSSI-Weighted Centroid],
+    table.header[Metric][Temporal Centroid][RSSI-Weighted Centroid],
     [Overall accuracy \[%\]],            [100.0],          [100.0],
-    [Correct directions \[n\]],          [78 / 78],        [78 / 78],
+    [Correct directions \[n\]],          [78],        [78],
     [Incorrect directions \[n\]],        [0],              [0],
-    [Unknown directions \[n\]],          [0],              [0],
     [Mean confidence (all calls)],       [0.327 ± 0.155],  [0.176 ± 0.099],
-    [Confidence ratio ($C_1 : C_2$)],   [1.86 : 1],       [-],
-    [Inter-algorithm agreement \[%\]],   [100.0],          [-],
   ),
   caption: [Algorithm comparison summary (combined dataset, n = 78)],
 )
@@ -1008,7 +1008,7 @@ Several directions for future development are identified. A hardware real-time c
 
 #bibliography("references.bib", style: "ieee")
 
-= Attachments <attachments>
+= Appendices <appendices>
 
 #show heading.where(level: 2): set heading(supplement: "Appendix")
 
@@ -1149,17 +1149,17 @@ Input: no payload (`VoidParam`).
 
 == Board Schematics <board_schematics>
 
-The schematic is organised as four hierarchical sheets produced in KiCad E.D.A. 9.0.9. Each sheet is self-contained and carries the full title block; cross-sheet connections are made via named net labels. See at #link("./pcb/lighthouse.pdf")
+The schematic is organised as four hierarchical sheets produced in KiCad E.D.A. 9.0.9. Each sheet is self-contained and carries the full title block; cross-sheet connections are made via named net labels. See at #link("./attachments/LH-ELE.pdf")
 
 #figure(
   table(
     columns: (auto, auto, 1fr),
     align: left,
     table.header[*Sheet*][*Source file*][*Contents*],
-    [1/4], [`lighthouse.kicad_sch`],    [Top-level sheet. ESP32-WROOM-32, TS1117B 3.3 V regulator, USB-C power input, DPDT power switch, fuse protection, status LEDs, push-buttons, BC337 low-side switch, battery monitoring, and all inter-sheet port connections.],
-    [2/4], [`charger.kicad_sch`],       [Charger submodule. TP4056 lithium-ion charge controller, DW01A protection IC, and FS8205A dual MOSFET.],
-    [3/4], [`setp_up_dc_dc.kicad_sch`], [Step-up DC/DC converter submodule. SX1308 boost converter, SS24A Schottky diode, and adjustable feedback divider.],
-    [4/4], [`r300.kicad_sch`],          [UHF RFID reader submodule. YPD-R300 module connections, decoupling capacitance, EN line, and on-board buzzer circuit.],
+    [LH-ELE-10], [`lighthouse.kicad_sch`],    [Top-level sheet. ESP32-WROOM-32, TS1117B 3.3 V regulator, USB-C power input, DPDT power switch, fuse protection, status LEDs, push-buttons, BC337 low-side switch, battery monitoring, and all inter-sheet port connections.],
+    [LH-ELE-11], [`charger.kicad_sch`],       [Charger submodule. TP4056 lithium-ion charge controller, DW01A protection IC, and FS8205A dual MOSFET.],
+    [LH-ELE-12], [`setp_up_dc_dc.kicad_sch`], [Step-up DC/DC converter submodule. SX1308 boost converter, SS24A Schottky diode, and adjustable feedback divider.],
+    [LH-ELE-13], [`r300.kicad_sch`],          [UHF RFID reader submodule. YPD-R300 module connections, decoupling capacitance, EN line, and on-board buzzer circuit.],
   ),
   caption: [Schematic sheet index],
 )
@@ -1183,7 +1183,7 @@ Four test jumpers are present on the board and are referenced in the schematics 
 
 The assembly drawing shows the top-side component placement for Board v2, produced from the KiCad PCB file. The drawing includes component courtyard outlines, reference designators, board outline with overall dimensions (83 × 80 mm), mounting hole positions, antenna keep-out zone, and board thickness (1.57 mm). Bottom-side features are limited to the four test jumpers documented in #ref(<board_schematics>).
 
-See at #link("./pcb/pdb_schematic.pdf")
+See at #link("./attachments/LH-PCB-10.pdf")
 
 
 == Enclosure drawing <enclosure_drawing>
