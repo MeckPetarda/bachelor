@@ -1210,7 +1210,7 @@ Four test jumpers are present on the board and are referenced in the schematics 
 
 The assembly drawing shows the top-side component placement for Board v2, produced from the KiCad PCB file. The drawing includes component courtyard outlines, reference designators, board outline with overall dimensions (83 × 80 mm), mounting hole positions, antenna keep-out zone, and board thickness (1.57 mm). Bottom-side features are limited to the four test jumpers documented in #ref(<board_schematics>).
 
-See at #link("./attachments/LH-PCB-10.pdf")
+See at #link("./attachments/LH-PCB.pdf")
 
 
 == Enclosure drawing <enclosure_drawing>
