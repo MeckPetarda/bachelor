@@ -10,33 +10,33 @@
 @legislation{gdpr,
   title        = {Regulation ({EU}) 2016/679 of the European Parliament and of the Council
                   of 27 April 2016 on the protection of natural persons with regard to the
-                  processing of personal data and on the free movement of such data
-                  (General Data Protection Regulation)},
+                  processing of personal data and on the free movement of such data,
+                  and repealing Directive 95/46/{EC} (General Data Protection Regulation)},
   journal      = {Official Journal of the European Union},
   volume       = {L 119},
   pages        = {1--88},
   date         = {2016-05-04},
   url          = {https://eur-lex.europa.eu/eli/reg/2016/679/oj},
 }
-
+ 
 @standard{iso-14443,
-  title        = {{ISO/IEC} 14443: Cards and Security Devices for Personal Identification
-                  --- Contactless Proximity Objects},
+  title        = {{ISO/IEC} 14443-1:2018 Cards and security devices for personal identification
+                  --- Contactless proximity objects --- Part 1: Physical characteristics},
   organization = {International Organization for Standardization},
-  number       = {ISO/IEC 14443},
+  number       = {ISO/IEC 14443-1:2018},
 }
 
 @standard{iso-15693,
-  title        = {{ISO/IEC} 15693: Cards and Security Devices for Personal Identification
-                  --- Contactless Vicinity Objects},
+  title        = {{ISO/IEC} 15693-1:2018 Cards and security devices for personal identification
+                  --- Contactless vicinity objects --- Part 1: Physical characteristics},
   organization = {International Organization for Standardization},
-  number       = {ISO/IEC 15693},
+  number       = {ISO/IEC 15693-1:2018},
 }
 
 @standard{iso-18000-63,
-  title        = {{ISO/IEC} 18000-63:2021: Information Technology --- Radio Frequency
-                  Identification for Item Management --- Part 63: Parameters for Air
-                  Interface Communications at 860~{MHz} to 960~{MHz} Type~C},
+  title        = {{ISO/IEC} 18000-63:2021 Information technology --- Radio frequency
+                  identification for item management --- Part 63: Parameters for air
+                  interface communications at 860~{MHz} to 960~{MHz} Type~{C}},
   organization = {International Organization for Standardization},
   number       = {ISO/IEC 18000-63:2021},
   date         = {2021},
@@ -51,9 +51,11 @@
   number       = {RFC 4330},
   date         = {2006-01},
   url          = {https://www.rfc-editor.org/rfc/rfc4330},
+  note         = {Obsoleted by RFC 5905},
 }
 
 @standard{mqtt,
+  editor       = {Banks, Andrew and Gupta, Rahul},
   title        = {{MQTT} Version 3.1.1},
   organization = {OASIS},
   number       = {OASIS Standard},
@@ -65,28 +67,30 @@
 % Academic Papers
 % ---------------------------------------------------------------------------
 
-@inproceedings{oikawa-2009,
-  author       = {Oikawa, Y.},
+@incollection{oikawa-2011,
+  author       = {Oikawa, Yoshinori},
   title        = {Tag Movement Direction Estimation Methods in an {RFID} Gate System},
-  booktitle    = {Proceedings of the 6th International Symposium on Wireless Communication
-                  Systems ({ISWCS} 2009)},
-  publisher    = {IEEE},
-  date         = {2009},
-  pages        = {41--45},
-  doi          = {10.1109/ISWCS.2009.5285332},
+  booktitle    = {Current Trends and Challenges in {RFID}},
+  editor       = {Turcu, Cornel},
+  publisher    = {IntechOpen},
+  date         = {2011-07-20},
+  doi          = {10.5772/18549},
+  isbn         = {978-953-307-356-9},
+  url          = {https://www.intechopen.com/chapters/16535},
 }
 
-@article{jie-2022-rf-access,
-  author       = {Jie, Z. and others},
+
+@article{wang-2022-rf-access,
+  author       = {Wang, Xuan and Wang, Xia and Yan, Yingli and Liu, Jia and Zhao, Zhihong},
   title        = {{RF-Access}: Barrier-Free Access Control Systems with {UHF} {RFID}},
   journal      = {Applied Sciences},
   publisher    = {MDPI},
   volume       = {12},
   number       = {22},
   pages        = {11592},
-  date         = {2022},
+  date         = {2022-11-15},
   doi          = {10.3390/app122211592},
-  note         = {Direction detection via Friis-derived RSSI peak argument: §2.1, Eqs.~1--2},
+  note         = {Direction detection via Friis-derived RSSI peak argument: §3.2.1, Eqs.~1--2},
 }
 
 % ---------------------------------------------------------------------------
@@ -100,7 +104,6 @@
   publisher    = {CZ.NIC, z.s.p.o.},
   location     = {Praha},
   date         = {2024},
-  pagetotal    = {525},
   isbn         = {978-80-88168-79-9},
 }
 
@@ -160,7 +163,7 @@
 }
 
 @misc{antenna-4dbi,
-  title  = {{4 dBi UHF RFID circularly polarised panel antenna -- product listing}},
+  title  = {{4 dBi UHF RFID circularly polarised panel antenna -- board-4dbi antenna product listing}},
   howpublished = {AliExpress product listing},
   note   = {Vendor-stated ideal free-space read range: 3.5 m},
   url    = {https://www.aliexpress.com/item/1005009293695195.html},
@@ -168,9 +171,9 @@
 }
 
 @misc{antenna-5dbi,
-  title  = {{5.5 dBi UHF RFID circularly polarised panel antenna -- product listing}},
+  title  = {{5 dBi UHF RFID circularly polarised panel antenna -- 5dBi SMA male (EU) product listing}},
   howpublished = {AliExpress product listing},
   note   = {Vendor-stated ideal free-space read range: 4.8 m},
-  url    = {https://www.aliexpress.com/item/1005009293695195.html},
+  url    = {https://www.aliexpress.com/item/1005003099964285.html},
   urldate = {Accessed 13 May 2026},
 }

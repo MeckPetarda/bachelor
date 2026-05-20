@@ -1,100 +1,452 @@
-<svg viewBox="0 0 720 500" xmlns="http://www.w3.org/2000/svg" font-family="Georgia, serif" font-size="12">
-  <rect width="720" height="500" fill="#fff"/>
-  <text x="360" y="26" text-anchor="middle" font-size="14" font-weight="bold" fill="#111">Offline Caching and Replay Sequence</text>
-
-  <defs>
-    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-      <polygon points="0 0,8 3,0 6" fill="#374151"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 720 500"
+   font-family="Georgia, serif"
+   font-size="12"
+   version="1.1"
+   id="svg25"
+   sodipodi:docname="3.3.4-1_offline_replay.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview25"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="1.1912785"
+     inkscape:cx="360.53702"
+     inkscape:cy="302.61605"
+     inkscape:window-width="1920"
+     inkscape:window-height="1011"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg25" />
+  <rect
+     width="720"
+     height="500"
+     fill="#fff"
+     id="rect1" />
+  <text
+     x="360"
+     y="26"
+     text-anchor="middle"
+     font-size="14"
+     font-weight="bold"
+     fill="#111"
+     id="text1">Offline Caching and Replay Sequence</text>
+  <defs
+     id="defs3">
+    <marker
+       id="arr"
+       markerWidth="8"
+       markerHeight="6"
+       refX="8"
+       refY="3"
+       orient="auto">
+      <polygon
+         points="0 0,8 3,0 6"
+         fill="#374151"
+         id="polygon1" />
     </marker>
-    <marker id="arrR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-      <polygon points="0 0,8 3,0 6" fill="#b91c1c"/>
+    <marker
+       id="arrR"
+       markerWidth="8"
+       markerHeight="6"
+       refX="8"
+       refY="3"
+       orient="auto"
+       viewBox="0 0 8 6"
+       preserveAspectRatio="xMidYMid">
+      <polygon
+         points="0 0,8 3,0 6"
+         fill="#b91c1c"
+         id="polygon2" />
     </marker>
-    <marker id="arrG" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-      <polygon points="0 0,8 3,0 6" fill="#15803d"/>
+    <marker
+       id="arrG"
+       markerWidth="8"
+       markerHeight="6"
+       refX="8"
+       refY="3"
+       orient="auto">
+      <polygon
+         points="0 0,8 3,0 6"
+         fill="#15803d"
+         id="polygon3" />
     </marker>
   </defs>
-
   <!-- Participants -->
   <!-- RFID / Tag -->
-  <rect x="30" y="45" width="100" height="30" rx="4" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
-  <text x="80" y="65" text-anchor="middle" fill="#1e3a8a" font-weight="bold" font-size="11">RFID / Tag</text>
+  <rect
+     x="30.035278"
+     y="45.035278"
+     width="109.88723"
+     height="29.929443"
+     rx="4.3954892"
+     fill="#dbeafe"
+     stroke="#1d4ed8"
+     stroke-width="1.57056"
+     id="rect3" />
+  <text
+     x="86"
+     y="65"
+     text-anchor="middle"
+     fill="#1e3a8a"
+     font-weight="bold"
+     font-size="11px"
+     id="text3">RFID / Tag</text>
   <!-- Firmware -->
-  <rect x="190" y="45" width="100" height="30" rx="4" fill="#e0e7ff" stroke="#4338ca" stroke-width="1.5"/>
-  <text x="240" y="65" text-anchor="middle" fill="#1e1b4b" font-weight="bold" font-size="11">Firmware</text>
+  <rect
+     x="205.85484"
+     y="45.035278"
+     width="109.88723"
+     height="29.929443"
+     rx="4.3954892"
+     fill="#e0e7ff"
+     stroke="#4338ca"
+     stroke-width="1.57056"
+     id="rect4" />
+  <text
+     x="262"
+     y="65"
+     text-anchor="middle"
+     fill="#1e1b4b"
+     font-weight="bold"
+     font-size="11px"
+     id="text4">Firmware</text>
   <!-- LittleFS -->
-  <rect x="350" y="45" width="100" height="30" rx="4" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
-  <text x="400" y="65" text-anchor="middle" fill="#78350f" font-weight="bold" font-size="11">LittleFS</text>
+  <rect
+     x="381.67441"
+     y="45.035278"
+     width="109.88723"
+     height="29.929443"
+     rx="4.3954892"
+     fill="#fef3c7"
+     stroke="#d97706"
+     stroke-width="1.57056"
+     id="rect5" />
+  <text
+     x="436"
+     y="65"
+     text-anchor="middle"
+     fill="#78350f"
+     font-weight="bold"
+     font-size="11px"
+     id="text5">LittleFS</text>
   <!-- MQTT Broker -->
-  <rect x="510" y="45" width="120" height="30" rx="4" fill="#dcfce7" stroke="#15803d" stroke-width="1.5"/>
-  <text x="570" y="65" text-anchor="middle" fill="#14532d" font-weight="bold" font-size="11">MQTT Broker</text>
-
+  <rect
+     x="557.49396"
+     y="45.035278"
+     width="131.86467"
+     height="29.929443"
+     rx="4.3954892"
+     fill="#dcfce7"
+     stroke="#15803d"
+     stroke-width="1.57056"
+     id="rect6" />
+  <text
+     x="624"
+     y="65"
+     text-anchor="middle"
+     fill="#14532d"
+     font-weight="bold"
+     font-size="11px"
+     id="text6">MQTT Broker</text>
   <!-- Lifelines -->
-  <line x1="80" y1="75" x2="80" y2="490" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="240" y1="75" x2="240" y2="490" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="400" y1="75" x2="400" y2="490" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="570" y1="75" x2="570" y2="490" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
-
+  <line
+     x1="30.579779"
+     y1="75"
+     x2="30.579779"
+     y2="490"
+     stroke="#94a3b8"
+     stroke-width="1.15955"
+     stroke-dasharray="4, 3"
+     id="line6" />
+  <line
+     x1="245.71132"
+     y1="75"
+     x2="245.71132"
+     y2="490"
+     stroke="#94a3b8"
+     stroke-width="1.15955"
+     stroke-dasharray="4, 3"
+     id="line7" />
+  <line
+     x1="460.84283"
+     y1="75"
+     x2="460.84283"
+     y2="490"
+     stroke="#94a3b8"
+     stroke-width="1.15955"
+     stroke-dasharray="4, 3"
+     id="line8" />
+  <line
+     x1="689.42023"
+     y1="75"
+     x2="689.42023"
+     y2="490"
+     stroke="#94a3b8"
+     stroke-width="1.15955"
+     stroke-dasharray="4, 3"
+     id="line9" />
   <!-- ── OFFLINE PHASE ── -->
-  <rect x="30" y="95" width="660" height="18" rx="3" fill="#fee2e2" fill-opacity="0.4"/>
-  <text x="360" y="108" text-anchor="middle" font-size="11" fill="#b91c1c" font-style="italic">MQTT offline — connection lost</text>
-
+  <rect
+     x="30"
+     y="95"
+     width="660"
+     height="18"
+     rx="3"
+     fill="#fee2e2"
+     fill-opacity="0.4"
+     id="rect9" />
+  <text
+     x="360"
+     y="108"
+     text-anchor="middle"
+     font-size="11"
+     fill="#b91c1c"
+     font-style="italic"
+     id="text9">MQTT offline — connection lost</text>
   <!-- 1. Tag detected -->
-  <line x1="80" y1="130" x2="230" y2="130" stroke="#1d4ed8" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="155" y="124" text-anchor="middle" font-size="10" fill="#374151">tag detection (EPC, RSSI, timestamp)</text>
-
+  <line
+     x1="30.579779"
+     y1="138"
+     x2="246.87077"
+     y2="138"
+     stroke="#1d4ed8"
+     stroke-width="1.80121"
+     marker-end="url(#arr)"
+     id="line10" />
+  <text
+     x="141"
+     y="132"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#374151"
+     id="text10">tag detection (EPC, RSSI, timestamp)</text>
   <!-- 2. MQTT publish fails -->
-  <line x1="240" y1="155" x2="560" y2="155" stroke="#b91c1c" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrR)"/>
-  <text x="400" y="149" text-anchor="middle" font-size="10" fill="#b91c1c">MQTT publish — FAILED (offline)</text>
+  <line
+     x1="245.71132"
+     y1="155.08578"
+     x2="690.57935"
+     y2="155.08578"
+     stroke="#b91c1c"
+     stroke-width="1.76792"
+     stroke-dasharray="5, 3"
+     marker-end="url(#arrR)"
+     id="line11" />
+  <text
+     x="466"
+     y="149"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#b91c1c"
+     id="text11">MQTT publish — FAILED (offline)</text>
   <!-- X mark -->
-  <text x="565" y="160" font-size="14" fill="#b91c1c" font-weight="bold">✕</text>
-
   <!-- 3. Write to LittleFS -->
-  <line x1="240" y1="180" x2="390" y2="180" stroke="#d97706" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="315" y="174" text-anchor="middle" font-size="10" fill="#d97706">write event to ring buffer</text>
-
+  <line
+     x1="245.71132"
+     y1="180.17802"
+     x2="461.7113"
+     y2="180.17802"
+     stroke="#d97706"
+     stroke-width="1.79867"
+     marker-end="url(#arr)"
+     id="line12"
+     style="marker-end:url(#arrR)" />
+  <text
+     x="351"
+     y="174"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#d97706"
+     id="text13">write event to ring buffer</text>
   <!-- 4. NVS pointer update -->
-  <line x1="400" y1="205" x2="250" y2="205" stroke="#d97706" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrR)"/>
-  <text x="325" y="199" text-anchor="middle" font-size="10" fill="#d97706">NVS read/write pointer updated</text>
-
+  <line
+     x1="461.13199"
+     y1="205.14146"
+     x2="245.132"
+     y2="205.14146"
+     stroke="#d97706"
+     stroke-width="1.39147"
+     stroke-dasharray="4, 3"
+     marker-end="url(#arrR)"
+     id="line13"
+     style="stroke-width:1.43816;stroke-dasharray:4.13421, 3.10066;stroke-dashoffset:0" />
+  <text
+     x="355"
+     y="199"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#d97706"
+     id="text14">NVS read/write pointer updated</text>
   <!-- More events (collapsed) -->
-  <text x="360" y="230" text-anchor="middle" font-size="10" fill="#64748b" font-style="italic">[ additional events accumulate in ring buffer ... ]</text>
-
   <!-- ── RECONNECT PHASE ── -->
-  <rect x="30" y="248" width="660" height="18" rx="3" fill="#dcfce7" fill-opacity="0.4"/>
-  <text x="360" y="261" text-anchor="middle" font-size="11" fill="#15803d" font-style="italic">MQTT reconnects</text>
-
+  <rect
+     x="30"
+     y="232"
+     width="660"
+     height="18"
+     rx="3"
+     fill="#dcfce7"
+     fill-opacity="0.4"
+     id="rect15" />
+  <text
+     x="360"
+     y="245"
+     text-anchor="middle"
+     font-size="11px"
+     fill="#15803d"
+     font-style="italic"
+     id="text16">MQTT reconnects</text>
   <!-- 5. MQTT reconnected -->
-  <line x1="240" y1="283" x2="560" y2="283" stroke="#15803d" stroke-width="1.5" marker-end="url(#arrG)"/>
-  <text x="400" y="277" text-anchor="middle" font-size="10" fill="#15803d">MQTT connected</text>
-
+  <line
+     x1="245.71132"
+     y1="282.9873"
+     x2="690.57935"
+     y2="282.9873"
+     stroke="#15803d"
+     stroke-width="1.76792"
+     marker-end="url(#arrG)"
+     id="line16" />
+  <text
+     x="468"
+     y="277"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#15803d"
+     id="text17">MQTT connected</text>
   <!-- 6. Replay task starts -->
-  <rect x="195" y="298" width="90" height="22" rx="3" fill="#e0e7ff" stroke="#4338ca" stroke-width="1"/>
-  <text x="240" y="313" text-anchor="middle" font-size="10" fill="#1e1b4b">replay task starts</text>
-
+  <rect
+     x="191.38289"
+     y="298.01926"
+     width="97.234222"
+     height="21.961496"
+     rx="3.2411408"
+     fill="#e0e7ff"
+     stroke="#4338ca"
+     stroke-width="1.0385"
+     id="rect17" />
+  <text
+     x="240"
+     y="313"
+     text-anchor="middle"
+     font-size="10"
+     fill="#1e1b4b"
+     id="text18">replay task starts</text>
   <!-- 7. Read from LittleFS -->
-  <line x1="240" y1="335" x2="390" y2="335" stroke="#d97706" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="315" y="329" text-anchor="middle" font-size="10" fill="#d97706">read event from ring buffer</text>
-
-  <line x1="400" y1="355" x2="250" y2="355" stroke="#d97706" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrR)"/>
-  <text x="325" y="349" text-anchor="middle" font-size="10" fill="#d97706">event payload</text>
-
+  <line
+     x1="245.71132"
+     y1="334.94998"
+     x2="461.7113"
+     y2="334.94998"
+     stroke="#d97706"
+     stroke-width="1.79867"
+     marker-end="url(#arr)"
+     id="line18"
+     style="marker-end:url(#arrR)" />
+  <text
+     x="353"
+     y="329"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#d97706"
+     id="text19">read event from ring buffer</text>
+  <line
+     x1="461.13199"
+     y1="354.85849"
+     x2="245.132"
+     y2="354.85849"
+     stroke="#d97706"
+     stroke-width="1.43864"
+     stroke-dasharray="4, 3"
+     marker-end="url(#arrR)"
+     id="line19" />
+  <text
+     x="363"
+     y="349"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#d97706"
+     id="text20">event payload</text>
   <!-- 8. Publish with offline flag -->
-  <line x1="240" y1="378" x2="560" y2="378" stroke="#15803d" stroke-width="1.5" marker-end="url(#arrG)"/>
-  <text x="400" y="372" text-anchor="middle" font-size="10" fill="#15803d">publish QoS 2 — offline:true, replayTime</text>
-
+  <line
+     x1="245.71132"
+     y1="387.91422"
+     x2="690.57935"
+     y2="387.91422"
+     stroke="#15803d"
+     stroke-width="1.76792"
+     marker-end="url(#arrG)"
+     id="line20" />
+  <text
+     x="470"
+     y="382"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#15803d"
+     id="text21">publish QoS 2 — offline:true, replayTime</text>
   <!-- 9. ACK -->
-  <line x1="560" y1="400" x2="250" y2="400" stroke="#15803d" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrG)"/>
-  <text x="400" y="394" text-anchor="middle" font-size="10" fill="#15803d">PUBACK / PUBCOMP (QoS 2 handshake)</text>
-
+  <line
+     x1="690.57898"
+     y1="410.0004"
+     x2="245.711"
+     y2="410.0004"
+     stroke="#15803d"
+     stroke-width="1.43753"
+     stroke-dasharray="4, 3"
+     marker-end="url(#arrG)"
+     id="line21" />
+  <text
+     x="470"
+     y="404"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#15803d"
+     id="text22">PUBACK / PUBCOMP (QoS 2 handshake)</text>
   <!-- 10. Advance ring buffer pointer -->
-  <line x1="240" y1="422" x2="390" y2="422" stroke="#d97706" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="315" y="416" text-anchor="middle" font-size="10" fill="#d97706">advance read pointer (NVS)</text>
-
+  <line
+     x1="245.71132"
+     y1="445.82199"
+     x2="461.7113"
+     y2="445.82199"
+     stroke="#d97706"
+     stroke-width="1.79867"
+     marker-end="url(#arr)"
+     id="line22"
+     style="marker-end:url(#arrR)" />
+  <text
+     x="349"
+     y="440"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#d97706"
+     id="text23">advance read pointer (NVS)</text>
   <!-- More events -->
-  <text x="360" y="448" text-anchor="middle" font-size="10" fill="#64748b" font-style="italic">[ repeats at max 10 events/s until buffer empty ]</text>
-
   <!-- Rate limit note -->
-  <rect x="30" y="462" width="660" height="22" rx="3" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1"/>
-  <text x="360" y="477" text-anchor="middle" font-size="10" fill="#475569">Replay task runs at lower priority than real-time scan logging — live detections are never delayed by replay</text>
-
+  <rect
+     x="30"
+     y="462"
+     width="660"
+     height="22"
+     rx="3"
+     fill="#f1f5f9"
+     stroke="#94a3b8"
+     stroke-width="1"
+     id="rect24" />
+  <text
+     x="360"
+     y="477"
+     text-anchor="middle"
+     font-size="10"
+     fill="#475569"
+     id="text25">Replay task runs at lower priority than real-time scan logging — live detections are never delayed by replay</text>
 </svg>

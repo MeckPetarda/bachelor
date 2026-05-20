@@ -109,7 +109,7 @@
   // diplomka.sty: \huge\bfseries\textsc + \newpage, raggedright
   //   above: 16.8pt   below: 10pt   \huge at 12pt base = 24.88pt
   show heading.where(level: 1): it => {
-    pagebreak(weak: true)
+    pagebreak()
     v(16.8pt, weak: true)
     block(
       width: 100%,
@@ -146,7 +146,7 @@
   show heading.where(level: 4): it => {
     v(12pt, weak: true)
     block(text(size: 12pt,  it.body))
-    v(6pt, weak: true)
+    v(8pt, weak: true)
   }
 
   show figure.where(kind: table): fg => {
@@ -322,14 +322,12 @@
     block(width: 100%, align(right, [*#author*]))
   }
 
-  pagebreak()
-
   // ── Acknowledgements (optional) ──────────────────────────────────────────
   if acknowledgements != none {
+    pagebreak()
     acknowledgements
 
     block(width: 100%, align(right, [*#author*]))
-    pagebreak()
   }
 
   // ── Table of contents ────────────────────────────────────────────────────
@@ -347,8 +345,6 @@
   
   title("List of Tables")
   outline(title: none,  target: figure.where(kind: table))
-
-  pagebreak()
 
   // ── Body ─────────────────────────────────────────────────────────────────
   body

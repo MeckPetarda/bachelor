@@ -51,7 +51,7 @@ I would like to thank my supervisor, Ing. Michal Bastl, Ph.D., for his guidance 
 
     *Acknowledgement*
 
-I affirm that the presented master’s thesis is my genuine work and that it was created with the support of the stated literature, under the supervision of my tutor. 
+I affirm that the presented bachelor’s thesis is my genuine work and that it was created with the support of the stated literature, under the supervision of my tutor. 
 
   ],
 )
@@ -66,7 +66,7 @@ Reliable recording of employee arrivals and departures is a baseline operational
 
 Commercially dominant attendance solutions - PIN terminals, contact-presented HF RFID card readers, and biometric (facial or fingerprint) terminals - share a structural property: each requires the employee to perform a deliberate identification action at a fixed point. This introduces friction at the threshold, creates queues at high-traffic times, and remains vulnerable to so-called buddy-punching, in which one employee enters or presents identification on another's behalf. A genuinely passive, zero-interaction system - one that records arrival and departure without any action from the employee beyond walking through the doorway - would eliminate all three of these issues simultaneously. No commercial product in the segment currently occupies this niche.
 
-The concrete need for such a system arises at Navigo Solutions s.r.o., a Brno-based software firm whose product Navigo3 is a software-as-a-service company information system used by project-based businesses for project management, finance, capacity planning, and human-resources work, including arrival and departure records and absence tracking @navigo3-website. Prior to this thesis, Navigo3 exposed only a rudimentary internal attendance API and offered no provision for external hardware integrations; attendance entries were made manually through the web interface. As part of the present work, this API has been extended into a form that external clients may use to act on behalf of Navigo3 users, making the system described here the first hardware integration into Navigo3 that is not a bespoke build for a single customer. The same extension admits further integrations beyond the one developed in this thesis.
+The concrete need for such a system arises at Navigo Solutions s.r.o., a Brno-based software firm whose product Navigo3 is a software-as-a-service company information system used by project-based businesses for project management, finance, capacity planning, and human-resources work, including arrival and departure records and absence tracking @navigo3-website. Navigo3 provides a public attendance API that can be used by authenticated external clients; attendance entries can be submitted on behalf of Navigo3 users through this interface. This thesis uses that API as an integration target. The internal implementation of Navigo3 and any Navigo3-side product changes remain outside the scope of this thesis.
 
 Two technical requirements follow from the zero-interaction goal. The first is reliable passive identification at a range of two to three metres, through clothing, bags, and pockets - the tag must be readable wherever an employee normally carries credentials. The second is the recovery of traversal direction: confirming that an employee crossed the doorway is not enough, since arrival and departure must be distinguished without any physical gate or turnstile. Resolving both requirements within a single self-contained embedded device, deployable at an arbitrary doorway with only mains power and wireless network connectivity, defines the scope of the system to be designed.
 
@@ -79,8 +79,8 @@ Of the candidate technologies surveyed in @research, only passive UHF RFID at 86
 
 The objectives of this thesis, as set out in the formal assignment, are:
 - a review of existing hardware and software approaches to attendance recording, with attention to their integration into enterprise software environments;
-- the design of a system architecture compatible with the integration constraints of the partner's information system;
-- the construction of a functional prototype encompassing the identification subsystem and the data path to the partner's software; and 
+- the design of a system architecture compatible with the integration constraints of company's information system;
+- the construction of a functional prototype encompassing the identification subsystem and the data path to the company's software; and 
 - verification of the prototype in a model office environment together with an assessment of its readiness for practical deployment.
 
 The remainder of the thesis is organised as follows. @research surveys identification technologies, established direction detection methods, candidate hardware platforms, and the software framework supporting the chosen microcontroller. @implementation_and_results documents the system architecture, the hardware design across two board revisions, the firmware, the server pipeline, the Navigo3 integration layer, and the verification campaign. @conclusion summarises the outcomes and identifies directions for further development.
@@ -109,9 +109,9 @@ UHF RFID is therefore the only mature passive identification technology meeting 
     columns: (auto, auto, auto, auto, auto),
     table.header[Technology][Read range][User action][Sensitive data][Selected],
     [PIN code],              [N/A],            [Yes], [No],  [No],
-    [HF RFID (13.56 MHz)],  [0–10 cm],        [Yes], [No],  [No],
-    [Biometric],            [Contact / ~1 m], [No],  [Yes], [No],
-    [UHF RFID (860–960 MHz)],[1–12 m],        [No],  [No],  [*Yes*],
+    [HF RFID (13.56 MHz)],  [0--10 cm],        [Yes], [No],  [No],
+    [Biometric],            [0--1 m], [No],  [Yes], [No],
+    [UHF RFID (860–960 MHz)],[1--12 m],        [No],  [No],  [*Yes*],
   ),
   caption: [Identification technology comparison],
 )
@@ -122,15 +122,15 @@ Distinguishing arrival from departure is a hard requirement for any attendance s
 
 The standard approach is to mount two readers on opposite sides of the doorway and treat the pair as a portal. The temporal sequence of detections from the two readers carries the direction: detections that begin at the outside reader before the inside reader imply entry, and the reverse implies exit.
 
-The simplest implementation is comparing the timestamps of the very first detection from each reader but is somewhat unreliable in practice. Passive UHF tags respond probabilistically and the radiation field in a real doorway is irregular due to multipath reflections; an early read from an RF null or a reflected wave can invert the apparent detection order. Oikawa demonstrates this failure mode experimentally on an RFID gate and proposes comparing the read-count-weighted temporal centroid of each reader's full detection group instead, which is far more robust to individual outlier reads @oikawa-2009.
+The simplest implementation is comparing the timestamps of the very first detection from each reader but is somewhat unreliable in practice. Passive UHF tags respond probabilistically and the radiation field in a real doorway is irregular due to multipath reflections; an early read from an RF null or a reflected wave can invert the apparent detection order. Oikawa demonstrates this failure mode experimentally on an RFID gate and proposes comparing the read-count-weighted temporal centroid of each reader's full detection group instead, which is far more robust to individual outlier reads @oikawa-2011.
 
-A complementary signal is available in the received signal strength indicator (RSSI). As a tag traverses the portal, its RSSI at each reader rises while the tag approaches, peaks at the moment of closest approach, and falls as the tag moves away - a direct consequence of the inverse-square dependence of received power on distance described by the Friis transmission equation. The reader whose RSSI peaks first is therefore the reader the tag passed first; in the portal geometry this carries the same direction information as the temporal centroid by an entirely different physical mechanism. This principle is used as the primary direction cue in the RF-Access barrier-free access control system of Jie et al. @jie-2022-rf-access.
+A complementary signal is available in the received signal strength indicator (RSSI). As a tag traverses the portal, its RSSI at each reader rises while the tag approaches, peaks at the moment of closest approach, and falls as the tag moves away - a direct consequence of the inverse-square dependence of received power on distance described by the Friis transmission equation. The reader whose RSSI peaks first is therefore the reader the tag passed first; in the portal geometry this carries the same direction information as the temporal centroid by an entirely different physical mechanism. This principle is used as the primary direction cue in the RF-Access barrier-free access control system of Wang et al. @wang-2022-rf-access.
 
 Two algorithmic families therefore emerge from this literature: a temporal centroid algorithm following Oikawa's approach, and an RSSI-weighted centroid algorithm based on the Friis-derived peak-time argument. Both require the full set of raw timestamped RSSI readings from both readers - any per-device deduplication or summarisation discards the very signal the algorithms operate on. Detailed mathematical formulations of both families are given in #ref(<direction_detection_and_event_processing>).
 
 #pagebreak()
 
-== Hardware Platforms and Embedded Architectures <hardware_platforms_and_embedded_architectures>
+== Hardware Platforms & Embedded Architectures <hardware_platforms_and_embedded_architectures>
 
 The Lighthouse unit's hardware platform must support the full set of identification, network, and local-storage tasks within a single self-contained embedded device. The two principal sub-decisions are the choice of microcontroller and the choice of UHF RFID reader module.
 
@@ -200,7 +200,7 @@ Two distinct communication paths exist in this system, with different requiremen
 
 For the firmware-to-server path, MQTT is selected. It was designed specifically for constrained devices communicating over unreliable networks and provides tunable Quality-of-Service levels, automatic reconnection in the client library, and a Last Will and Testament (LWT) mechanism that publishes a broker-generated notification on unexpected disconnection @mqtt. The application of these features in the Lighthouse firmware is described in @mqtt_communication_and_offline_caching.
 
-For the server-to-enterprise path, REST over HTTP is appropriate. Attendance records are created once per traversal event - a low-frequency, high-importance flow that is well served by stateless idempotent HTTP endpoints, which are also universally supported by enterprise software. The integration target is Navigo3, the HR and project-management platform developed by Navigo Solutions s.r.o.; its REST API is built on the open-source `dry-api` framework, a typed JSON-over-HTTP transport @dry-api @navigo3-api. The platform's attendance-recording endpoints were extended in release 2026.03 with parametrised `start`/`stop` overloads, developed in conjunction with this thesis; the connector implementation is described in #ref(<navigo3_integration>).
+For the server-to-enterprise path, REST over HTTP is appropriate. Attendance records are created once per traversal event - a low-frequency, high-importance flow that is well served by stateless idempotent HTTP endpoints, which are also universally supported by enterprise software. The integration target is Navigo3, the HR and project-management platform developed by Navigo Solutions s.r.o.; its REST API is built on the firm's open-source `dry-api` framework, a typed JSON-over-HTTP transport @dry-api @navigo3-api. The platform exposes parametrised `start`, `stop`, and `upsert` endpoints for recording attendance on behalf of authenticated external clients; the connector implementation against these endpoints is described in #ref(<navigo3_integration>).
 
 == Embedded Software Frameworks <embedded_software_frameworks>
 
@@ -401,7 +401,7 @@ The 470 µF electrolytic capacitor on the R300 5 V rail was sized to limit volta
 
 UHF RFID operates in the 860–960 MHz range (ETSI band 865–868 MHz in Europe, FCC 902–928 MHz in North America). At these frequencies the integrity of the feed path between the YPD-R300 RF output and the antenna directly governs detection range; the R300 RF output is specified for 50 Ω impedance (per YPD-R300 datasheet Section 3.1; see also @uhf_rfid_reader_modules), and any mismatch reflects power away from the antenna. Board v2 routes the R300 RF output to a board-edge SMA coaxial receptacle via a 2 cm microstrip trace. 
 
-The trace width on Board v2 was not impedance-controlled during layout. Achieving 50 Ω characteristic impedance on a microstrip requires the trace width to be matched to the PCB substrate thickness, dielectric constant, and copper weight, none of which were explicitly calculated or verified for the chosen stack-up. The empirical consequence is visible in #ref(<unit_ranges>). The Blue unit, fitted with a 4 dBi antenna soldered directly to the R300 RF output pad, and the Yellow unit, fitted with a 5.5 dBi antenna routed through the SMA receptacle and the 2 cm trace, both achieve the same 3.0 m maximum reliable range. Vendor-stated ideal free-space ranges for the two antennas are 3.5 m and 4.8 m respectively @antenna-4dbi @antenna-5dbi; the Blue unit therefore achieves approximately 86% of its antenna's stated ideal, while Yellow achieves only 62%. Were Yellow's feed path as efficient as Blue's, the larger antenna's expected range would be approximately 4.1 m. The recoverable range loss attributable to the unmatched feed path is therefore estimated at 1 to 1.5 m, the lower bound coming from the proportional argument above and the upper bound allowing for additional loss in connector transitions not present on the direct-solder unit. 
+The trace width on Board v2 was not impedance-controlled during layout. Achieving 50 Ω characteristic impedance on a microstrip requires the trace width to be matched to the PCB substrate thickness, dielectric constant, and copper weight, none of which were explicitly calculated or verified for the chosen stack-up. The empirical consequence is visible in #ref(<unit_ranges>). The Blue unit, fitted with a 4 dBi antenna soldered directly to the R300 RF output pad, and the Yellow unit, fitted with a 5 dBi antenna routed through the SMA receptacle and the 2 cm trace, both achieve the same 3.0 m maximum reliable range. Vendor-stated ideal free-space ranges for the two antennas are 3.5 m and 4.8 m respectively @antenna-4dbi @antenna-5dbi; the Blue unit therefore achieves approximately 86% of its antenna's stated ideal, while Yellow achieves only 62%. Were Yellow's feed path as efficient as Blue's, the larger antenna's expected range would be approximately 4.1 m. The recoverable range loss attributable to the unmatched feed path is therefore estimated at 1 to 1.5 m, the lower bound coming from the proportional argument above and the upper bound allowing for additional loss in connector transitions not present on the direct-solder unit. 
 
 #figure(
   image("./images/antenna_joint_comparison.png", width: 80%),
@@ -415,12 +415,12 @@ A future board revision should reposition the SMA receptacle immediately adjacen
 A prototype enclosure was designed in FreeCAD to house the Board v2 PCB, battery, PIR sensor, and antenna in a wall-mountable form factor suitable for doorway deployment. The design addresses several constraints imposed by the operational requirements of a passive detection system. The PIR sensor window must face the detection zone to trigger RFID scan windows when personnel approach the portal. The antenna must be oriented toward the doorway with minimal physical obstruction to maintain the detection range validated during board testing. The USB-C port must remain accessible for charging and firmware updates without disassembling the enclosure. The four status LEDs must be visible to operators for diagnostic purposes, implemented via light pipes from the PCB-mounted LEDs to the enclosure front face. The two push buttons must remain accessible for manual scan mode control and WiFi provisioning entry.
 
 #figure(
-  image("./images/lighthouses.jpg", width: 100%),
+  image("./images/lighthouses.jpg", width: 90%),
   caption: [Manufactured units - PIR sensor, antenna position, LED light pipes, and USB-C port access]
 )
 
 #figure(
-  image("./images/3.2.4-2_case.png", width: 100%),
+  image("./images/3.2.4-2_case.png", width: 90%),
   caption: [CAD model screenshot - exploded or open view showing internal component placement: PCB, battery, antenna mounting]
 )
 
@@ -704,7 +704,7 @@ Scans from ungrouped Lighthouse units-those with `groupId IS NULL`-are handled s
 
 ==== Algorithm 1 - Temporal Centroid (C₁) <algorithm_1_temporal_centroid>
 
-Algorithm 1 implements the temporal centroid approach of Oikawa @oikawa-2009, surveyed in @direction_detection_methods. For each Lighthouse group, the centroid is the arithmetic mean of its scan timestamps: 
+Algorithm 1 implements the temporal centroid approach of Oikawa @oikawa-2011, surveyed in @direction_detection_methods. For each Lighthouse group, the centroid is the arithmetic mean of its scan timestamps: 
 
 $ overline(t)_"out" = 1 / N_"out" sum_(i=1)^(N_"out") t_i^"out", quad overline(t)_"in" = 1 / N_"in" sum_(i=1)^(N_"in") t_i^"in" $
 
@@ -741,7 +741,7 @@ BCF measures the balance of scan counts between the two Lighthouses; it is 1.0 w
 
 ==== Algorithm 2 - RSSI-Weighted Centroid (C₂) <algorithm_2_rssi-weighted_centroid>
 
-Algorithm 2 follows the same temporal centroid structure as Algorithm 1 but weights each scan by a monotonically increasing function of its RSSI, $w_i = f("RSSI"_i)$, drawing on the signal-strength direction cue of Jie et al. @jie-2022-rf-access surveyed in @direction_detection_methods. The specific form of $f$ is implementation-defined; the algorithm requires only that stronger signals yield higher weights. The weighted centroid for one Lighthouse group is: 
+Algorithm 2 follows the same temporal centroid structure as Algorithm 1 but weights each scan by a monotonically increasing function of its RSSI, $w_i = f("RSSI"_i)$, drawing on the signal-strength direction cue of Wang et al. @wang-2022-rf-access surveyed in @direction_detection_methods. The specific form of $f$ is implementation-defined; the algorithm requires only that stronger signals yield higher weights. The weighted centroid for one Lighthouse group is: 
 $ overline(t)_w = (sum_i w_i dot t_i) / (sum_i w_i) $
 
 Stronger signals - produced when the tag is closest to a reader's antenna - pull the effective centroid toward their timestamps, disambiguating cases where the arithmetic means of the two groups are nearly equal. Direction inference is otherwise identical to Algorithm 1, and CSzF and BCF are reused unchanged. CSF is reused with the weighted centroids $overline(t)_("w,out")$ and $overline(t)_("w,in")$ substituted for the arithmetic means in its numerator; this weighted variant is denoted $"CSF"_w$ below. 
@@ -911,15 +911,15 @@ Per-unit detection range was measured with each unit in isolation. A passive UHF
   table(
     columns: (auto, auto, auto, auto, auto),
     table.header[Unit][Antenna][Antenna connection][Max reliable range \[m\]][Condition],
-    [Red],    [5.5 dBi], [SMA],     [2.5], [Pre-drop],
-    [Red],    [5.5 dBi], [SMA],     [1.5], [Post-repair],
-    [Yellow], [5.5 dBi], [SMA],     [3.0], [N/A],
+    [Red],    [5 dBi], [SMA],     [2.5], [Pre-drop],
+    [Red],    [5 dBi], [SMA],     [1.5], [Post-repair],
+    [Yellow], [5 dBi], [SMA],     [3.0], [N/A],
     [Blue],   [4 dBi],   [Direct-solder], [3.0], [N/A],
   ),
   caption: [Detection range per unit],
 ) <unit_ranges>
 
-Yellow and Blue achieve the same 3.0 m maximum reliable range despite Yellow carrying a higher-gain 5.5 dBi antenna. Under vendor-stated ideal conditions the 5.5 dBi antenna reaches approximately 1.3 m further than the 4 dBi antenna @antenna-4dbi @antenna-5dbi; the absence of any such advantage in the measured ranges is consistent with non-trivial forward-path loss on Yellow's feed, attributed in #ref(<antenna_and_rf_considerations>) to the non-impedance-controlled 2 cm microstrip trace. Red's pre-drop range of 2.5 m was already 0.5 m below Yellow's despite identical antenna and connection type, attributable to assembly-level variance in the SMA cable and connector. 
+Yellow and Blue achieve the same 3.0 m maximum reliable range despite Yellow carrying a higher-gain 5 dBi antenna. Under vendor-stated ideal conditions the 5 dBi antenna reaches approximately 1.3 m further than the 4 dBi antenna @antenna-4dbi @antenna-5dbi; the absence of any such advantage in the measured ranges is consistent with non-trivial forward-path loss on Yellow's feed, attributed in #ref(<antenna_and_rf_considerations>) to the non-impedance-controlled 2 cm microstrip trace. Red's pre-drop range of 2.5 m was already 0.5 m below Yellow's despite identical antenna and connection type, attributable to assembly-level variance in the SMA cable and connector. 
 
 === Direction detection accuracy
 
@@ -949,7 +949,7 @@ End-to-end latency was measured as the interval between `cluster_started_at` - t
   table(
     columns: (auto, auto),
     table.header[Metric][Value \[s\]],
-    [Theoretical minimum], [\~11],
+    [Expected pipeline budget], [\~11],
     [Mean measured (cluster start → Navigo3)], [9.54 ± 1.16],
     [Mean measured (IR trigger → Navigo3, adjusted)], [\~9.94],
     [Min measured],        [7.46],
@@ -1008,6 +1008,25 @@ Several directions for future development are identified. A hardware real-time c
 
 #bibliography("references.bib", style: "ieee")
 
+= List of Attachments <list_of_attachments>
+
+#figure(
+  table(
+    columns: ( auto, 1fr),
+    align: left,
+    table.header[*File*][*Description*],
+     [#link("./attachments/LH-ELE.pdf", "LH-ELE.pdf")],    [Board schematics: four hierarchical KiCad sheets],
+     [#link("./attachments/LH-PCB.pdf", "LH-PCB.pdf")], [PCB assembly drawing: component placement],
+     [#link("./attachments/LH-ASM-10_assembly.pdf", "LH-ASM-10_assembly.pdf")],  [Enclosure assembly drawing.],
+     [#link("./attachments/LH-ASM-20_exploded.pdf", "LH-ASM-20_exploded.pdf")],  [Enclosure exploded view.],
+     [#link("./attachments/LH-MEC-10_front_face.pdf", "LH-MEC-10_front_face.pdf")], [Enclosure front face part drawing.],
+     [#link("./attachments/LH-MEC-20_back_cover.pdf", "LH-MEC-20_back_cover.pdf")], [Enclosure back cover part drawing.],
+     [#link("./attachments/LH-MEC-30_pcb_mount.pdf", "LH-MEC-30_pcb_mount.pdf")],  [PCB mount part drawing.],
+     [#link("./attachments/LH-MEC-40_switch_shim.pdf", "LH-MEC-40_switch_shim.pdf")], [Switch shim part drawing.],
+  ),
+  caption: [List of attachments],
+)
+
 = Appendices <appendices>
 
 #show heading.where(level: 2): set heading(supplement: "Appendix")
@@ -1017,6 +1036,14 @@ Several directions for future development are identified. A hardware real-time c
   if levels.len() == 1 { numbering("1.", ..levels) }
   else if levels.len() == 2 { numbering("A", levels.last()) }
 })
+
+== Project Repository <project_repository>
+
+The complete source code for the system described in this thesis - firmware, server, dashboard, hardware design files, and the Typst source of this document - is maintained in a single Git repository, made publicly available on GitHub at:
+
+#align(center)[#link("https://github.com/MeckPetarda/bachelor")]
+
+The state of the repository at the time of thesis submission is preserved under the git tag `thesis-submission`; the URL `https://github.com/MeckPetarda/bachelor/tree/thesis-submission` resolves to that snapshot.
 
 == Use of generative AI <use_of_ai>
 
@@ -1063,7 +1090,7 @@ The Lighthouse integration layer communicates with Navigo3 through several API m
 
 Field types follow the Navigo3 schema convention: `string` maps to a JSON string, `number` to a JSON number, `datetime` to a string in the format `yyyy-MM-dd HH:mm:ss` (UTC), `date` to `yyyy-MM-dd`, and `time` to `HH:mm:ss`. Fields marked as optional may be omitted from the request payload entirely. 
 
-=== `attendance/embedded/start`
+==== `attendance/embedded/start`
 
 Registers the start of a work interval for a user. Called by `pushEvent()` when an eligible processed event with `direction = in` is pushed individually. 
 
@@ -1084,7 +1111,7 @@ Output: no payload (`VoidParam`).
 
 A successful response indicates the interval was opened in Navigo3. The connector sets `syncedToIntegration = true` on the corresponding `processed_events` row. 
 
-=== `attendance/embedded/stop`
+==== `attendance/embedded/stop`
 
 Registers the end of a work interval for a user. Called by `pushEvent()` when an eligible processed event with `direction = out` is pushed individually. 
 
@@ -1104,7 +1131,7 @@ Output: no payload (`VoidParam`).
 
 The `typeId` field is intentionally omitted; Navigo3 infers the attendance type from the most recently opened interval for the user. The connector sets `syncedToIntegration = true` on the corresponding `processed_events` row. 
 
-=== `attendance/embedded/upsert`
+==== `attendance/embedded/upsert`
 
 Creates or updates a closed attendance interval. Called by `pushPair()` when a counterpart event - opposite direction, same `userId`, same calendar day, also unsynced - is found at push time. The endpoint is idempotent: if a record for the given user and day already exists, Navigo3 updates its timestamps; otherwise it creates a new record. 
 
@@ -1129,7 +1156,7 @@ Creates or updates a closed attendance interval. Called by `pushPair()` when a c
 
 Output: `{ id: number }` - the primary key of the created or updated attendance record. The connector writes this value to the `navigo3RecordId` column on both the entry and exit `processed_events` rows, then sets `syncedToIntegration = true` on both in a single database transaction. 
 
-=== `attendance/embedded/types`
+==== `attendance/embedded/types`
 
 Lists all attendance types configured in the Navigo3 instance. Called once at service initialisation; not called again during normal operation. 
 
@@ -1179,7 +1206,7 @@ Four test jumpers are present on the board and are referenced in the schematics 
   caption: [Test jumper reference - bottom side of PCB],
 )
 
-=== PCB Assembly Drawing <pcb_assembly_drawing>
+==== PCB Assembly Drawing <pcb_assembly_drawing>
 
 The assembly drawing shows the top-side component placement for Board v2, produced from the KiCad PCB file. The drawing includes component courtyard outlines, reference designators, board outline with overall dimensions (83 × 80 mm), mounting hole positions, antenna keep-out zone, and board thickness (1.57 mm). Bottom-side features are limited to the four test jumpers documented in #ref(<board_schematics>).
 

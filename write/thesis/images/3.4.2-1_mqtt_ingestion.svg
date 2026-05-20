@@ -1,73 +1,422 @@
-<svg viewBox="0 0 660 400" xmlns="http://www.w3.org/2000/svg" font-family="Georgia, serif" font-size="12">
-  <rect width="660" height="400" fill="#fff"/>
-  <text x="330" y="26" text-anchor="middle" font-size="14" font-weight="bold" fill="#111">MQTT Scan Ingestion Sequence</text>
-
-  <defs>
-    <marker id="a" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#374151"/></marker>
-    <marker id="ar" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#b91c1c"/></marker>
-    <marker id="ag" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#15803d"/></marker>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 660 400"
+   font-family="Georgia, serif"
+   font-size="12"
+   version="1.1"
+   id="svg24"
+   sodipodi:docname="3.4.2-1_mqtt_ingestion.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview24"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="1.8378788"
+     inkscape:cx="331.63232"
+     inkscape:cy="203.22341"
+     inkscape:window-width="1920"
+     inkscape:window-height="1011"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg24" />
+  <rect
+     width="660"
+     height="400"
+     fill="#fff"
+     id="rect1" />
+  <line
+     x1="425.25562"
+     y1="74"
+     x2="425.25562"
+     y2="380"
+     stroke="#cbd5e1"
+     stroke-width="1.10971"
+     stroke-dasharray="4, 3"
+     id="line9" />
+  <line
+     x1="425.35349"
+     y1="267.30914"
+     x2="425.35349"
+     y2="291.30917"
+     stroke="#374151"
+     stroke-width="1.66456"
+     marker-end="url(#a-7)"
+     id="line17-5"
+     style="marker-end:url(#a-7)" />
+  <text
+     x="330"
+     y="26"
+     text-anchor="middle"
+     font-size="14"
+     font-weight="bold"
+     fill="#111"
+     id="text1">MQTT Scan Ingestion Sequence</text>
+  <defs
+     id="defs3">
+    <marker
+       id="a"
+       markerWidth="7"
+       markerHeight="5"
+       refX="7"
+       refY="2.5"
+       orient="auto">
+      <polygon
+         points="0 0,7 2.5,0 5"
+         fill="#374151"
+         id="polygon1" />
+    </marker>
+    <marker
+       id="ar"
+       markerWidth="7"
+       markerHeight="5"
+       refX="7"
+       refY="2.5"
+       orient="auto">
+      <polygon
+         points="0 0,7 2.5,0 5"
+         fill="#b91c1c"
+         id="polygon2" />
+    </marker>
+    <marker
+       id="ag"
+       markerWidth="7"
+       markerHeight="5"
+       refX="7"
+       refY="2.5"
+       orient="auto">
+      <polygon
+         points="0 0,7 2.5,0 5"
+         fill="#15803d"
+         id="polygon3" />
+    </marker>
+    <marker
+       id="a-7"
+       markerWidth="7"
+       markerHeight="5"
+       refX="7"
+       refY="2.5"
+       orient="auto">
+      <polygon
+         points="7,2.5 0,5 0,0 "
+         fill="#374151"
+         id="polygon1-5" />
+    </marker>
   </defs>
-
   <!-- Participants -->
-  <rect x="30"  y="44" width="110" height="30" rx="4" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
-  <text x="85"  y="63" text-anchor="middle" fill="#1e3a8a" font-weight="bold" font-size="11">Firmware</text>
-
-  <rect x="190" y="44" width="110" height="30" rx="4" fill="#e0e7ff" stroke="#4338ca" stroke-width="1.5"/>
-  <text x="245" y="63" text-anchor="middle" fill="#1e1b4b" font-weight="bold" font-size="11">MQTT Broker</text>
-
-  <rect x="350" y="44" width="110" height="30" rx="4" fill="#e0e7ff" stroke="#4338ca" stroke-width="1.5"/>
-  <text x="405" y="63" text-anchor="middle" fill="#1e1b4b" font-weight="bold" font-size="11">Scan Handler</text>
-
-  <rect x="510" y="44" width="120" height="30" rx="4" fill="#fef9c3" stroke="#a16207" stroke-width="1.5"/>
-  <text x="570" y="58" text-anchor="middle" fill="#78350f" font-weight="bold" font-size="11">PostgreSQL</text>
-  <text x="570" y="70" text-anchor="middle" fill="#78350f" font-size="9">raw_scans</text>
-
+  <rect
+     x="30"
+     y="44"
+     width="110"
+     height="30"
+     rx="4"
+     fill="#dbeafe"
+     stroke="#1d4ed8"
+     stroke-width="1.5"
+     id="rect3" />
+  <text
+     x="85"
+     y="63"
+     text-anchor="middle"
+     fill="#1e3a8a"
+     font-weight="bold"
+     font-size="11"
+     id="text3">Firmware</text>
+  <rect
+     x="190"
+     y="44"
+     width="110"
+     height="30"
+     rx="4"
+     fill="#e0e7ff"
+     stroke="#4338ca"
+     stroke-width="1.5"
+     id="rect4" />
+  <text
+     x="245"
+     y="63"
+     text-anchor="middle"
+     fill="#1e1b4b"
+     font-weight="bold"
+     font-size="11"
+     id="text4">MQTT Broker</text>
+  <rect
+     x="350"
+     y="44"
+     width="110"
+     height="30"
+     rx="4"
+     fill="#e0e7ff"
+     stroke="#4338ca"
+     stroke-width="1.5"
+     id="rect5" />
+  <text
+     x="405"
+     y="63"
+     text-anchor="middle"
+     fill="#1e1b4b"
+     font-weight="bold"
+     font-size="11"
+     id="text5">Scan Handler</text>
+  <rect
+     x="510"
+     y="44"
+     width="120"
+     height="30"
+     rx="4"
+     fill="#fef9c3"
+     stroke="#a16207"
+     stroke-width="1.5"
+     id="rect6" />
+  <text
+     x="570"
+     y="58"
+     text-anchor="middle"
+     fill="#78350f"
+     font-weight="bold"
+     font-size="11"
+     id="text6">PostgreSQL</text>
+  <text
+     x="570"
+     y="70"
+     text-anchor="middle"
+     fill="#78350f"
+     font-size="9"
+     id="text7">raw_scans</text>
   <!-- Lifelines -->
-  <line x1="85"  y1="74" x2="85"  y2="380" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="245" y1="74" x2="245" y2="380" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="405" y1="74" x2="405" y2="380" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="570" y1="74" x2="570" y2="380" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>
-
+  <line
+     x1="31.191015"
+     y1="74"
+     x2="31.191015"
+     y2="380"
+     stroke="#cbd5e1"
+     stroke-width="1.10971"
+     stroke-dasharray="4, 3"
+     id="line7" />
+  <line
+     x1="228.22331"
+     y1="74"
+     x2="228.22331"
+     y2="380"
+     stroke="#cbd5e1"
+     stroke-width="1.10971"
+     stroke-dasharray="4, 3"
+     id="line8" />
+  <line
+     x1="628.44513"
+     y1="74"
+     x2="628.44513"
+     y2="380"
+     stroke="#cbd5e1"
+     stroke-width="1.10971"
+     stroke-dasharray="4, 3"
+     id="line10" />
   <!-- 1. Batch accumulator flushes (self-activation) -->
-  <rect x="50" y="96" width="70" height="20" rx="2" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1"/>
-  <text x="85" y="110" text-anchor="middle" font-size="9" fill="#1e3a8a">batch flush (150 ms)</text>
-
+  <rect
+     x="29.805202"
+     y="90.657639"
+     width="101.36074"
+     height="19.80262"
+     rx="2.8960211"
+     fill="#dbeafe"
+     stroke="#1d4ed8"
+     stroke-width="1.19738"
+     id="rect10" />
+  <text
+     x="80.485573"
+     y="104.55894"
+     text-anchor="middle"
+     font-size="9px"
+     fill="#1e3a8a"
+     id="text10">batch flush (150 ms)</text>
   <!-- 2. PUBLISH JSON array -->
-  <line x1="85" y1="130" x2="235" y2="130" stroke="#1d4ed8" stroke-width="1.8" marker-end="url(#a)"/>
-  <text x="165" y="123" text-anchor="middle" font-size="10" fill="#374151" font-weight="bold">PUBLISH  QoS 1</text>
-  <text x="165" y="136" text-anchor="middle" font-size="9" fill="#64748b">lighthouse/{id}/scans — JSON array</text>
-
+  <line
+     x1="31.133553"
+     y1="138"
+     x2="229.55894"
+     y2="138"
+     stroke="#1d4ed8"
+     stroke-width="2.07027"
+     marker-end="url(#a)"
+     id="line11" />
+  <text
+     x="131.80957"
+     y="131"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#374151"
+     font-weight="bold"
+     id="text11">PUBLISH QoS 1</text>
+  <text
+     x="117.37437"
+     y="168.85497"
+     text-anchor="middle"
+     font-size="9.98737px"
+     fill="#64748b"
+     id="text12"
+     transform="scale(1.109708,0.90113795)"
+     style="stroke-width:1.10971">lighthouse/{id}/scans-batch</text>
   <!-- 3. PUBACK -->
-  <line x1="235" y1="155" x2="95"  y2="155" stroke="#374151" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#a)"/>
-  <text x="165" y="149" text-anchor="middle" font-size="9" fill="#64748b">PUBACK</text>
-
+  <line
+     x1="228.42322"
+     y1="175"
+     x2="32.079315"
+     y2="175"
+     stroke="#374151"
+     stroke-width="1.4211"
+     stroke-dasharray="4, 3"
+     marker-end="url(#a)"
+     id="line12" />
+  <text
+     x="129.63315"
+     y="169"
+     text-anchor="middle"
+     font-size="9px"
+     fill="#64748b"
+     id="text13">PUBACK</text>
   <!-- 4. onPublish callback → Scan Handler -->
-  <line x1="245" y1="178" x2="395" y2="178" stroke="#374151" stroke-width="1.8" marker-end="url(#a)"/>
-  <text x="320" y="171" text-anchor="middle" font-size="10" fill="#374151" font-weight="bold">onPublish callback</text>
-
+  <line
+     x1="228.22331"
+     y1="186"
+     x2="424.91141"
+     y2="186"
+     stroke="#374151"
+     stroke-width="2.06118"
+     marker-end="url(#a)"
+     id="line13" />
+  <text
+     x="320"
+     y="179"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#374151"
+     font-weight="bold"
+     id="text14">onPublish callback</text>
   <!-- 5. Parse + validate loop note -->
-  <rect x="370" y="196" width="160" height="48" rx="3" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1"/>
-  <text x="450" y="211" text-anchor="middle" font-size="9" fill="#374151" font-weight="bold">for each element:</text>
-  <text x="450" y="224" text-anchor="middle" font-size="9" fill="#374151">validate (epc, rssiDbm,</text>
-  <text x="450" y="237" text-anchor="middle" font-size="9" fill="#374151">timestamp, timeBasis)</text>
-
+  <rect
+     x="326.52109"
+     y="204.04951"
+     width="246.95786"
+     height="37.562962"
+     rx="4.6304598"
+     fill="#f1f5f9"
+     stroke="#94a3b8"
+     stroke-width="1.09903"
+     id="rect14" />
+  <text
+     x="450"
+     y="219"
+     text-anchor="middle"
+     font-size="9px"
+     fill="#374151"
+     font-weight="bold"
+     id="text15">for each element:</text>
+  <text
+     x="450"
+     y="232"
+     text-anchor="middle"
+     font-size="9px"
+     fill="#374151"
+     id="text16">validate (epc, rssiDbm, timestamp, timeBasis)</text>
+  <text
+     x="450"
+     y="237"
+     text-anchor="middle"
+     font-size="9px"
+     fill="#374151"
+     id="text17" />
   <!-- 6a. Valid → INSERT -->
-  <line x1="405" y1="244" x2="405" y2="268" stroke="#374151" stroke-width="1.5" marker-end="url(#a)"/>
-  <text x="415" y="260" font-size="9" fill="#15803d">valid</text>
-  <line x1="405" y1="268" x2="560" y2="268" stroke="#374151" stroke-width="1.8" marker-end="url(#a)"/>
-  <text x="483" y="261" text-anchor="middle" font-size="10" fill="#374151" font-weight="bold">INSERT raw_scan</text>
-  <text x="483" y="274" text-anchor="middle" font-size="9" fill="#64748b">processedAt = null</text>
-
+  <line
+     x1="425.25562"
+     y1="242.2061"
+     x2="425.25562"
+     y2="266.20612"
+     stroke="#374151"
+     stroke-width="1.66456"
+     marker-end="url(#a)"
+     id="line17" />
+  <text
+     x="395.9563"
+     y="258.20612"
+     font-size="9px"
+     fill="#15803d"
+     id="text18">valid</text>
+  <line
+     x1="425.25562"
+     y1="266.20612"
+     x2="629.73328"
+     y2="266.20612"
+     stroke="#374151"
+     stroke-width="2.06742"
+     marker-end="url(#a)"
+     id="line18" />
+  <text
+     x="518.91095"
+     y="259.20612"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#374151"
+     font-weight="bold"
+     id="text19">INSERT raw_scan</text>
+  <text
+     x="518.91095"
+     y="277.64716"
+     text-anchor="middle"
+     font-size="9px"
+     fill="#64748b"
+     id="text20">processedAt = null</text>
+  <rect
+     x="332.93695"
+     y="292.21475"
+     width="187.24651"
+     height="37.70322"
+     rx="3.5108721"
+     fill="#f1f5f9"
+     stroke="#94a3b8"
+     stroke-width="0.95877"
+     id="rect14-6" />
   <!-- 6b. Invalid → discard (note) -->
-  <text x="375" y="300" font-size="9" fill="#b91c1c">invalid → discarded silently</text>
-
   <!-- 7. WebSocket broadcast -->
-  <line x1="405" y1="320" x2="235" y2="320" stroke="#374151" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a)"/>
-  <text x="320" y="313" text-anchor="middle" font-size="10" fill="#374151" font-weight="bold">WS broadcast  scan event</text>
-  <text x="320" y="326" text-anchor="middle" font-size="9" fill="#64748b">to all connected dashboard clients</text>
-
+  <text
+     x="428.16159"
+     y="307"
+     text-anchor="middle"
+     font-size="10px"
+     fill="#374151"
+     font-weight="bold"
+     id="text22">WS broadcast scan event</text>
+  <text
+     x="427.07336"
+     y="321.07336"
+     text-anchor="middle"
+     font-size="9px"
+     fill="#64748b"
+     id="text23">to all connected dashboard clients</text>
   <!-- Footer note -->
-  <rect x="30" y="352" width="600" height="24" rx="3" fill="#f1f5f9" stroke="#d1d5db" stroke-width="1"/>
-  <text x="330" y="368" text-anchor="middle" font-size="10" fill="#475569">timeBasis (synced / estimated / relative) is stored verbatim and evaluated at cluster processing time, not here</text>
-
+  <rect
+     x="30"
+     y="352"
+     width="600"
+     height="24"
+     rx="3"
+     fill="#f1f5f9"
+     stroke="#d1d5db"
+     stroke-width="1"
+     id="rect23" />
+  <text
+     x="330"
+     y="368"
+     text-anchor="middle"
+     font-size="10"
+     fill="#475569"
+     id="text24">timeBasis (synced / estimated / relative) is stored verbatim and evaluated at cluster processing time, not here</text>
 </svg>
