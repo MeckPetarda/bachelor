@@ -34,6 +34,36 @@ Laboratory validation confirmed that every detected traversal was correctly clas
   keywords-en: [
 UHF RFID, passive RFID, ESP32, FreeRTOS, KiCad, attendance system, attendance tracking, portal model, direction detection, temporal centroid, embedded system, MQTT, FreeCAD, Navigo3
   ],
+  bibliographic-citation: [
+    *Printed work citation:*
+
+    HLOUŠEK, Jakub. _Embedded Implementation of an Attendance System for Integration into an Enterprise Application._ Bachelor's Thesis. Michal BASTL (supervisor). Brno: Brno University of Technology, Faculty of Mechanical Engineering, 2026.
+
+    *Citace tištěné práce:*
+
+    HLOUŠEK, Jakub. _Embedded řešení docházkového systému pro integraci do podnikové aplikace._ Bakalářská práce. Michal BASTL (vedoucí práce). Brno: Vysoké učení technické v Brně, Fakulta strojního inženýrství, 2026.
+
+    *Electronic source citation:*
+
+    HLOUŠEK, Jakub. _Embedded Implementation of an Attendance System for Integration into an Enterprise Application._ Online, bachelor's Thesis. Michal BASTL (supervisor). Brno: Brno University of Technology, Faculty of Mechanical Engineering, 2026. Available at: #link("https://www.vut.cz/en/students/final-thesis/detail/174035"). [accessed 2026-05-20].
+
+    *Citace elektronického zdroje:*
+
+    HLOUŠEK, Jakub. _Embedded řešení docházkového systému pro integraci do podnikové aplikace._ Online, bakalářská práce. Michal BASTL (vedoucí práce). Brno: Vysoké učení technické v Brně, Fakulta strojního inženýrství, 2026. Dostupné z: #link("https://www.vut.cz/studenti/zav-prace/detail/174035"). [cit. 2026-05-20].
+  ],
+  extended-abstract-cs: [
+Spolehlivá evidence příchodů a odchodů zaměstnanců je základním provozním požadavkem většiny podniků a vstupním zdrojem dat pro mzdové systémy, alokaci projektového času a plnění požadavků na pracovní výkazy. Dominantní komerční řešení -- PIN terminály, bezkontaktní čtečky karet a biometrické terminály -- mají společnou vlastnost: každé z nich vyžaduje, aby zaměstnanec provedl vědomý identifikační úkon na pevném místě. Tím vznikají fronty při vstupu ve špičce, systémy jsou náchylné k zaznamenání docházky za jiného zaměstnance a zbytečně zatěžují každodenní provoz. Žádné komerčně dostupné řešení v současnosti tento problém neřeší způsobem, který by nevyžadoval vědomou součinnost zaměstnance. Cílem této práce bylo navrhnout a implementovat pasivní docházkový systém, který tyto nedostatky odstraní -- systém zaznamenávající příchody a odchody bez jakékoli aktivity ze strany zaměstnance, pouze na základě přirozeného průchodu vstupními dveřmi, a předávající výsledné záznamy přímo do firemního informačního systému.
+
+Jako identifikační technologie byl zvolen pasivní UHF RFID pracující v pásmu 860--960 MHz. Jde o jedinou komerčně dostupnou pasivní technologii splňující požadavek na bezdotykovou detekci ve vzdálenosti 2--3 metry, přičemž tag může být nošen v kapse nebo tašce bez jakéhokoli vědomého přiložení. Vysokofrekvenční RFID a technologie NFC jsou omezeny na kontaktní vzdálenosti řádově centimetrů, čímž vyžadují vědomý úkon srovnatelný s PIN terminálem. Biometrické systémy technicky umožňují pasivní identifikaci, avšak zpracování biometrických údajů za účelem jednoznačné identifikace osoby je zvláštní kategorií osobních dat dle čl. 9 nařízení GDPR, jejíž zpracování je za běžných podmínek zakázáno. Kombinace technických a právních omezení alternativních technologií tedy jednoznačně určila UHF RFID jako základ systému.
+
+Navržený systém je postaven na portálovém modelu: dvě embedded zařízení na bázi ESP32 osazená UHF RFID čtečkami jsou umístěna na protilehlých stranách vstupních dvěří a společně tvoří detekční portál. Každá jednotka pracuje zcela autonomně a o svém protějšku na druhé straně dveří nemá žádnou přímou znalost -- publikuje pouze surová timestampovaná data o detekovaných tazích. Veškerá logika určení směru průchodu je soustředěna na serveru, kde jsou data z obou jednotek sdružována a vyhodnocována. Server zpracovává příchozí skeny dvěma nezávislými algoritmy -- jedním založeným na časovém těžišti detekcí, druhým na vývoji síly signálu -- a výsledné záznamy o průchodu předává do firemní HR platformy Navigo3 prostřednictvím modulární integrační vrstvy navržené jako rozšiřitelná o další systémy. Součástí řešení je také webový operátorský dashboard umožňující správu zařízení, přiřazení tagů uživatelům a sledování událostí v reálném čase. Firmware běží na operačním systému FreeRTOS a zajišťuje sběr surových dat ze čtečky, jejich přenos přes MQTT na centrální server a lokální ukládání událostí při výpadku sítě s automatickým přehráním po obnovení připojení.
+
+Hardwarový vývoj probíhal ve dvou fázích. V první fázi byl sestaven funkční prototyp na nepájivém poli z komerčně dostupných modulů -- vývojové desky ESP32, čtecího modulu UHF RFID na nosné desce, step-up DC/DC měniče a nabíjecího modulu lithiového akumulátoru. Žádný z těchto modulů nebyl dodán s úplnou technickou dokumentací, každý proto byl zpětně analyzován za účelem zachycení hodnot součástek a interního zapojení. Výsledné schematické podklady se staly základem pro druhou fázi: návrh desky plošných spojů v prostředí KiCad, která integruje funkcionalitu všech čtyř modulů na jediné desce spolu s rozšířenou ochranou napájení, monitorováním stavu akumulátoru a konsolidovaným připojením přes USB-C. Deska byla vyrobena a osazena ve třech kusech. Paralelně byl v prostředí FreeCAD navržen kryt pro 3D tisk, který ukrývá desku, akumulátor a anténu do kompaktního nástěnného pouzdra s okénkem pro PIR senzor, LED indikátory a přístupem k USB-C konektoru. Všechny tři jednotky byly sestaveny do finální podoby a uvedeny do provozu s produkčním firmwarem.
+
+Laboratorní ověření bylo provedeno na třech jednotkách v jejich finálních 3D tištěných krytech v modelovém prostředí dveřního průchodu. Maximální spolehlivý dosah detekce dosáhl 3,0~m u dvou ze tří jednotek; u třetí jednotky byl dosah nižší v důsledku zhoršené kvality RF spoje na anténním kabelu, což potvrzuje, že dominantní proměnnou dosahu je kvalita RF přenosové cesty, nikoli elektronika čtecího modulu. Oba detekční algoritmy dosáhly 100\% přesnosti určení směru průchodu na souboru 78 zachycených průchodů, přičemž se na každém z nich shodly. Na základě vyšších a interpretabilnějších hodnot skóre spolehlivosti je pro produkční nasazení doporučen algoritmus využívající časové těžiště. Spolehlivost detekce závisí výrazně na způsobu nošení tagu: při nošení v ruce nebo v přední kapse dosahovala 87--98~%, při určitých způsobech nošení -- zejména s hranou tagu kolmou k anténám -- klesla na nulu v důsledku fyziky polarizace UHF tagu. Systém nikdy nevydá nesprávné určení směru průchodu; jeho jedinou poruchovou modalitou je nedetekce, a to díky logice serveru, který odmítá zpracovat shluky dat pocházející pouze z jedné strany portálu.
+
+Systém je charakterizován jako laboratorně ověřený proof-of-concept s identifikovanými podmínkami spolehlivého provozu. Mezi identifikované oblasti dalšího rozvoje patří doplnění hardwarových hodin reálného času na budoucí revizi desky, přesun konektoru antény blíže k výstupu čtecího modulu za účelem eliminace impedanční neshody a rozšířené testování v reálném provozu jako podmínka pro produkční nasazení.
+  ],
   assignment: [
     #image("assignment.pdf", page: 1, height: 100%)
     #pagebreak()

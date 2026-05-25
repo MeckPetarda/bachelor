@@ -59,6 +59,14 @@
   keywords-en: [],
   declaration: [],
   acknowledgements: none,
+  // Bibliographic self-citation (ČSN ISO 690). Rendered after keywords,
+  // before the declaration. Required for theses written in English.
+  bibliographic-citation: none,
+
+  // Extended Czech abstract (~3 normostrany). Required for English-language
+  // theses in Czech-accredited programmes (čl. 3 §12–13 Směrnice č. 2/2026 /
+  // čl. 15 §1e Směrnice č. 72/2017).
+  extended-abstract-cs: none,
 
   // Official assignment (zadání). The printed two-page assignment is the
   // mandated first content after the title page. Supply it as a PDF
@@ -295,24 +303,37 @@
 
   // ── Abstract page ────────────────────────────────────────────────────────
   [
-    *Abstrakt*
-
-    #abstract-cs
-
     *Summary*
 
     #abstract-en
 
-    *Klíčová slova*
+    *Abstrakt*
 
-    #keywords-cs
+    #abstract-cs
 
     *Keywords*
 
     #keywords-en
+
+    *Klíčová slova*
+
+    #keywords-cs
   ]
 
   pagebreak()
+
+// ── Extended abstract in Czech (item e) ─────────────────────────────────
+  if extended-abstract-cs != none {
+    title("Rozšířený abstrakt")
+    extended-abstract-cs
+    pagebreak()
+  }
+
+  // ── Bibliographic citation (item f) ─────────────────────────────────────
+  if bibliographic-citation != none {
+    bibliographic-citation
+    pagebreak()
+  }
 
   // ── Declaration ──────────────────────────────────────────────────────────
   {
